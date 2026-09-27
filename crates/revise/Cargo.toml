@@ -1,0 +1,17 @@
+[package]
+name = "writer-revise"
+version = "0.1.0"
+edition = "2024"
+description = "Prototype of the Korean style-check engine for the revise mode"
+publish = false
+
+[lib]
+name = "writer_revise"
+path = "src/lib.rs"
+
+[[bin]]
+name = "revise-check"
+path = "src/main.rs"
+
+[dependencies]
+lindera = { version = "6.2.0", features = ["embed-ko-dic"] }

@@ -247,3 +247,13 @@ B2는 문장 하나를 가리키는 표시가 아니라, 여백에 **문장 길�
 - Kiwi: https://github.com/bab2min/kiwi , kiwi-rs: https://lib.rs/crates/kiwi-rs
 - lindera-ko-dic: https://crates.io/crates/lindera-ko-dic
 - 번역투·이중 피동: https://www.korean.go.kr/nkview/nklife/2012_1/22_0106.pdf , https://namu.wiki/w/이중%20피동%20표현
+
+## 15. 시제품 (2026-09-27)
+
+`crates/revise` (Rust, lindera 6.2 + ko-dic 내장). v0.2 규칙 11개를 구현했고 샘플 원고에서 의도한 문제를 모두 찾았다. 테스트 15개 통과.
+
+- 속도: 사전 불러오기 0.5~0.7초(앱 시작 시 1번), 5,600자 분석 약 30 ms + 점검 약 9 ms.
+- 크기: 사전 포함 실행 파일 82.6 MB (압축 약 19 MB). 배포 방식 검토 필요.
+- 조정할 것: 실제 원고로 오탐률 측정, ‘-었다’ 연속(A2) 기준, 상태창에서 연속 끊기, 반복(A3)에 대사 포함 여부, 겹친 피동을 형태소로 찾기, 사전 용량.
+
+자세한 결과: [crates/revise/README.md](../crates/revise/README.md)
