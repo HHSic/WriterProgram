@@ -1,0 +1,356 @@
+// Left column (탐색): the manuscript tree, planning documents and trash.
+// Always the same whatever is open in the middle (docs/layout-data.md).
+
+import { useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import type { DocSummary, PartView, ProjectKind } from '../api/types';
+import { Icon } from '../components/Icon';
+import { openMenu, type MenuItem } from '../components/Menu';
+import { num } from '../lib/format';
+import { KIND_LABEL, STATUS_LABEL, UNTITLED, docNoun, docNumber, statusesFor, stockCount } from '../lib/labels';
+import {
+  addDoc,
+  addPart,
+  leaveProject,
+  moveDoc,
+  openDialog,
+  removePart,
+  renameDoc,
+  renamePart,
+  selectDoc,
+  setStatus,
+  setTarget,
+  trashDoc,
+  useApp,
+} from '../store';
+
+const DRAG_TYPE = 'application/x-writer-doc';
+
+type DropTarget = { docId: string; after: boolean } | { partId: string } | null;
+
+export function Sidebar() {
+  const ov = useApp((s) => s.overview)!;
+  const activeDocId = useApp((s) => s.activeDocId);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [drop, setDrop] = useState<DropTarget>(null);
+  const kind = ov.project.kind;
+  const noun = docNoun(kind);
+
+  const activePart = ov.parts.find((p) => p.docs.some((d) => d.id === activeDocId));
+
+  const toggle = (partId: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(partId)) next.delete(partId);
+      else next.add(partId);
+      return next;
+    });
+
+  // Drag and drop ---------------------------------------------------------
+
+  const onDragStart = (e: DragEvent, docId: string) => {
+    e.dataTransfer.setData(DRAG_TYPE, docId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDragOverDoc = (e: DragEvent, docId: string) => {
+    if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+    e.preventDefault();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setDrop({ docId, after: e.clientY > rect.top + rect.height / 2 });
+  };
+
+  const onDropDoc = (e: DragEvent, list: DocSummary[], partId: string | null) => {
+    e.preventDefault();
+    const dragged = e.dataTransfer.getData(DRAG_TYPE);
+    const target = drop;
+    setDrop(null);
+    if (!dragged || !target || !('docId' in target) || target.docId === dragged) return;
+    const rest = list.map((d) => d.id).filter((id) => id !== dragged);
+    const index = rest.indexOf(target.docId) + (target.after ? 1 : 0);
+    void moveDoc(dragged, partId, index);
+  };
+
+  const onDropPart = (e: DragEvent, part: PartView) => {
+    e.preventDefault();
+    setDrop(null);
+    const dragged = e.dataTransfer.getData(DRAG_TYPE);
+    if (dragged) void moveDoc(dragged, part.id, part.docs.filter((d) => d.id !== dragged).length);
+  };
+
+  // Menus -------------------------------------------------------------------
+
+  const docMenu = (doc: DocSummary, planning: boolean): MenuItem[] => {
+    const items: MenuItem[] = [
+      {
+        label: '이름 바꾸기',
+        onSelect: () =>
+          openDialog({
+            kind: 'prompt',
+            title: '이름 바꾸기',
+            label: '제목',
+            value: doc.title,
+            confirm: '바꾸기',
+            onSubmit: (title) => renameDoc(doc.id, title),
+          }),
+      },
+      {
+        label: planning ? '아래에 새 기획 문서' : `아래에 새 ${noun}`,
+        onSelect: () => void addDoc({ section: planning ? 'planning' : 'manuscript', after: doc.id }),
+      },
+    ];
+    if (!planning) {
+      items.push(
+        {
+          label: '목표 분량 바꾸기',
+          onSelect: () =>
+            openDialog({
+              kind: 'prompt',
+              title: '목표 분량',
+              label: `이 ${noun}의 목표 글자 수 (비우면 작품 기본값)`,
+              value: doc.target ? String(doc.target) : '',
+              confirm: '바꾸기',
+              inputMode: 'numeric',
+              onSubmit: (value) => {
+                const n = Number.parseInt(value.replace(/[^0-9]/g, ''), 10);
+                return setTarget(doc.id, Number.isFinite(n) && n > 0 ? n : null);
+              },
+            }),
+        },
+        { separator: true },
+        { heading: '상태' },
+        ...statusesFor(kind).map(
+          (status): MenuItem => ({
+            label: STATUS_LABEL[status],
+            checked: doc.status === status,
+            onSelect: () => void setStatus(doc.id, status),
+          }),
+        ),
+      );
+    }
+    items.push({ separator: true }, { label: '휴지통으로', danger: true, onSelect: () => void trashDoc(doc.id) });
+    return items;
+  };
+
+  const partMenu = (part: PartView): MenuItem[] => [
+    {
+      label: '이름 바꾸기',
+      onSelect: () =>
+        openDialog({
+          kind: 'prompt',
+          title: '부 이름 바꾸기',
+          label: '이름',
+          value: part.title,
+          confirm: '바꾸기',
+          onSubmit: (title) => renamePart(part.id, title),
+        }),
+    },
+    { label: `이 부에 새 ${noun}`, onSelect: () => void addDoc({ partId: part.id }) },
+    { separator: true },
+    {
+      label: '부 지우기',
+      danger: true,
+      disabled: part.docs.length > 0 || ov.parts.length === 1,
+      onSelect: () => void removePart(part.id),
+    },
+  ];
+
+  // Rendering -----------------------------------------------------------------
+
+  const numbers = new Map<string, number>();
+  ov.parts.flatMap((p) => p.docs).forEach((d, i) => numbers.set(d.id, i + 1));
+  const stock = stockCount(ov.parts);
+
+  return (
+    <aside className="sidebar" aria-label="탐색">
+      <div className="col-head sidebar-head">
+        <div className="logo small" aria-hidden="true">
+          글
+        </div>
+        <div className="sidebar-title">
+          <strong title={ov.project.title}>{ov.project.title}</strong>
+          <span>
+            {KIND_LABEL[kind]} · {num(ov.total.withSpaces)}자
+          </span>
+        </div>
+        <button type="button" className="icon-btn" aria-label="작품 목록으로" title="작품 목록으로" onClick={() => void leaveProject()}>
+          <Icon name="swap" size={14} />
+        </button>
+      </div>
+
+      <div className="sidebar-scroll">
+        <section aria-label="원고" className="tree">
+          <div className="section-head">
+            <span className="section-label">원고</span>
+            {kind === 'webnovel' && stock > 0 && <span className="stock-chip">비축 {stock}화</span>}
+            <button type="button" className="icon-btn tiny" aria-label="부 추가" title="부 추가" onClick={() => void addPart()}>
+              <Icon name="plus" size={13} />
+            </button>
+          </div>
+
+          {ov.parts.map((part) => {
+            const open = !collapsed.has(part.id);
+            return (
+              <div key={part.id} className="part">
+                <button
+                  type="button"
+                  className={`part-head${drop && 'partId' in drop && drop.partId === part.id ? ' drop-into' : ''}`}
+                  onClick={() => toggle(part.id)}
+                  onContextMenu={(e) => openMenu(e, partMenu(part))}
+                  onDragOver={(e) => {
+                    if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+                    e.preventDefault();
+                    setDrop({ partId: part.id });
+                  }}
+                  onDragLeave={() => setDrop(null)}
+                  onDrop={(e) => onDropPart(e, part)}
+                  aria-expanded={open}
+                >
+                  <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} />
+                  <span className="part-title">{part.title}</span>
+                  <span className="count">{part.docs.length}</span>
+                </button>
+                {open &&
+                  part.docs.map((doc) => (
+                      <DocItem
+                        key={doc.id}
+                        doc={doc}
+                        label={docNumber(kind, numbers.get(doc.id) ?? 0)}
+                        kind={kind}
+                        goal={doc.target ?? ov.project.goal.perDoc}
+                        countSpaces={ov.project.goal.countSpaces}
+                        active={doc.id === activeDocId}
+                        drop={drop && 'docId' in drop && drop.docId === doc.id ? (drop.after ? 'after' : 'before') : null}
+                        onDragStart={(e) => onDragStart(e, doc.id)}
+                        onDragOver={(e) => onDragOverDoc(e, doc.id)}
+                        onDrop={(e) => onDropDoc(e, part.docs, part.id)}
+                        onDragEnd={() => setDrop(null)}
+                        onMenu={(e) => openMenu(e, docMenu(doc, false))}
+                      />
+                    ))}
+              </div>
+            );
+          })}
+        </section>
+
+        <section aria-label="기획" className="tree planning">
+          <div className="section-head">
+            <span className="section-label">기획</span>
+            <button
+              type="button"
+              className="icon-btn tiny"
+              aria-label="새 기획 문서"
+              title="새 기획 문서"
+              onClick={() => void addDoc({ section: 'planning', title: '새 기획 문서' })}
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </div>
+          {ov.planning.map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              draggable
+              className={`plan-item${doc.id === activeDocId ? ' active' : ''}${
+                drop && 'docId' in drop && drop.docId === doc.id ? (drop.after ? ' drop-after' : ' drop-before') : ''
+              }`}
+              onClick={() => void selectDoc(doc.id)}
+              onContextMenu={(e) => openMenu(e, docMenu(doc, true))}
+              onDragStart={(e) => onDragStart(e, doc.id)}
+              onDragOver={(e) => onDragOverDoc(e, doc.id)}
+              onDrop={(e) => onDropDoc(e, ov.planning, null)}
+              onDragEnd={() => setDrop(null)}
+            >
+              <Icon name="pencil" size={14} />
+              <span className="grow ellipsis">{doc.title || UNTITLED}</span>
+            </button>
+          ))}
+        </section>
+      </div>
+
+      <div className="sidebar-foot">
+        <button
+          type="button"
+          className="btn dashed grow"
+          onClick={() => void addDoc({ partId: activePart?.id })}
+        >
+          <Icon name="plus" size={14} />새 {noun}
+        </button>
+        <button
+          type="button"
+          className="btn square"
+          aria-label={`휴지통, ${ov.trashCount}개`}
+          title="휴지통"
+          onClick={() => openDialog({ kind: 'trash' })}
+        >
+          <Icon name="trash" size={15} />
+          {ov.trashCount > 0 && <span className="count">{ov.trashCount}</span>}
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function DocItem({
+  doc,
+  label,
+  kind,
+  goal,
+  countSpaces,
+  active,
+  drop,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onMenu,
+}: {
+  doc: DocSummary;
+  label: string;
+  kind: ProjectKind;
+  goal: number | null;
+  countSpaces: boolean;
+  active: boolean;
+  drop: 'before' | 'after' | null;
+  onDragStart: (e: DragEvent) => void;
+  onDragOver: (e: DragEvent) => void;
+  onDrop: (e: DragEvent) => void;
+  onDragEnd: () => void;
+  onMenu: (e: ReactMouseEvent) => void;
+}) {
+  const chars = countSpaces ? doc.counts.withSpaces : doc.counts.withoutSpaces;
+  const pct = goal ? Math.min(100, Math.round((chars / goal) * 100)) : null;
+  return (
+    <button
+      type="button"
+      draggable
+      className={`doc-item${active ? ' active' : ''}${drop ? ` drop-${drop}` : ''}`}
+      title={doc.synopsis || undefined}
+      aria-label={`${label} ${doc.title || UNTITLED}, ${STATUS_LABEL[doc.status]}, ${num(chars)}자`}
+      aria-current={active ? 'true' : undefined}
+      onClick={() => void selectDoc(doc.id)}
+      onContextMenu={onMenu}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+    >
+      <span className="doc-line">
+        <span className="doc-no">{label}</span>
+        <span className="doc-title">{doc.title || UNTITLED}</span>
+        <span className={`chip status-${doc.status}`} data-kind={kind}>
+          {STATUS_LABEL[doc.status]}
+        </span>
+      </span>
+      <span className="doc-line">
+        {pct !== null ? (
+          <span className="bar" aria-hidden="true">
+            <span className={`bar-fill${pct >= 100 ? ' full' : ''}`} style={{ width: `${pct}%` }} />
+          </span>
+        ) : (
+          <span className="grow" />
+        )}
+        <span className="doc-count">{num(chars)}</span>
+      </span>
+    </button>
+  );
+}

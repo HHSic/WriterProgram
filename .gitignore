@@ -1,1 +1,5 @@
-﻿target/
+target/
+node_modules/
+app/dist/
+app/src-tauri/gen/schemas/
+*.log

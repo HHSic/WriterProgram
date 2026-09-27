@@ -1,0 +1,445 @@
+[
+ {
+  "name": "one short paragraph",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가나다"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 3,
+   "withoutSpaces": 3,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "two paragraphs with a space",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가 나"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "다"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 4,
+   "withoutSpaces": 3,
+   "manuscriptLines": 2,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "twenty characters wrap after the indent",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가가가가가가가가가가가가가가가가가가가가"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 20,
+   "withoutSpaces": 20,
+   "manuscriptLines": 2,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "scene break takes a line",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "sceneBreak"
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "나"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 2,
+   "withoutSpaces": 2,
+   "manuscriptLines": 3,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "line break starts a line without indent",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "나"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 2,
+   "withoutSpaces": 2,
+   "manuscriptLines": 2,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "two digits share a cell",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "2026년"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 5,
+   "withoutSpaces": 5,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "no blank after a period",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "했다. 그리고"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 7,
+   "withoutSpaces": 6,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "period hangs at the end of a full line",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가가가가가가가가가가가가가가가가가가가."
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 20,
+   "withoutSpaces": 20,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "space at a line start is dropped",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가가가가가가가가가가가가가가가가가가가 나"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 21,
+   "withoutSpaces": 20,
+   "manuscriptLines": 2,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "marks do not change counts",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "굵게",
+       "marks": [
+        {
+         "type": "bold"
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": " 보통"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 5,
+   "withoutSpaces": 4,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "empty document",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph"
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 0,
+   "withoutSpaces": 0,
+   "manuscriptLines": 0,
+   "manuscriptPages": 0
+  }
+ },
+ {
+  "name": "eleven lines make two sheets",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 11,
+   "withoutSpaces": 11,
+   "manuscriptLines": 11,
+   "manuscriptPages": 2
+  }
+ },
+ {
+  "name": "other spaces",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가　나 다\t라"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 7,
+   "withoutSpaces": 4,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ },
+ {
+  "name": "characters outside the basic plane",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "😀가"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 2,
+   "withoutSpaces": 2,
+   "manuscriptLines": 1,
+   "manuscriptPages": 1
+  }
+ }
+]
