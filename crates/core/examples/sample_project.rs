@@ -98,7 +98,7 @@ fn main() {
                 }
             })
             .collect();
-        doc::save_body(&root, &id, body, Duration::minutes(10)).expect("body");
+        doc::save_body(&root, &id, body, Duration::minutes(10), Default::default()).expect("body");
         previous = Some(id);
     }
     println!("{}", root.display());

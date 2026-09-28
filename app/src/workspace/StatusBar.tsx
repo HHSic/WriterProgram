@@ -1,7 +1,8 @@
-import { num } from '../lib/format';
+import { placeNote, usePlaceOf } from '../components/PlacePicker';
+import { num, timeLabel } from '../lib/format';
 import { writtenToday } from '../lib/today';
 import { paperName } from '../lib/labels';
-import { findDoc, useApp } from '../store';
+import { findDoc, openDialog, syncNow, useApp } from '../store';
 
 export function StatusBar() {
   const ov = useApp((s) => s.overview)!;
@@ -9,6 +10,9 @@ export function StatusBar() {
   const live = useApp((s) => s.liveCounts);
   const selection = useApp((s) => s.selection);
   const catalog = useApp((s) => s.catalog);
+  const where = usePlaceOf(ov.root);
+  const link = useApp((s) => s.link);
+  const syncing = useApp((s) => s.syncing);
   const place = activeDocId ? findDoc(ov, activeDocId) : null;
   const counts = place ? (live ?? place.doc.counts) : null;
 
@@ -48,6 +52,35 @@ export function StatusBar() {
         </>
       )}
       <span className="grow" />
+      {ov.copies.length > 0 && (
+        <button type="button" className="status-link warn" onClick={() => openDialog({ kind: 'copies' })}>
+          다른 기기 사본 {ov.copies.length}개
+        </button>
+      )}
+      {link && (
+        <button
+          type="button"
+          className={`status-link${link.error ? ' warn' : ' synced'}`}
+          title={link.error ? `마지막으로 맞추지 못함 · ${link.error} · 눌러서 다시 맞추기` : '눌러서 지금 맞추기'}
+          onClick={() => void syncNow()}
+        >
+          {syncing
+            ? '드라이브와 맞추는 중'
+            : link.error
+              ? '드라이브와 맞추지 못함'
+              : `드라이브와 맞춤${link.syncedAt ? ` · ${timeLabel(link.syncedAt).replace('오늘 ', '')}` : ''}`}
+        </button>
+      )}
+      {where !== undefined && !link && (
+        <button
+          type="button"
+          className={`status-link${where ? ' synced' : ''}`}
+          title={placeNote(where)}
+          onClick={() => openDialog({ kind: 'project', tab: 'basic' })}
+        >
+          {where ? where.label : '이 PC에만'}
+        </button>
+      )}
       <span className="status-item">
         오늘 {today >= 0 ? '+' : '−'}
         {num(Math.abs(today))}자

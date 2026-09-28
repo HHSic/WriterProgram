@@ -12,7 +12,7 @@ import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
 import { showMatch } from '../editor/search';
 import type { SaveSession } from '../editor/session';
-import { attach, peerOf } from '../editor/shared';
+import { RELOAD, attach, peerOf } from '../editor/shared';
 import { useAutoHeight } from '../lib/autoHeight';
 import { loadCursor, saveCursor } from '../lib/cursor';
 import { errorText } from '../lib/format';
@@ -30,7 +30,10 @@ import {
   toastError,
   useApp,
 } from '../store';
+import { touchCapable, touchLike } from '../lib/pointer';
 import { useNameIndex } from './CardPanels';
+import { DocBanners } from './Copies';
+import { EditToolbar } from './EditToolbar';
 
 export function DocPane({ docId, tabKey, locked }: { docId: string; tabKey: string; locked: boolean }) {
   const root = useApp((s) => s.overview!.root);
@@ -94,8 +97,9 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       editorProps: {
         attributes: { class: 'manuscript', spellcheck: 'false', lang: 'ko', 'aria-label': '본문' },
       },
-      onUpdate: ({ editor }) => {
-        sessionRef.current?.changed();
+      onUpdate: ({ editor, transaction }) => {
+        // Text loaded from disk (another device's) needs no saving.
+        if (!transaction.getMeta(RELOAD)) sessionRef.current?.changed();
         clearTimeout(countTimer.current);
         countTimer.current = setTimeout(() => {
           if (isFocusedTab(tabKey)) useApp.setState({ liveCounts: countBlocks(blocksFromNode(editor.state.doc)) });
@@ -115,10 +119,16 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   );
 
   useEffect(() => {
-    const { session, detach } = attach(root, docId, editor, (outcome) => {
-      patchSummary(docId, { counts: outcome.counts, pages: outcome.pages, modified: new Date().toISOString() });
-      if (outcome.snapshot) useApp.setState((s) => ({ recordsVersion: s.recordsVersion + 1 }));
-    });
+    const { session, detach } = attach(
+      root,
+      docId,
+      editor,
+      (outcome) => {
+        patchSummary(docId, { counts: outcome.counts, pages: outcome.pages, modified: new Date().toISOString() });
+        if (outcome.snapshot) useApp.setState((s) => ({ recordsVersion: s.recordsVersion + 1 }));
+      },
+      data.rev,
+    );
     sessionRef.current = session;
     registerEditor(tabKey, editor, true);
     return () => {
@@ -128,11 +138,14 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       detach();
       registerEditor(tabKey, editor, false);
     };
-  }, [root, docId, tabKey, editor]);
+  }, [root, docId, tabKey, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // While another device's edits wait for the writer's pick, nothing more is typed.
+  const conflict = useApp((s) => !!s.conflicts[docId]);
+  const editable = !locked && !conflict;
   useEffect(() => {
-    if (editor.isEditable !== !locked) editor.setEditable(!locked, false);
-  }, [editor, locked]);
+    if (editor.isEditable !== editable) editor.setEditable(editable, false);
+  }, [editor, editable]);
 
   useEffect(() => setCardNames(editor, names), [editor, names]);
 
@@ -195,14 +208,21 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
     return () => clearTimeout(timer);
   }, [jump, docId, tabKey, editor]);
 
+  const toolbarMode = useApp((s) => s.view.toolbar);
+  const toolbar = toolbarMode === 'always' || (toolbarMode === 'auto' && touchCapable());
+
   return (
-    <div className="doc-scroll">
-      <article className="page">
-        <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked} />
-        <EditorContent editor={editor} />
-      </article>
-      <FormatBubble editor={editor} />
-    </div>
+    <>
+      <DocBanners docId={docId} />
+      <div className="doc-scroll">
+        <article className="page">
+          <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked} />
+          <EditorContent editor={editor} />
+        </article>
+        <FormatBubble editor={editor} />
+      </div>
+      {toolbar && <EditToolbar editor={editor} />}
+    </>
   );
 }
 
@@ -345,7 +365,13 @@ function FormatBubble({ editor }: { editor: Editor }) {
       className="bubble"
       options={{ placement: 'top', offset: 8 }}
       shouldShow={({ state, editor: e, view }) =>
-        e.isEditable && view.hasFocus() && !state.selection.empty && !(state.selection instanceof NodeSelection)
+        // After a finger the phone shows its own selection menu; the tools are
+        // in the 편집 도구줄 instead.
+        !touchLike() &&
+        e.isEditable &&
+        view.hasFocus() &&
+        !state.selection.empty &&
+        !(state.selection instanceof NodeSelection)
       }
     >
       <button

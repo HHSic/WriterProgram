@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api';
-import type { ProjectKind } from '../api/types';
+import type { Place, ProjectKind } from '../api/types';
 import { Modal } from '../components/Modal';
+import { PlacePicker } from '../components/PlacePicker';
 import { fileSafe } from '../lib/format';
 import { closeDialog, enterProject, toastError } from '../store';
 
@@ -18,19 +19,16 @@ export function NewProjectDialog() {
   const [countSpaces, setCountSpaces] = useState(true);
   const [firstChapter, setFirstChapter] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [places, setPlaces] = useState<Place[] | null>(null);
 
   useEffect(() => {
     api.defaultLocation().then(setParent, () => setParent(''));
+    api.storagePlaces().then(setPlaces, () => setPlaces([]));
   }, []);
 
   const pickKind = (k: ProjectKind) => {
     setKind(k);
     setGoal(k === 'webnovel' ? '5000' : '');
-  };
-
-  const pickParent = async () => {
-    const picked = await api.pickFolder('작품을 저장할 곳', parent || undefined);
-    if (picked) setParent(picked);
   };
 
   const submit = async (e: FormEvent) => {
@@ -95,12 +93,7 @@ export function NewProjectDialog() {
 
         <div className="field">
           <span className="field-label">저장 위치</span>
-          <div className="row">
-            <input readOnly value={parent} className="grow" aria-label="저장 위치" />
-            <button type="button" className="btn" onClick={pickParent}>
-              바꾸기
-            </button>
-          </div>
+          <PlacePicker places={places} value={parent} onChange={setParent} />
           {title.trim() && parent && (
             <small className="hint">
               {parent}

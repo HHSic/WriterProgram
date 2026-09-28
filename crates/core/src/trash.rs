@@ -30,6 +30,10 @@ pub struct TrashItem {
     pub index: usize,
     #[serde(default)]
     pub chars: u32,
+    /// For a copy left by a sync program (copies.rs): the file name it comes
+    /// back under, next to the original.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file: Option<String>,
 }
 
 fn item_dir(root: &Path, id: &str) -> Result<PathBuf> {
@@ -63,6 +67,7 @@ pub fn trash_doc(root: &Path, doc_id: &str) -> Result<TrashItem> {
         part_id,
         index,
         chars: count_blocks(&file.body).with_spaces,
+        file: None,
     };
     let target = dir.join(doc::file_name(doc_id));
     fs::rename(&path, &target).map_err(|e| Error::io(&path, e))?;
@@ -104,6 +109,7 @@ fn read_item(root: &Path, id: &str) -> Result<TrashItem> {
         part_id: None,
         index: usize::MAX,
         chars: count_blocks(&file.body).with_spaces,
+        file: None,
     })
 }
 
@@ -148,6 +154,7 @@ pub fn trash_card(root: &Path, card_id: &str) -> Result<TrashItem> {
         part_id: None,
         index: 0,
         chars: card.description.chars().count() as u32,
+        file: None,
     };
     fs::rename(&path, dir.join(doc::file_name(card_id))).map_err(|e| Error::io(&path, e))?;
     write_item(&dir, &item)?;
@@ -178,8 +185,54 @@ pub fn trash_note(root: &Path, note_id: &str) -> Result<TrashItem> {
         part_id: None,
         index: 0,
         chars: note.text.chars().count() as u32,
+        file: None,
     };
     fs::rename(&path, dir.join(doc::file_name(note_id))).map_err(|e| Error::io(&path, e))?;
+    write_item(&dir, &item)?;
+    Ok(item)
+}
+
+/// Moves a copy left by a sync program to the trash. Restoring it brings the
+/// file back under the same name.
+pub fn trash_copy(
+    root: &Path,
+    section: Section,
+    file: &str,
+    of: &str,
+    title: &str,
+    chars: u32,
+) -> Result<TrashItem> {
+    trash_copy_as(root, section, file, file, of, title, chars)
+}
+
+/// Moves `file` of a section to the trash as a copy of `of`, to come back as
+/// `restore_as` (used when a copy takes the original's place).
+pub fn trash_copy_as(
+    root: &Path,
+    section: Section,
+    file: &str,
+    restore_as: &str,
+    of: &str,
+    title: &str,
+    chars: u32,
+) -> Result<TrashItem> {
+    let path = root.join(section.dir()).join(file);
+    let now = Utc::now();
+    let id = format!("{}-{of}-copy", stamp(now));
+    let dir = item_dir(root, &id)?;
+    fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    let item = TrashItem {
+        id,
+        doc_id: of.into(),
+        section,
+        title: title.into(),
+        deleted_at: to_iso(now),
+        part_id: None,
+        index: 0,
+        chars,
+        file: Some(restore_as.into()),
+    };
+    fs::rename(&path, dir.join(restore_as)).map_err(|e| Error::io(&path, e))?;
     write_item(&dir, &item)?;
     Ok(item)
 }
@@ -188,6 +241,21 @@ pub fn trash_note(root: &Path, note_id: &str) -> Result<TrashItem> {
 pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
     let item = read_item(root, id)?;
     let dir = item_dir(root, id)?;
+    if let Some(name) = &item.file {
+        let target = root.join(item.section.dir()).join(name);
+        if target.exists() {
+            return Err(Error::Invalid(
+                "같은 이름의 사본이 이미 있어 되살릴 수 없음".into(),
+            ));
+        }
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+        }
+        let source = dir.join(name);
+        fs::rename(&source, &target).map_err(|e| Error::io(&source, e))?;
+        fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+        return Ok(item);
+    }
     let target = root
         .join(item.section.dir())
         .join(doc::file_name(&item.doc_id));
@@ -227,6 +295,10 @@ pub fn delete(root: &Path, id: &str) -> Result<()> {
     let item = read_item(root, id)?;
     let dir = item_dir(root, id)?;
     fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    if item.file.is_some() {
+        // A copy: the records belong to the original, which is still there.
+        return Ok(());
+    }
     snapshot::remove_all(root, &item.doc_id)
 }
 

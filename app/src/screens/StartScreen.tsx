@@ -43,9 +43,17 @@ export function StartScreen() {
         <div className="logo" aria-hidden="true">
           글
         </div>
-        <div>
+        <div className="grow">
           <h1>WriterProgram</h1>
           <p>한 편을 끝까지 쓰는 곳</p>
+        </div>
+        <div className="row">
+          <button type="button" className="btn ghost" onClick={() => openDialog({ kind: 'driveImport' })}>
+            드라이브에서 가져오기
+          </button>
+          <button type="button" className="btn ghost" onClick={() => openDialog({ kind: 'drives' })}>
+            기기 간 맞추기
+          </button>
         </div>
       </header>
 

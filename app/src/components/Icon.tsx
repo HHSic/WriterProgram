@@ -99,6 +99,8 @@ const PATHS = {
     </>
   ),
   indent: <path d="M4 5h16M10 10h10M10 14h10M4 19h16M4 9.5l3 2.5-3 2.5" />,
+  undo: <path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-3" />,
+  redo: <path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h3" />,
   symbol: <path d="M5 19h4.5v-2.2A6.5 6.5 0 1 1 14.5 16.8V19H19" />,
 } satisfies Record<string, ReactNode>;
 

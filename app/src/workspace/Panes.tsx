@@ -5,13 +5,15 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { Overview } from '../api/types';
 import { Icon, type IconName } from '../components/Icon';
-import { openMenu } from '../components/Menu';
+import type { MenuItem } from '../components/Menu';
 import { UNTITLED, docNoun, docNumber, withObject } from '../lib/labels';
+import { pressMenu } from '../lib/press';
 import type { Tab, Target } from '../lib/tabs';
 import {
   activateTab,
   addDoc,
   closeTab,
+  newDocPartId,
   findDoc,
   focusPane,
   reorderTab,
@@ -74,7 +76,7 @@ function PaneView({ pane, index, focused, multi }: { pane: Pane; index: number; 
         {pane.tabs.length === 0 && (
           <div className="pane-message">
             <p>왼쪽에서 {withObject(docNoun(kind))} 고르거나 새로 만드세요.</p>
-            <button type="button" className="btn" onClick={() => void addDoc({})}>
+            <button type="button" className="btn" onClick={() => void addDoc({ partId: newDocPartId() })}>
               <Icon name="plus" size={14} />새 {docNoun(kind)}
             </button>
           </div>
@@ -112,6 +114,30 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
   useEffect(() => {
     strip.current?.querySelector('.ctab.on')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [pane.active]);
+
+  const tabMenu = (tab: Tab): MenuItem[] => {
+    const i = pane.tabs.findIndex((t) => t.key === tab.key);
+    return [
+      { label: '닫기', onSelect: () => void closeTab(index, tab.key) },
+      {
+        label: '다른 탭 모두 닫기',
+        disabled: pane.tabs.length < 2,
+        onSelect: () => {
+          void (async () => {
+            for (const other of pane.tabs) if (other.key !== tab.key) await closeTab(index, other.key);
+          })();
+        },
+      },
+      { separator: true },
+      // Moving without a mouse drag.
+      { label: '왼쪽으로 옮기기', disabled: i <= 0, onSelect: () => reorderTab(index, tab.key, pane.tabs[i - 1].key) },
+      {
+        label: '오른쪽으로 옮기기',
+        disabled: i >= pane.tabs.length - 1,
+        onSelect: () => reorderTab(index, tab.key, pane.tabs[i + 2]?.key ?? null),
+      },
+    ];
+  };
 
   const onDrop = (e: DragEvent, before: string | null) => {
     e.preventDefault();
@@ -161,20 +187,7 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
               onAuxClick={(e) => {
                 if (e.button === 1) void closeTab(index, tab.key);
               }}
-              onContextMenu={(e) =>
-                openMenu(e, [
-                  { label: '닫기', onSelect: () => void closeTab(index, tab.key) },
-                  {
-                    label: '다른 탭 모두 닫기',
-                    disabled: pane.tabs.length < 2,
-                    onSelect: () => {
-                      void (async () => {
-                        for (const other of pane.tabs) if (other.key !== tab.key) await closeTab(index, other.key);
-                      })();
-                    },
-                  },
-                ])
-              }
+              {...pressMenu(() => tabMenu(tab), () => ({ title: label }))}
               onDragStart={(e) => {
                 e.dataTransfer.setData(TAB_DRAG, tab.key);
                 e.dataTransfer.effectAllowed = 'move';

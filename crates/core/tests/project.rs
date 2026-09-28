@@ -80,6 +80,7 @@ fn saving_keeps_meta_changed_elsewhere() {
         &id,
         body(&["셔터를 반쯤 내렸을 때 종이 울렸다."]),
         Duration::minutes(10),
+        Default::default(),
     )
     .unwrap();
     assert_eq!(out.counts.with_spaces, 20);
@@ -115,18 +116,25 @@ fn automatic_records() {
     let id = first_doc(&root);
     let every = Duration::zero();
 
-    doc::save_body(&root, &id, body(&["하나"]), every).unwrap();
-    let out = doc::save_body(&root, &id, body(&["하나", "둘"]), every).unwrap();
+    doc::save_body(&root, &id, body(&["하나"]), every, Default::default()).unwrap();
+    let out = doc::save_body(&root, &id, body(&["하나", "둘"]), every, Default::default()).unwrap();
     let rec = out.snapshot.expect("previous text is kept");
     assert_eq!(rec.kind, "auto");
     assert_eq!(rec.counts.with_spaces, 2);
 
     // Saving the same text again does nothing.
-    let out = doc::save_body(&root, &id, body(&["하나", "둘"]), every).unwrap();
+    let out = doc::save_body(&root, &id, body(&["하나", "둘"]), every, Default::default()).unwrap();
     assert!(out.snapshot.is_none());
 
     // Not due yet with a long interval.
-    let out = doc::save_body(&root, &id, body(&["하나", "둘", "셋"]), Duration::hours(1)).unwrap();
+    let out = doc::save_body(
+        &root,
+        &id,
+        body(&["하나", "둘", "셋"]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
     assert!(out.snapshot.is_none());
     assert_eq!(snapshot::list(&root, &id).unwrap().len(), 1);
 }
@@ -138,12 +146,26 @@ fn records_by_hand_and_going_back() {
     let id = first_doc(&root);
     let hour = Duration::hours(1);
 
-    doc::save_body(&root, &id, body(&["퇴고 전 문장."]), hour).unwrap();
+    doc::save_body(
+        &root,
+        &id,
+        body(&["퇴고 전 문장."]),
+        hour,
+        Default::default(),
+    )
+    .unwrap();
     let current = doc::load(&root, &id).unwrap();
     let kept = snapshot::create(&root, &current, "manual", "  1교 보내기 전 ").unwrap();
     assert_eq!(kept.name, "1교 보내기 전");
 
-    doc::save_body(&root, &id, body(&["완전히 새로 쓴 문장."]), hour).unwrap();
+    doc::save_body(
+        &root,
+        &id,
+        body(&["완전히 새로 쓴 문장."]),
+        hour,
+        Default::default(),
+    )
+    .unwrap();
     let before = snapshot::restore(&root, &id, &kept.id).unwrap();
     assert_eq!(before.kind, "before-restore");
 
@@ -230,7 +252,14 @@ fn trash_and_restore() {
     let root = new_project(dir.path(), ProjectKind::Webnovel);
     let first = first_doc(&root);
     let second = project::add_doc(&root, &NewDoc::default()).unwrap();
-    doc::save_body(&root, &first, body(&["지울 회차"]), Duration::hours(1)).unwrap();
+    doc::save_body(
+        &root,
+        &first,
+        body(&["지울 회차"]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
 
     let item = trash::trash_doc(&root, &first).unwrap();
     assert_eq!(item.chars, 5);
@@ -296,9 +325,17 @@ fn text_export() {
             Block::text("장면 둘"),
         ],
         Duration::hours(1),
+        Default::default(),
     )
     .unwrap();
-    doc::save_body(&root, &second, body(&["둘째 화"]), Duration::hours(1)).unwrap();
+    doc::save_body(
+        &root,
+        &second,
+        body(&["둘째 화"]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
 
     let items = vec![
         ExportItem {
@@ -394,6 +431,7 @@ fn find_and_replace_across_chapters() {
         &first,
         body(&["서하는 우산을 폈다.", "서하가 웃었다."]),
         Duration::hours(1),
+        Default::default(),
     )
     .unwrap();
     doc::save_body(
@@ -401,6 +439,7 @@ fn find_and_replace_across_chapters() {
         &second,
         body(&["윤서하의 서점."]),
         Duration::hours(1),
+        Default::default(),
     )
     .unwrap();
 
@@ -456,6 +495,7 @@ fn setting_cards() {
         &first,
         body(&["윤서하는 우산을 폈다.", "서하가 웃었다."]),
         Duration::hours(1),
+        Default::default(),
     )
     .unwrap();
     doc::save_body(
@@ -463,6 +503,7 @@ fn setting_cards() {
         &second,
         body(&["달빛 서점은 밤에만 연다."]),
         Duration::hours(1),
+        Default::default(),
     )
     .unwrap();
 
@@ -529,7 +570,14 @@ fn notes_on_text_chapters_cards_and_project() {
             },
         ],
     }];
-    doc::save_body(&root, &chapter, marked, Duration::hours(1)).unwrap();
+    doc::save_body(
+        &root,
+        &chapter,
+        marked,
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
     let file = fs::read_to_string(root.join("manuscript").join(format!("{chapter}.md"))).unwrap();
     assert!(file.contains("<mark data-memo=\"memo1\">“영업, 끝났나요?”</mark> 남자가 물었다."));
 

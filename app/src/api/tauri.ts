@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import type { Backend } from './types';
+import type { Backend, Change } from './types';
 
 const FILE_TYPE_NAMES: Record<string, string> = {
   txt: '텍스트 파일',
@@ -25,7 +26,8 @@ export const tauriBackend: Backend = {
   docMove: (root, docId, partId, index) => invoke('doc_move', { root, docId, partId, index }),
   docTrash: (root, docId) => invoke('doc_trash', { root, docId }),
   docLoad: (root, docId) => invoke('doc_load', { root, docId }),
-  docSave: (root, docId, body) => invoke('doc_save', { root, docId, body }),
+  docSave: (root, docId, body, base, force) => invoke('doc_save', { root, docId, body, base: base ?? null, force: force ?? false }),
+  docKeep: (root, docId, body, kind) => invoke('doc_keep', { root, docId, body, kind }),
   docUpdateMeta: (root, docId, patch) => invoke('doc_update_meta', { root, docId, patch }),
   snapshotList: (root, docId) => invoke('snapshot_list', { root, docId }),
   snapshotCreate: (root, docId, name) => invoke('snapshot_create', { root, docId, name }),
@@ -57,6 +59,35 @@ export const tauriBackend: Backend = {
   formatSavePreset: (name, format) => invoke('format_save_preset', { name, format }),
   formatDeletePreset: (name) => invoke('format_delete_preset', { name }),
   formatEstimate: (root, format) => invoke('format_estimate', { root, format }),
+  copyLoad: (root, section, file) => invoke('copy_load', { root, section, file }),
+  copyResolve: (root, section, file, action) => invoke('copy_resolve', { root, section, file, action }),
+  storagePlaces: () => invoke('storage_places'),
+  storageOf: (path) => invoke('storage_of', { path }),
+  projectMove: (root, dest) => invoke('project_move', { root, dest }),
+  watchProject: (root, onChange) => {
+    let stopped = false;
+    const unlisten = listen<{ root: string; changes: Change[] }>('project-changed', (event) => {
+      if (!stopped && event.payload.root === root) onChange(event.payload.changes);
+    });
+    void invoke('project_watch', { root }).catch(() => {
+      // Without a watcher, changes from other devices show when the project opens again.
+    });
+    return () => {
+      stopped = true;
+      void unlisten.then((stop) => stop());
+      void invoke('project_unwatch', { root }).catch(() => {});
+    };
+  },
+  driveStatus: () => invoke('drive_status'),
+  driveConnect: (provider) => invoke('drive_connect', { provider }),
+  driveCancel: () => invoke('drive_cancel'),
+  driveDisconnect: (provider) => invoke('drive_disconnect', { provider }),
+  driveProjects: (provider) => invoke('drive_projects', { provider }),
+  driveFetch: (provider, folder, dest) => invoke('drive_fetch', { provider, folder, dest }),
+  projectLinkGet: (projectId) => invoke('project_link_get', { projectId }),
+  projectLink: (projectId, title, provider) => invoke('project_link', { projectId, title, provider }),
+  projectUnlink: (projectId) => invoke('project_unlink', { projectId }),
+  projectSync: (root, projectId) => invoke('project_sync', { root, projectId }),
   reveal: (path) => invoke('reveal', { path }),
   pickFolder: async (title, defaultPath) => {
     const picked = await open({ directory: true, multiple: false, title, defaultPath });

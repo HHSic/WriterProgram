@@ -3039,3 +3039,748 @@ fieldset.plain {
 .center-head > .grow {
   flex: 0 0 0;
 }
+
+/* A part in the tree: the arrow folds it, the title picks it for 새 회차. */
+.part-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.part-toggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.part-toggle:hover {
+  background: var(--hover);
+}
+
+.part-row .part-head {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.part-head.selected {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border), inset 3px 0 0 var(--accent);
+  color: var(--text);
+}
+
+/* Touch: ⋯ buttons, sheets, long press and finger drag (lib/press.ts) ----- */
+
+.more-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-2);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.more-btn:hover {
+  color: var(--text);
+}
+
+.more-btn:focus-visible,
+.doc-row:hover > .more-btn,
+.plan-row:hover > .more-btn,
+.card-row:hover > .more-btn,
+.part-row:hover > .more-btn,
+.kind-row:hover > .more-btn,
+.otable tr:hover .more-btn,
+.otable tr:focus-within .more-btn {
+  opacity: 1;
+}
+
+.doc-row,
+.plan-row,
+.card-row {
+  position: relative;
+}
+
+.doc-row > .more-btn {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+}
+
+.plan-row > .more-btn,
+.card-row > .more-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.part-row > .more-btn,
+.kind-row > .more-btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.c-no-inner {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* A long press shouldn't select text or open the system's own menu. */
+.doc-row,
+.plan-row,
+.card-row,
+.part-row,
+.kind-row,
+.ctab,
+.otable td.c-no {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pressing {
+  background: var(--hover) !important;
+  transform: scale(0.985);
+  transition: transform 0.12s;
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 80;
+  max-width: 60vw;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -130%);
+  pointer-events: none;
+}
+
+/* The menu as a sheet from the bottom, after a finger. */
+.menu-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--overlay);
+  animation: sheet-fade 0.15s ease-out;
+}
+
+.menu-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 480px);
+  max-height: 78vh;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: sheet-up 0.18s ease-out;
+}
+
+.menu-sheet-head {
+  padding: 10px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.menu-sheet-head strong {
+  display: block;
+  font-size: 15px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.menu-sheet-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.menu-sheet-items {
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.menu-sheet .menu-item {
+  height: 46px;
+  padding: 0 14px 0 8px;
+  font-size: 15px;
+}
+
+.menu-sheet .menu-heading {
+  padding: 10px 14px 4px 32px;
+  font-size: 12px;
+}
+
+.menu-sheet-close {
+  flex-shrink: 0;
+  height: 46px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 편집 도구줄 under the page */
+.edit-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: var(--kb, 0px);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tool {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--body-font);
+  font-size: 16px;
+  color: var(--text);
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.tool.on {
+  background: var(--text);
+  color: var(--surface);
+}
+
+.tool-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+/* Screens that take touch: bigger targets, and nothing hidden behind hover. */
+/* Other devices: copies, changes on two devices, where projects are kept ---- */
+
+.copy-badge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.doc-banners {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px clamp(12px, 3vw, 40px) 0;
+}
+
+.doc-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  width: min(100%, calc(var(--measure) + 144px));
+  margin: 0 auto;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--amber);
+  border-radius: 8px;
+  background: var(--amber-soft);
+}
+
+.doc-banner.warn {
+  border-left-color: var(--danger);
+  background: var(--chip-red-bg);
+}
+
+.doc-banner-text {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.doc-banner-text strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.doc-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.save-state.conflict {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.save-state.conflict .dot-mark {
+  background: var(--danger);
+}
+
+.status-link {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-link:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.status-link.synced::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  vertical-align: 1px;
+}
+
+.status-link.warn {
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+  font-weight: 600;
+}
+
+.storage-note.synced {
+  color: var(--blue-strong);
+}
+
+/* 다른 기기 사본 */
+
+.copy-list {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.copy-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.copy-item .grow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.copy-item .link-btn {
+  padding: 0;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.copy-item .link-btn:hover {
+  text-decoration: underline;
+}
+
+/* 둘 다 보기 */
+
+.compare-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.compare {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--body-font, inherit);
+}
+
+.compare-head,
+.compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.compare-head span {
+  position: sticky;
+  top: 0;
+  padding: 8px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.compare-row p {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 14px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.compare-row p + p,
+.compare-head span + span {
+  border-left: 1px solid var(--border);
+}
+
+.compare-row.same p {
+  color: var(--muted);
+}
+
+.compare-row.changed,
+.compare-row.removed,
+.compare-row.added {
+  background: var(--amber-soft);
+}
+
+.compare-empty {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--hover) 6px 12px);
+}
+
+.compare mark {
+  border-radius: 3px;
+  color: inherit;
+}
+
+.diff-left {
+  background: var(--chip-red-bg);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.diff-right {
+  background: var(--chip-green-bg);
+}
+
+.compare-fold {
+  display: block;
+  width: 100%;
+  padding: 4px;
+  border: 0;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.compare-fold:hover {
+  color: var(--text);
+}
+
+.modal-foot .grow {
+  flex: 1;
+}
+
+/* 저장 위치 */
+
+.places {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.place {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.place.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.place input {
+  margin: 3px 0 0;
+}
+
+.place-mark {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.place-mark.service-local {
+  background: var(--muted);
+}
+
+.place-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.place-text strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.place-text small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.place-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-here {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--chip-blue-bg);
+  color: var(--chip-blue-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.place-pick {
+  align-self: flex-start;
+}
+
+.busy-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+}
+
+.busy-box {
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+}
+
+
+/* 기기 간 맞추기 */
+
+.drive-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drive-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.drive-item .place-mark {
+  margin-top: 0;
+}
+
+.drive-item .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drive-item strong {
+  font-size: 13.5px;
+}
+
+.drive-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.drive-import + .drive-import {
+  margin-top: 12px;
+}
+
+.drive-import h3 {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.place-mark.service-google,
+.place-mark.service-googledrive {
+  background: #34a853;
+}
+
+.place-mark.service-dropbox {
+  background: #0061fe;
+}
+
+.start-head .grow {
+  flex: 1;
+}
+
+@media (any-pointer: coarse) {
+  .more-btn {
+    opacity: 1;
+  }
+
+  .doc-row,
+  .plan-row,
+  .card-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .doc-row > .doc-item,
+  .plan-row > .plan-item,
+  .card-row > .card-item {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .doc-row > .more-btn,
+  .plan-row > .more-btn,
+  .card-row > .more-btn,
+  .part-row > .more-btn,
+  .kind-row > .more-btn {
+    position: static;
+    width: 34px;
+    height: 34px;
+    border-color: transparent;
+    background: transparent;
+    transform: none;
+  }
+
+  .plan-item,
+  .card-item {
+    height: 40px;
+  }
+
+  .part-head,
+  .part-toggle {
+    height: 38px;
+  }
+
+  .part-toggle {
+    width: 30px;
+  }
+
+  .icon-btn.tiny {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ctab {
+    height: 34px;
+  }
+
+  .ctab-close {
+    width: 26px;
+    height: 26px;
+    opacity: 0.8;
+  }
+}

@@ -5,9 +5,11 @@ import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { api } from '../api';
 import type { FormatCatalog, Goal, HeadAlign, HeadContent, ManuscriptFormat, ProjectKind, RunningHead } from '../api/types';
 import { Modal } from '../components/Modal';
+import { placeNote, usePlaceOf } from '../components/PlacePicker';
+import { ProjectDriveField } from './Drives';
 import { num } from '../lib/format';
 import { KIND_LABEL, docNoun, formatName } from '../lib/labels';
-import { closeDialog, loadCatalog, toastError, updateProject, useApp, type SettingsTab } from '../store';
+import { closeDialog, loadCatalog, openDialog, toastError, updateProject, useApp, type SettingsTab } from '../store';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'basic', label: '기본 정보' },
@@ -29,6 +31,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
   const [goal, setGoal] = useState<Goal>(project.goal);
   const [format, setFormat] = useState<ManuscriptFormat>(project.manuscriptFormat);
   const [busy, setBusy] = useState(false);
+  const where = usePlaceOf(ov.root);
 
   const save = async () => {
     if (busy) return;
@@ -119,8 +122,15 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
                   폴더 열기
                 </button>
               )}
+              <button type="button" className="btn" onClick={() => openDialog({ kind: 'move' })}>
+                옮기기…
+              </button>
             </div>
+            {where !== undefined && (
+              <small className={`hint storage-note${where ? ' synced' : ''}`}>{placeNote(where)}</small>
+            )}
           </div>
+          <ProjectDriveField />
         </div>
       )}
 

@@ -7,6 +7,8 @@
 //! described in `docs/architecture.md`.
 
 pub mod cards;
+pub mod changes;
+pub mod copies;
 pub mod count;
 pub mod doc;
 pub mod docx;
@@ -17,6 +19,7 @@ pub mod hwpx;
 pub mod layout;
 pub mod markup;
 pub mod notes;
+pub mod places;
 pub mod project;
 pub mod recent;
 pub mod search;

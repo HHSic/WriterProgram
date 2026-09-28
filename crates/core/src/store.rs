@@ -5,13 +5,40 @@ use std::fs::{self, File};
 use std::hash::{BuildHasher, Hasher};
 use std::io::Write;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use chrono::{DateTime, Datelike, SecondsFormat, Timelike, Utc};
+use sha2::{Digest, Sha256};
 
 use crate::{Error, Result};
+
+type WriteHook = Box<dyn Fn(&Path, &[u8]) + Send + Sync>;
+
+static WRITE_HOOK: OnceLock<WriteHook> = OnceLock::new();
+
+/// Registers a function called after every successful `atomic_write`, so the
+/// app can tell its own writes from changes made by other programs (a sync
+/// client bringing another device's edits). Only the first call counts.
+pub fn on_write(hook: impl Fn(&Path, &[u8]) + Send + Sync + 'static) {
+    let _ = WRITE_HOOK.set(Box::new(hook));
+}
+
+/// SHA-256 of some content.
+pub fn sha256(bytes: &[u8]) -> [u8; 32] {
+    Sha256::digest(bytes).into()
+}
+
+/// Short fingerprint of some content: the first 16 hex digits of its SHA-256.
+/// The same on every device, so it can also compare files across devices.
+pub fn rev_of(bytes: &[u8]) -> String {
+    sha256(bytes)[..8]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
 
 /// Writes `bytes` to `path` so that the file is either the old or the new
 /// content, never a mix: write a temporary file next to it, flush it to disk,
@@ -45,6 +72,9 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     #[cfg(unix)]
     if let Ok(d) = File::open(dir) {
         let _ = d.sync_all();
+    }
+    if let Some(hook) = WRITE_HOOK.get() {
+        hook(path, bytes);
     }
     Ok(())
 }
@@ -86,7 +116,19 @@ pub fn new_id() -> String {
     hasher.write_u64(nanos);
     hasher.write_u64(COUNTER.fetch_add(1, Ordering::Relaxed));
     hasher.write_u32(std::process::id());
-    let mut v = hasher.finish();
+    id_from(hasher.finish())
+}
+
+/// An id worked out from `seed`: the same seed gives the same id on every
+/// device (used for files taken into a project under a name of their own).
+pub fn stable_id(seed: &str) -> String {
+    let digest = Sha256::digest(seed.as_bytes());
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&digest[..8]);
+    id_from(u64::from_le_bytes(bytes))
+}
+
+fn id_from(mut v: u64) -> String {
     const ALPHABET: &[u8; 32] = b"0123456789abcdefghjkmnpqrstvwxyz";
     let mut id = String::with_capacity(12);
     for _ in 0..12 {
@@ -171,6 +213,15 @@ mod tests {
         let b = new_id();
         assert_eq!(a.len(), 12);
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn stable_ids_and_revs() {
+        assert_eq!(stable_id("manuscript/메모"), stable_id("manuscript/메모"));
+        assert_ne!(stable_id("manuscript/메모"), stable_id("planning/메모"));
+        assert_eq!(stable_id("x").len(), 12);
+        assert_eq!(rev_of(b"abc").len(), 16);
+        assert_eq!(rev_of(b"abc"), "ba7816bf8f01cfea");
     }
 
     #[test]

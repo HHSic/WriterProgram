@@ -1,11 +1,18 @@
 mod commands;
+mod drives;
+mod watch;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let state = commands::AppState::default();
+    let own = state.own.clone();
+    writer_core::store::on_write(move |path, bytes| own.record(path, bytes));
+    drives::init_secrets();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .manage(commands::AppState::default())
+        .manage(state)
+        .manage(drives::DriveState::default())
         .invoke_handler(tauri::generate_handler![
             commands::recent_list,
             commands::recent_remove,
@@ -52,6 +59,24 @@ pub fn run() {
             commands::note_create,
             commands::note_save,
             commands::note_trash,
+            commands::doc_keep,
+            commands::copy_load,
+            commands::copy_resolve,
+            commands::storage_places,
+            commands::storage_of,
+            commands::project_move,
+            commands::project_watch,
+            commands::project_unwatch,
+            drives::drive_status,
+            drives::drive_connect,
+            drives::drive_cancel,
+            drives::drive_disconnect,
+            drives::drive_projects,
+            drives::drive_fetch,
+            drives::project_link_get,
+            drives::project_link,
+            drives::project_unlink,
+            drives::project_sync,
             commands::reveal,
         ])
         .run(tauri::generate_context!())

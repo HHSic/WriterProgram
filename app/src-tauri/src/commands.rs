@@ -2,39 +2,71 @@
 //! errors come back as a short reason in screen words.
 
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use chrono::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use writer_core::cards::{self, Appearance, Card, CardSummary, CardType};
+use writer_core::copies::{self, Resolve};
 use writer_core::count::{Counts, count_blocks};
-use writer_core::doc::{self, DocFile, DocMeta, MetaPatch, SaveOutcome};
+use writer_core::doc::{self, DocFile, DocMeta, MetaPatch, SaveGuard, SaveOutcome, Section};
 use writer_core::export::{self, DocOptions, ExportItem, FileKind, TextOptions};
 use writer_core::format::{self, Catalog, ManuscriptFormat, UserPreset};
 use writer_core::markup::Body;
 use writer_core::notes::{self, NewNote, Note};
+use writer_core::places::{self, Env, Place};
 use writer_core::project::{self, NewDoc, NewProject, Overview, ProjectInfo, ProjectPatch};
 use writer_core::recent::{self, RecentItem};
 use writer_core::search::{self, ReplaceOutcome, SearchQuery, SearchResult};
 use writer_core::snapshot::{self, SnapshotInfo};
 use writer_core::trash::{self, TrashItem};
 
+use crate::watch::{self, OwnWrites, Watching};
+
 /// How often an automatic record is kept while writing.
 const AUTO_RECORD_EVERY_MINUTES: i64 = 10;
 
-/// Serializes writes so two saves never read-modify-write the same file at once.
 #[derive(Default)]
 pub struct AppState {
+    /// Serializes writes so two saves never read-modify-write the same file at once.
     lock: Mutex<()>,
+    /// What the app itself wrote, to tell it from other devices' changes.
+    pub own: Arc<OwnWrites>,
+    /// The open project's folder watcher.
+    watching: Mutex<Option<Watching>>,
 }
 
 impl AppState {
-    fn write(&self) -> MutexGuard<'_, ()> {
+    pub fn write(&self) -> MutexGuard<'_, ()> {
         self.lock
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// The lock itself, for work that takes it around each write (sync passes).
+    pub fn lock(&self) -> &Mutex<()> {
+        &self.lock
+    }
+
+    fn watch(&self, watching: Option<Watching>) {
+        let mut slot = self
+            .watching
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *slot = watching;
+    }
+
+    /// Stops watching `root`, unless another project is watched by now.
+    fn unwatch(&self, root: &str) {
+        let mut slot = self
+            .watching
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if slot.as_ref().is_some_and(|w| w.root == root) {
+            *slot = None;
+        }
     }
 }
 
@@ -51,7 +83,7 @@ fn config_file(app: &AppHandle, name: &str) -> Res<PathBuf> {
         .map_err(|e| e.to_string())
 }
 
-fn recent_file(app: &AppHandle) -> Res<PathBuf> {
+pub(crate) fn recent_file(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "recent.json")
 }
 
@@ -67,15 +99,19 @@ pub struct DocData {
     meta: DocMeta,
     body: Body,
     counts: Counts,
+    /// Fingerprint of the text, sent back with saves (see `SaveGuard`).
+    rev: String,
 }
 
 impl From<DocFile> for DocData {
     fn from(file: DocFile) -> Self {
         let counts = count_blocks(&file.body);
+        let rev = file.rev();
         DocData {
             meta: file.meta,
             body: Body::new(file.body),
             counts,
+            rev,
         }
     }
 }
@@ -191,12 +227,17 @@ pub async fn doc_load(root: String, doc_id: String) -> Res<DocData> {
         .map_err(fail)
 }
 
+/// Saves the editor's text. `base` is the fingerprint of the text the editor
+/// started from: when the text on disk changed since (another device), the
+/// save is refused unless `force` (see `doc::save_body`).
 #[tauri::command]
 pub async fn doc_save(
     state: State<'_, AppState>,
     root: String,
     doc_id: String,
     body: Body,
+    base: Option<String>,
+    force: Option<bool>,
 ) -> Res<SaveOutcome> {
     let _write = state.write();
     doc::save_body(
@@ -204,8 +245,26 @@ pub async fn doc_save(
         &doc_id,
         body.content,
         Duration::minutes(AUTO_RECORD_EVERY_MINUTES),
+        SaveGuard {
+            base: base.as_deref(),
+            force: force.unwrap_or(false),
+        },
     )
     .map_err(fail)
+}
+
+/// Keeps the editor's text as a record, before another device's text is
+/// loaded in its place.
+#[tauri::command]
+pub async fn doc_keep(
+    state: State<'_, AppState>,
+    root: String,
+    doc_id: String,
+    body: Body,
+    kind: String,
+) -> Res<Option<SnapshotInfo>> {
+    let _write = state.write();
+    doc::keep_record(Path::new(&root), &doc_id, body.content, &kind).map_err(fail)
 }
 
 #[tauri::command]
@@ -480,4 +539,90 @@ pub async fn note_trash(
 ) -> Res<TrashItem> {
     let _write = state.write();
     trash::trash_note(Path::new(&root), &note_id).map_err(fail)
+}
+
+// ---------------------------------------------------------------------------
+// Other devices: copies left by sync programs, where projects are kept, and
+// watching the open project for changes that arrive.
+
+/// A copy of a chapter or planning document, to compare with the original.
+#[tauri::command]
+pub async fn copy_load(root: String, section: Section, file: String) -> Res<DocData> {
+    copies::load(Path::new(&root), section, &file)
+        .map(DocData::from)
+        .map_err(fail)
+}
+
+#[tauri::command]
+pub async fn copy_resolve(
+    state: State<'_, AppState>,
+    root: String,
+    section: Section,
+    file: String,
+    action: Resolve,
+) -> Res<()> {
+    let _write = state.write();
+    copies::resolve(Path::new(&root), section, &file, action).map_err(fail)
+}
+
+fn detect_places(app: &AppHandle) -> Vec<Place> {
+    places::detect(&Env::current(app.path().document_dir().ok()))
+}
+
+/// Folders that OneDrive, Google Drive, Dropbox or iCloud keep in step with
+/// other devices, then this computer only.
+#[tauri::command]
+pub async fn storage_places(app: AppHandle) -> Res<Vec<Place>> {
+    Ok(detect_places(&app))
+}
+
+/// The sync folder a path is in, if any.
+#[tauri::command]
+pub async fn storage_of(app: AppHandle, path: String) -> Res<Option<Place>> {
+    let places = detect_places(&app);
+    Ok(places::place_of(Path::new(&path), &places).cloned())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveOutcome {
+    overview: Overview,
+    left_behind: bool,
+}
+
+/// Moves the project folder into `dest` and opens it there.
+#[tauri::command]
+pub async fn project_move(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    root: String,
+    dest: String,
+) -> Res<MoveOutcome> {
+    // A watched folder cannot be renamed on Windows.
+    state.watch(None);
+    let _write = state.write();
+    let moved = project::relocate(Path::new(&root), Path::new(&dest)).map_err(fail)?;
+    let overview = project::open(Path::new(&moved.root)).map_err(fail)?;
+    let recent = recent_file(&app)?;
+    let _ = recent::remove(&recent, &root);
+    let _ = recent::touch(&recent, &overview);
+    Ok(MoveOutcome {
+        overview,
+        left_behind: moved.left_behind,
+    })
+}
+
+/// Starts telling the screen about changes in the project folder that the
+/// app did not make (event "project-changed").
+#[tauri::command]
+pub async fn project_watch(app: AppHandle, state: State<'_, AppState>, root: String) -> Res<()> {
+    state.watch(None);
+    state.watch(Some(watch::start(&app, &root)?));
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn project_unwatch(state: State<'_, AppState>, root: String) -> Res<()> {
+    state.unwatch(&root);
+    Ok(())
 }

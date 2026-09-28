@@ -6,7 +6,9 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'rea
 import { api } from '../api';
 import type { DocStatus, DocSummary, MetaPatch } from '../api/types';
 import { Icon } from '../components/Icon';
-import { openMenu } from '../components/Menu';
+import { openMenu, type MenuItem } from '../components/Menu';
+import { MoreButton } from '../components/MoreButton';
+import { pressMenu } from '../lib/press';
 import { num, timeLabel } from '../lib/format';
 import { registerFlusher } from '../lib/flush';
 import { STATUS_LABEL, UNTITLED, docNoun, docNumber, statusesFor, withObject, withSubject } from '../lib/labels';
@@ -163,6 +165,20 @@ export function OutlineTable({ partId }: { partId: string }) {
                       key={d.id}
                       doc={d}
                       label={docNumber(kind, numbers.get(d.id) ?? 0)}
+                      menu={() => {
+                        const i = part.docs.findIndex((x) => x.id === d.id);
+                        return [
+                          { label: '열기', onSelect: () => void selectDoc(d.id) },
+                          { label: '새 탭에서 열기', onSelect: () => void selectDoc(d.id, true) },
+                          { separator: true },
+                          { label: '위로 옮기기', disabled: i <= 0, onSelect: () => void moveDoc(d.id, part.id, i - 1) },
+                          {
+                            label: '아래로 옮기기',
+                            disabled: i >= part.docs.length - 1,
+                            onSelect: () => void moveDoc(d.id, part.id, i + 1),
+                          },
+                        ];
+                      }}
                       synopsisCell={show('synopsis')}
                       drop={drop?.id === d.id ? (drop.after ? 'after' : 'before') : null}
                       onDragStart={(e) => {
@@ -229,6 +245,7 @@ export function OutlineTable({ partId }: { partId: string }) {
 function Row({
   doc,
   label,
+  menu,
   synopsisCell,
   drop,
   children,
@@ -239,6 +256,7 @@ function Row({
 }: {
   doc: DocSummary;
   label: string;
+  menu: () => MenuItem[];
   synopsisCell: boolean;
   drop: 'before' | 'after' | null;
   children: ReactNode;
@@ -304,10 +322,13 @@ function Row({
         void selectDoc(doc.id);
       }}
     >
-      <td className="c-no">
-        <button type="button" className="link-btn" title="열기" onClick={() => void selectDoc(doc.id)}>
-          {label}
-        </button>
+      <td className="c-no" {...pressMenu(menu, () => ({ title: `${label} ${doc.title || UNTITLED}` }))}>
+        <span className="c-no-inner">
+          <button type="button" className="link-btn" title="열기" onClick={() => void selectDoc(doc.id)}>
+            {label}
+          </button>
+          <MoreButton items={menu} opts={() => ({ title: `${label} ${doc.title || UNTITLED}` })} label={`${label} 메뉴`} />
+        </span>
       </td>
       <td className="c-title">
         <input

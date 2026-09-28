@@ -9,6 +9,11 @@ import type {
   Appearance,
   Backend,
   Card,
+  Change,
+  CopyInfo,
+  DriveInfo,
+  DriveLink,
+  DriveProvider,
   CardSummary,
   CardType,
   DocMeta,
@@ -18,6 +23,7 @@ import type {
   Note,
   ManuscriptFormat,
   Overview,
+  Place,
   ProjectInfo,
   ProjectKind,
   RecentItem,
@@ -46,9 +52,13 @@ interface MockProject {
   docs: Map<string, MockDoc>;
   records: Map<string, { info: SnapshotInfo; body: JSONContent }[]>;
   trash: { item: TrashItem; doc: MockDoc }[];
+  /** Copies "left by a sync program" (see otherDevice below). */
+  copies: { info: CopyInfo; doc?: MockDoc; card?: Card }[];
 }
 
 const projects = new Map<string, MockProject>();
+/** The screen's handler for changes "from another device", while a project is watched. */
+let watcher: { root: string; onChange: (changes: Change[]) => void } | null = null;
 let recent: RecentItem[] = [];
 let userPresets: UserPreset[] = [];
 
@@ -231,6 +241,16 @@ function summary(d: MockDoc, format?: ManuscriptFormat): DocSummary {
   };
 }
 
+/** Fingerprint of a text, like the Rust side's (different numbers, same use). */
+function revOf(body: JSONContent): string {
+  let h = 0x811c9dc5;
+  for (const ch of JSON.stringify(blocksFromJSON(body))) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
 function overview(root: string): Overview {
   const p = project(root);
   const format = p.info.manuscriptFormat;
@@ -256,6 +276,7 @@ function overview(root: string): Overview {
     totalPages: mockPages(total.withSpaces, format),
     cardTypes: clone(p.cardTypes),
     cards: [...p.cards.values()].sort((a, b) => a.name.localeCompare(b.name)).map(cardSummary),
+    copies: p.copies.map((c) => clone(c.info)),
   };
 }
 
@@ -296,6 +317,7 @@ function createProject(parent: string, title: string, kind: ProjectInfo['kind'],
     docs: new Map(),
     records: new Map(),
     trash: [],
+    copies: [],
   };
   projects.set(root, p);
   p.planning.push(newDoc(p, 'planning', '시놉시스').meta.id, newDoc(p, 'planning', '작품 소개').meta.id);
@@ -503,16 +525,32 @@ export const mockBackend: Backend = {
   async docLoad(root, docId) {
     await wait();
     const d = doc(project(root), docId);
-    return { meta: clone(d.meta), body: clone(d.body), counts: counts(d.body) };
+    return { meta: clone(d.meta), body: clone(d.body), counts: counts(d.body), rev: revOf(d.body) };
   },
-  async docSave(root, docId, b) {
+  async docSave(root, docId, b, base, force) {
     await wait();
     const p = project(root);
     const d = doc(p, docId);
+    const c = counts(b);
+    const pages = d.section === 'manuscript' ? mockPages(c.withSpaces, p.info.manuscriptFormat) : null;
+    const disk = revOf(d.body);
+    if (revOf(b) === disk) return { counts: c, pages, snapshot: null, rev: disk, conflict: false };
+    const elsewhere = !!base && base !== disk;
+    if (elsewhere && !force) {
+      const snapshot = record(p, { ...d, body: clone(b) }, 'this-device', '');
+      return { counts: c, pages, snapshot, rev: disk, conflict: true };
+    }
+    const snapshot = elsewhere ? record(p, d, 'other-device', '') : null;
     d.body = clone(b);
     d.modified = now();
-    const c = counts(b);
-    return { counts: c, pages: d.section === 'manuscript' ? mockPages(c.withSpaces, p.info.manuscriptFormat) : null, snapshot: null };
+    return { counts: c, pages, snapshot, rev: revOf(b), conflict: false };
+  },
+  async docKeep(root, docId, b, kind) {
+    const p = project(root);
+    const d = doc(p, docId);
+    const newest = p.records.get(docId)?.[0];
+    if (newest && revOf(newest.body) === revOf(b)) return null;
+    return record(p, { ...d, body: clone(b) }, kind, '');
   },
   async docUpdateMeta(root, docId, patch) {
     const d = doc(project(root), docId);
@@ -535,7 +573,7 @@ export const mockBackend: Backend = {
     const p = project(root);
     const r = (p.records.get(docId) ?? []).find((x) => x.info.id === snapshotId);
     if (!r) throw '기록을 찾을 수 없음';
-    return { meta: clone(doc(p, docId).meta), body: clone(r.body), counts: r.info.counts };
+    return { meta: clone(doc(p, docId).meta), body: clone(r.body), counts: r.info.counts, rev: revOf(r.body) };
   },
   async snapshotRestore(root, docId, snapshotId) {
     const p = project(root);
@@ -877,6 +915,145 @@ export const mockBackend: Backend = {
   async formatEstimate(root, format) {
     return mockPages(overview(root).total.withSpaces, format);
   },
+  async copyLoad(root, _section, file) {
+    const p = project(root);
+    const c = p.copies.find((x) => x.info.file === file);
+    if (!c?.doc) throw '사본을 찾을 수 없음';
+    return { meta: clone(c.doc.meta), body: clone(c.doc.body), counts: counts(c.doc.body), rev: revOf(c.doc.body) };
+  },
+  async copyResolve(root, _section, file, action) {
+    const p = project(root);
+    const c = p.copies.find((x) => x.info.file === file);
+    if (!c) throw '사본을 찾을 수 없음';
+    p.copies = p.copies.filter((x) => x !== c);
+    const of = c.info.of;
+    if (action === 'discard') {
+      const item: TrashItem = {
+        id: `${Date.now()}-${of}-copy`,
+        docId: of,
+        section: c.info.section,
+        title: c.info.title,
+        deletedAt: now(),
+        partId: null,
+        index: 0,
+        chars: c.info.chars,
+        file,
+      };
+      p.trash.unshift({ item, doc: c.doc ?? ({ card: c.card } as unknown as MockDoc) });
+      return;
+    }
+    if (c.doc) {
+      const d = doc(p, of);
+      if (action === 'take') {
+        record(p, d, 'before-copy', '');
+        d.body = clone(c.doc.body);
+        d.meta.title = c.doc.meta.title;
+        d.modified = now();
+      } else {
+        const copy = newDoc(p, d.section, `${c.doc.meta.title} (사본)`, clone(c.doc.body));
+        if (d.section === 'planning') p.planning.splice(p.planning.indexOf(of) + 1, 0, copy.meta.id);
+        else {
+          const part = p.parts.find((x) => x.docs.includes(of))!;
+          part.docs.splice(part.docs.indexOf(of) + 1, 0, copy.meta.id);
+        }
+      }
+    } else if (c.card) {
+      if (action === 'take') p.cards.set(of, { ...c.card, id: of });
+      else {
+        const card = { ...c.card, id: id(), name: `${c.card.name} (사본)` };
+        p.cards.set(card.id, card);
+      }
+    }
+  },
+  async storagePlaces() {
+    return clone(PLACES);
+  },
+  async storageOf(path) {
+    const lower = path.toLowerCase();
+    const found = PLACES.filter((pl) => pl.service !== 'local' && lower.startsWith(pl.root.toLowerCase()));
+    return found.length ? clone(found[0]) : null;
+  },
+  async projectMove(root, dest) {
+    await wait();
+    const p = project(root);
+    const folder = root.split('\\').pop() ?? p.info.title;
+    const target = `${dest}\\${folder}`;
+    if (target.toLowerCase() === root.toLowerCase()) throw '이미 그 위치에 있음';
+    projects.delete(root);
+    projects.set(target, p);
+    recent = recent.filter((r) => r.path !== root);
+    touchRecent(target);
+    return { overview: overview(target), leftBehind: false };
+  },
+  async driveStatus() {
+    return {
+      drives: drives.map((d) => ({ ...d, account: d.account ? { ...d.account } : null })),
+      appsFile: 'C:\\Users\\작가\\AppData\\Roaming\\com.writerprogram.desktop\\drive-apps.json',
+    };
+  },
+  async driveConnect(provider) {
+    const d = drive(provider);
+    if (!d.registered) throw `${d.label} 앱 등록 전이라 아직 연결할 수 없음`;
+    connecting = true;
+    for (let i = 0; i < 12 && connecting; i++) await new Promise((r) => setTimeout(r, 100));
+    if (!connecting) throw '연결을 그만둠';
+    connecting = false;
+    d.account = { name: '윤서하', email: 'writer@example.com' };
+    d.connectedAt = now();
+    return { ...d.account };
+  },
+  async driveCancel() {
+    connecting = false;
+  },
+  async driveDisconnect(provider) {
+    const d = drive(provider);
+    d.account = null;
+    d.connectedAt = null;
+    for (const [id, link] of links) if (link.provider === provider) links.delete(id);
+  },
+  async driveProjects(provider) {
+    if (!drive(provider).account) throw '연결되어 있지 않음';
+    return [...projects.values()]
+      .filter((p) => [...links.entries()].some(([id, l]) => id === p.info.id && l.provider === provider))
+      .map((p) => ({ folder: p.info.title, title: p.info.title, id: p.info.id }));
+  },
+  async driveFetch(_provider, folder) {
+    await wait();
+    const root = [...projects.keys()].find((r) => project(r).info.title === folder);
+    if (!root) throw '드라이브의 이 폴더에는 작품이 없음';
+    touchRecent(root);
+    return overview(root);
+  },
+  async projectLinkGet(projectId) {
+    const link = links.get(projectId);
+    return link ? { ...link } : null;
+  },
+  async projectLink(projectId, title, provider) {
+    if (!drive(provider).account) throw `${drive(provider).label}에 연결되어 있지 않음`;
+    const link: DriveLink = { provider, folder: title, linkedAt: now(), syncedAt: null, error: null };
+    links.set(projectId, link);
+    return { ...link };
+  },
+  async projectUnlink(projectId) {
+    links.delete(projectId);
+  },
+  async projectSync(_root, projectId) {
+    await wait();
+    const link = links.get(projectId);
+    if (!link) throw '이 작품은 드라이브와 맞추지 않음';
+    link.syncedAt = now();
+    link.error = null;
+    return {
+      link: { ...link },
+      report: { uploaded: [], downloaded: [], removedHere: [], removedThere: [], copies: [], merged: false, later: [] },
+    };
+  },
+  watchProject(root, onChange) {
+    watcher = { root, onChange };
+    return () => {
+      if (watcher?.root === root) watcher = null;
+    };
+  },
   async pickSaveFile(_title, defaultName) {
     return `C:\\Users\\작가\\Documents\\${defaultName}`;
   },
@@ -885,3 +1062,50 @@ export const mockBackend: Backend = {
     document.title = title;
   },
 };
+
+const PLACES: Place[] = [
+  { service: 'onedrive', label: 'OneDrive', root: 'C:\\Users\\작가\\OneDrive', suggested: 'C:\\Users\\작가\\OneDrive\\WriterProgram' },
+  { service: 'googledrive', label: 'Google Drive', root: 'G:\\내 드라이브', suggested: 'G:\\내 드라이브\\WriterProgram' },
+  { service: 'local', label: '이 PC', root: 'C:\\Users\\작가\\Documents', suggested: 'C:\\Users\\작가\\Documents\\WriterProgram' },
+];
+
+/**
+ * Stand-in for another device, to try the screens in a browser:
+ * `__otherDevice.edit(docId, ['문단', ...])` changes a chapter as a sync
+ * program would, `__otherDevice.copy(docId, [...])` leaves a copy of it.
+ */
+const otherDevice = {
+  edit(docId: string, paragraphs: string[]) {
+    if (!watcher) return;
+    const d = doc(project(watcher.root), docId);
+    d.body = body(...paragraphs);
+    d.modified = now();
+    watcher.onChange([{ kind: 'doc', id: docId, rev: revOf(d.body) }]);
+  },
+  copy(docId: string, paragraphs: string[], device = 'DESKTOP-1AB2C3D') {
+    if (!watcher) return;
+    const p = project(watcher.root);
+    const d = doc(p, docId);
+    const copyDoc: MockDoc = { ...clone(d), body: body(...paragraphs), modified: now() };
+    const file = `${docId}-${device}.md`;
+    p.copies.push({
+      info: { file, section: d.section, of: docId, title: d.meta.title, modified: now(), chars: counts(copyDoc.body).withSpaces, device },
+      doc: copyDoc,
+    });
+    watcher.onChange([{ kind: 'doc', id: `${docId}-${device}`, rev: revOf(copyDoc.body) }]);
+  },
+};
+if (typeof window !== 'undefined') (window as unknown as { __otherDevice: typeof otherDevice }).__otherDevice = otherDevice;
+
+/** Drives in the browser preview: all "registered", none connected. */
+const drives: DriveInfo[] = [
+  { provider: 'google', label: 'Google Drive', registered: true, account: null, connectedAt: null },
+  { provider: 'onedrive', label: 'OneDrive', registered: true, account: null, connectedAt: null },
+  { provider: 'dropbox', label: 'Dropbox', registered: false, account: null, connectedAt: null },
+];
+const links = new Map<string, DriveLink>();
+let connecting = false;
+
+function drive(provider: DriveProvider): DriveInfo {
+  return drives.find((d) => d.provider === provider)!;
+}

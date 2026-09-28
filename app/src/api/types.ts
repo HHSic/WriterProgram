@@ -16,7 +16,17 @@ export type DocStatus =
   | 'proof1'
   | 'proof2'
   | 'proof3';
-export type SnapshotKind = 'auto' | 'manual' | 'before-replace' | 'before-restore' | 'before-revise';
+export type SnapshotKind =
+  | 'auto'
+  | 'manual'
+  | 'before-replace'
+  | 'before-restore'
+  | 'before-revise'
+  // Writing on two devices (crates/core/src/copies.rs, doc.rs save_body).
+  | 'this-device'
+  | 'other-device'
+  | 'before-reload'
+  | 'before-copy';
 
 export interface Counts {
   withSpaces: number;
@@ -177,7 +187,102 @@ export interface Overview {
   totalPages: number | null;
   cardTypes: CardType[];
   cards: CardSummary[];
+  /** Copies left by sync programs, waiting for the writer to pick. */
+  copies: CopyInfo[];
 }
+
+/** A copy of a file left by a sync program (crates/core/src/copies.rs). */
+export interface CopyInfo {
+  /** File name in its folder, e.g. `k7q2m9x4t1ab-DESKTOP-1AB2C3D.md`. */
+  file: string;
+  section: Section;
+  /** Id of the document, card or note it is a copy of. */
+  of: string;
+  title: string;
+  modified: string | null;
+  chars: number;
+  /** The device it came from, when the sync program named it. */
+  device: string | null;
+}
+
+/** take: the copy replaces the original; discard: it goes to the trash; keepBoth: it becomes its own. */
+export type CopyAction = 'take' | 'discard' | 'keepBoth';
+
+/** Where projects are kept (crates/core/src/places.rs). */
+export type Service = 'onedrive' | 'googledrive' | 'dropbox' | 'icloud' | 'local';
+
+export interface Place {
+  service: Service;
+  label: string;
+  /** The folder the program keeps in step. */
+  root: string;
+  /** Where new projects go in this place. */
+  suggested: string;
+}
+
+/** Drives the app can keep projects in step with directly (crates/sync). */
+export type DriveProvider = 'google' | 'onedrive' | 'dropbox';
+
+export interface DriveAccount {
+  name: string;
+  email: string;
+}
+
+export interface DriveInfo {
+  provider: DriveProvider;
+  label: string;
+  /** The app is registered with this drive, so it can sign in. */
+  registered: boolean;
+  account: DriveAccount | null;
+  connectedAt: string | null;
+}
+
+export interface DriveStatus {
+  drives: DriveInfo[];
+  /** Where the app's registrations with the drives are read from. */
+  appsFile: string;
+}
+
+/** A project kept in step with a folder on a drive. */
+export interface DriveLink {
+  provider: DriveProvider;
+  folder: string;
+  linkedAt: string;
+  syncedAt: string | null;
+  /** Why the last pass stopped; null when it went through. */
+  error: string | null;
+}
+
+export interface SyncReport {
+  uploaded: string[];
+  downloaded: string[];
+  removedHere: string[];
+  removedThere: string[];
+  copies: string[];
+  merged: boolean;
+  later: string[];
+}
+
+export interface SyncOutcome {
+  link: DriveLink;
+  report: SyncReport | null;
+}
+
+export interface DriveProject {
+  folder: string;
+  title: string;
+  id: string;
+}
+
+/** A change in the project folder the app did not make (crates/core/src/changes.rs). */
+export type Change =
+  | { kind: 'project' }
+  | { kind: 'projectCopy' }
+  | { kind: 'doc'; id: string; rev: string | null }
+  | { kind: 'card'; id: string }
+  | { kind: 'note'; id: string }
+  | { kind: 'records'; docId: string }
+  | { kind: 'trash' };
 
 export interface DocMeta {
   id: string;
@@ -192,6 +297,8 @@ export interface DocData {
   meta: DocMeta;
   body: JSONContent;
   counts: Counts;
+  /** Fingerprint of the text, sent back with saves. */
+  rev: string;
 }
 
 export interface SnapshotInfo {
@@ -206,6 +313,13 @@ export interface SaveOutcome {
   counts: Counts;
   pages: number | null;
   snapshot: SnapshotInfo | null;
+  /** Fingerprint of the text now on disk. */
+  rev: string;
+  /**
+   * The text on disk changed since the editor loaded it (another device), so
+   * nothing was saved; the editor's text is kept as a record (`snapshot`).
+   */
+  conflict: boolean;
 }
 
 export interface TrashItem {
@@ -217,6 +331,8 @@ export interface TrashItem {
   partId: string | null;
   index: number;
   chars: number;
+  /** For a copy left by a sync program: the name it comes back under. */
+  file?: string | null;
 }
 
 export interface RecentItem {
@@ -326,7 +442,13 @@ export interface Backend {
   docMove(root: string, docId: string, partId: string | null, index: number): Promise<void>;
   docTrash(root: string, docId: string): Promise<TrashItem>;
   docLoad(root: string, docId: string): Promise<DocData>;
-  docSave(root: string, docId: string, body: JSONContent): Promise<SaveOutcome>;
+  /**
+   * `base` is the fingerprint of the text the editor started from; when the
+   * text on disk changed since, nothing is saved unless `force`.
+   */
+  docSave(root: string, docId: string, body: JSONContent, base?: string | null, force?: boolean): Promise<SaveOutcome>;
+  /** Keeps a record of `body` as the document's text (before loading another device's). */
+  docKeep(root: string, docId: string, body: JSONContent, kind: SnapshotKind): Promise<SnapshotInfo | null>;
   docUpdateMeta(root: string, docId: string, patch: MetaPatch): Promise<DocMeta>;
   snapshotList(root: string, docId: string): Promise<SnapshotInfo[]>;
   snapshotCreate(root: string, docId: string, name: string): Promise<SnapshotInfo>;
@@ -365,6 +487,32 @@ export interface Backend {
   formatSavePreset(name: string, format: ManuscriptFormat): Promise<UserPreset[]>;
   formatDeletePreset(name: string): Promise<UserPreset[]>;
   formatEstimate(root: string, format: ManuscriptFormat): Promise<number | null>;
+  /** A copy of a chapter or planning document, to compare with the original. */
+  copyLoad(root: string, section: Section, file: string): Promise<DocData>;
+  copyResolve(root: string, section: Section, file: string, action: CopyAction): Promise<void>;
+  /** Sync folders on this computer, then this computer only. */
+  storagePlaces(): Promise<Place[]>;
+  /** The sync folder a path is in, if any. */
+  storageOf(path: string): Promise<Place | null>;
+  /** Moves the project folder into `dest` and opens it there. */
+  projectMove(root: string, dest: string): Promise<{ overview: Overview; leftBehind: boolean }>;
+  /**
+   * Calls `onChange` with changes in the project folder that the app did not
+   * make (another device, or by hand). Returns a function that stops it.
+   */
+  watchProject(root: string, onChange: (changes: Change[]) => void): () => void;
+  driveStatus(): Promise<DriveStatus>;
+  /** Opens the drive's sign-in page in the browser and waits for the writer. */
+  driveConnect(provider: DriveProvider): Promise<DriveAccount>;
+  driveCancel(): Promise<void>;
+  driveDisconnect(provider: DriveProvider): Promise<void>;
+  driveProjects(provider: DriveProvider): Promise<DriveProject[]>;
+  /** Brings a project from a drive into a new folder in `dest` and opens it. */
+  driveFetch(provider: DriveProvider, folder: string, dest: string): Promise<Overview>;
+  projectLinkGet(projectId: string): Promise<DriveLink | null>;
+  projectLink(projectId: string, title: string, provider: DriveProvider): Promise<DriveLink>;
+  projectUnlink(projectId: string): Promise<void>;
+  projectSync(root: string, projectId: string): Promise<SyncOutcome>;
   reveal(path: string): Promise<void>;
   pickFolder(title: string, defaultPath?: string): Promise<string | null>;
   /** `extension` without the dot: txt, docx or hwpx. */

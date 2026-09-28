@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::cards::{self, CardSummary, CardType};
+use crate::copies::{self, CopyInfo};
 use crate::count::{Counts, count_blocks};
 use crate::doc::{self, DocFile, DocMeta, Section};
 use crate::format::{self, ManuscriptFormat};
@@ -265,6 +266,123 @@ pub fn create(opts: &NewProject) -> Result<PathBuf> {
     Ok(root)
 }
 
+// ---------------------------------------------------------------------------
+// Moving
+
+/// Where a project went, from `relocate`.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Moved {
+    pub root: String,
+    /// The old folder could not be removed completely (a program was holding
+    /// a file); what is left of it stays where it was.
+    pub left_behind: bool,
+}
+
+/// Moves the project folder into `dest_parent`, for example into a folder
+/// that OneDrive keeps in step with other devices. On the same disk this is
+/// one rename. Otherwise the folder is copied, every file is checked against
+/// the original, and only then is the old folder removed.
+pub fn relocate(root: &Path, dest_parent: &Path) -> Result<Moved> {
+    load(root)?;
+    let name = root
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .ok_or_else(|| Error::Invalid("작품 폴더가 올바르지 않음".into()))?;
+    fs::create_dir_all(dest_parent).map_err(|e| Error::io(dest_parent, e))?;
+    let (from, to) = (canonical(root)?, canonical(dest_parent)?);
+    if to.starts_with(&from) {
+        return Err(Error::Invalid("작품 폴더 안으로는 옮길 수 없음".into()));
+    }
+    if from.parent() == Some(to.as_path()) {
+        return Err(Error::Invalid("이미 그 위치에 있음".into()));
+    }
+    let target = unique_dir(dest_parent, &name);
+
+    if rename_dir(root, &target).is_ok() {
+        return Ok(Moved {
+            root: target.to_string_lossy().into_owned(),
+            left_behind: false,
+        });
+    }
+
+    let staging = dest_parent.join(format!(".{name}.{}.moving", new_id()));
+    let copied = copy_tree(root, &staging).and_then(|()| same_tree(root, &staging));
+    if let Err(e) = copied {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(e);
+    }
+    if let Err(e) = rename_dir(&staging, &target) {
+        let _ = fs::remove_dir_all(&staging);
+        return Err(Error::io(&target, e));
+    }
+    Ok(Moved {
+        root: target.to_string_lossy().into_owned(),
+        left_behind: fs::remove_dir_all(root).is_err(),
+    })
+}
+
+fn canonical(path: &Path) -> Result<PathBuf> {
+    fs::canonicalize(path).map_err(|e| Error::io(path, e))
+}
+
+/// Renames a folder, retrying briefly while a sync program or virus scanner
+/// holds a file in it.
+fn rename_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+    let mut last = None;
+    for attempt in 0..4 {
+        match fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                last = Some(e);
+                std::thread::sleep(std::time::Duration::from_millis(80 * (attempt + 1)));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last.expect("retried at least once"))
+}
+
+fn copy_tree(from: &Path, to: &Path) -> Result<()> {
+    fs::create_dir_all(to).map_err(|e| Error::io(to, e))?;
+    for entry in fs::read_dir(from).map_err(|e| Error::io(from, e))? {
+        let entry = entry.map_err(|e| Error::io(from, e))?;
+        let (source, target) = (entry.path(), to.join(entry.file_name()));
+        if entry
+            .file_type()
+            .map_err(|e| Error::io(&source, e))?
+            .is_dir()
+        {
+            copy_tree(&source, &target)?;
+        } else {
+            fs::copy(&source, &target).map_err(|e| Error::io(&source, e))?;
+        }
+    }
+    Ok(())
+}
+
+/// Checks that `copy` holds exactly the files of `original`, byte for byte.
+fn same_tree(original: &Path, copy: &Path) -> Result<()> {
+    for entry in fs::read_dir(original).map_err(|e| Error::io(original, e))? {
+        let entry = entry.map_err(|e| Error::io(original, e))?;
+        let (a, b) = (entry.path(), copy.join(entry.file_name()));
+        if entry.file_type().map_err(|e| Error::io(&a, e))?.is_dir() {
+            same_tree(&a, &b)?;
+            continue;
+        }
+        let same = matches!(
+            (fs::read(&a), fs::read(&b)),
+            (Ok(x), Ok(y)) if x == y
+        );
+        if !same {
+            return Err(Error::Invalid(
+                "옮긴 파일이 원래 파일과 달라 옮기지 않음. 원래 폴더는 그대로 있습니다.".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn unique_dir(parent: &Path, name: &str) -> PathBuf {
     let first = parent.join(name);
     if !first.exists() {
@@ -380,12 +498,22 @@ pub struct Overview {
     pub total_pages: Option<u32>,
     pub card_types: Vec<CardType>,
     pub cards: Vec<CardSummary>,
+    /// Copies left by sync programs, waiting for the writer to pick (copies.rs).
+    pub copies: Vec<CopyInfo>,
 }
 
-/// Opens a project: brings the structure in line with the files on disk,
-/// clears expired trash and old automatic records, and returns the overview.
+/// Opens a project: sorts out what sync programs left (copies.rs), brings the
+/// structure in line with the files on disk, clears expired trash and old
+/// automatic records, and returns the overview.
 pub fn open(root: &Path) -> Result<Overview> {
+    if root.is_dir() {
+        copies::restore_project_file(root)?;
+    }
     let mut project = load(root)?;
+    copies::reconcile(root)?;
+    if copies::merge_project_copies(root)? {
+        project = load(root)?;
+    }
     if repair(root, &mut project)? {
         save(root, &project)?;
     }
@@ -394,21 +522,42 @@ pub fn open(root: &Path) -> Result<Overview> {
     overview(root)
 }
 
+/// Reads the documents the structure lists. One whose file is not there
+/// (yet: it may still be on its way from another device) or cannot be read
+/// right now is left out, as is a second mention of the same document.
+fn listed_docs<'a>(
+    root: &Path,
+    section: Section,
+    ids: impl IntoIterator<Item = &'a String>,
+    seen: &mut HashSet<String>,
+) -> Vec<(DocFile, Option<String>)> {
+    ids.into_iter()
+        .filter(|id| seen.insert((*id).clone()))
+        .filter_map(|id| {
+            let path = root.join(section.dir()).join(doc::file_name(id));
+            let file = doc::read_doc(&path).ok()?;
+            Some((file, modified(&path)))
+        })
+        .collect()
+}
+
+/// Whether a document listed in the structure has its file.
+fn present(root: &Path, section: Section, id: &str) -> bool {
+    root.join(section.dir()).join(doc::file_name(id)).is_file()
+}
+
 pub fn overview(root: &Path) -> Result<Overview> {
     let project = load(root)?;
     let metrics = PageMetrics::of(&project.manuscript_format());
-    let path = |section: Section, id: &str| root.join(section.dir()).join(doc::file_name(id));
-    let read =
-        |section: Section, id: &str| -> Result<DocFile> { doc::read_doc(&path(section, id)) };
+    let mut seen = HashSet::new();
     let mut total = Counts::default();
     let mut bodies: Vec<Vec<Block>> = Vec::new();
     let mut parts = Vec::with_capacity(project.parts.len());
     for part in &project.parts {
         let mut docs = Vec::with_capacity(part.docs.len());
-        for id in &part.docs {
-            let file = read(Section::Manuscript, id)?;
+        for (file, modified) in listed_docs(root, Section::Manuscript, &part.docs, &mut seen) {
             let mut summary = DocSummary::of(&file, metrics.as_ref());
-            summary.modified = modified(&path(Section::Manuscript, id));
+            summary.modified = modified;
             total.add(&summary.counts);
             docs.push(summary);
             bodies.push(file.body);
@@ -419,15 +568,14 @@ pub fn overview(root: &Path) -> Result<Overview> {
             docs,
         });
     }
-    let planning = project
-        .planning
-        .iter()
-        .map(|id| {
-            let mut summary = DocSummary::of(&read(Section::Planning, id)?, None);
-            summary.modified = modified(&path(Section::Planning, id));
-            Ok(summary)
+    let planning = listed_docs(root, Section::Planning, &project.planning, &mut seen)
+        .into_iter()
+        .map(|(file, modified)| {
+            let mut summary = DocSummary::of(&file, None);
+            summary.modified = modified;
+            summary
         })
-        .collect::<Result<Vec<_>>>()?;
+        .collect();
     Ok(Overview {
         root: root.to_string_lossy().into_owned(),
         project: ProjectInfo::from(&project),
@@ -438,6 +586,7 @@ pub fn overview(root: &Path) -> Result<Overview> {
         total_pages: metrics.map(|m| m.pages(bodies.iter().map(Vec::as_slice), true)),
         card_types: project.card_types(),
         cards: cards::list(root)?,
+        copies: copies::list(root)?,
     })
 }
 
@@ -448,36 +597,31 @@ pub fn estimate_pages(root: &Path, format: &ManuscriptFormat) -> Result<Option<u
         return Ok(None);
     };
     let project = load(root)?;
-    let mut bodies = Vec::new();
-    for id in project.parts.iter().flat_map(|p| &p.docs) {
-        let path = root.join(MANUSCRIPT_DIR).join(doc::file_name(id));
-        bodies.push(doc::read_doc(&path)?.body);
-    }
+    let bodies: Vec<Vec<Block>> = listed_docs(
+        root,
+        Section::Manuscript,
+        project.parts.iter().flat_map(|p| &p.docs),
+        &mut HashSet::new(),
+    )
+    .into_iter()
+    .map(|(file, _)| file.body)
+    .collect();
     Ok(Some(metrics.pages(bodies.iter().map(Vec::as_slice), true)))
 }
 
-/// Document ids present as files in a section folder.
+/// Document ids present as files in a section folder (copies left by sync
+/// programs not included).
 fn ids_on_disk(root: &Path, section: Section) -> Result<Vec<String>> {
     let dir = root.join(section.dir());
     fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
-    let mut ids = Vec::new();
-    for entry in fs::read_dir(&dir).map_err(|e| Error::io(&dir, e))? {
-        let entry = entry.map_err(|e| Error::io(&dir, e))?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') || !entry.path().is_file() {
-            continue;
-        }
-        if let Some(id) = name.strip_suffix(".md") {
-            ids.push(id.to_string());
-        }
-    }
-    Ok(ids)
+    Ok(copies::scan(root, section)?.ids)
 }
 
-/// Makes the structure match the files: drops entries whose file is gone
-/// (deleted or trashed elsewhere) and adds files the structure does not list
-/// (for example ones that arrived through folder sync). Returns whether
-/// anything changed.
+/// Makes the structure match the files: adds files the structure does not
+/// list (for example ones that arrived through folder sync) and drops
+/// entries listed twice. Entries whose file is missing stay: with folder sync
+/// the structure can arrive before the chapter files, and the tree leaves
+/// them out until they come. Returns whether anything changed.
 fn repair(root: &Path, project: &mut Project) -> Result<bool> {
     let mut changed = false;
     if project.parts.is_empty() {
@@ -491,8 +635,7 @@ fn repair(root: &Path, project: &mut Project) -> Result<bool> {
     let mut seen = HashSet::new();
     for part in &mut project.parts {
         let before = part.docs.len();
-        part.docs
-            .retain(|id| on_disk.contains(id) && seen.insert(id.clone()));
+        part.docs.retain(|id| seen.insert(id.clone()));
         changed |= part.docs.len() != before;
     }
     let mut found: Vec<String> = on_disk.difference(&seen).cloned().collect();
@@ -508,11 +651,8 @@ fn repair(root: &Path, project: &mut Project) -> Result<bool> {
     }
 
     let on_disk: HashSet<String> = ids_on_disk(root, Section::Planning)?.into_iter().collect();
-    let mut seen = HashSet::new();
     let before = project.planning.len();
-    project
-        .planning
-        .retain(|id| on_disk.contains(id) && seen.insert(id.clone()));
+    project.planning.retain(|id| seen.insert(id.clone()));
     changed |= project.planning.len() != before;
     let mut found: Vec<String> = on_disk.difference(&seen).cloned().collect();
     if !found.is_empty() {
@@ -606,7 +746,11 @@ pub fn rename_part(root: &Path, part_id: &str, title: &str) -> Result<()> {
 /// Removes an empty part. A part that still has chapters cannot be removed.
 pub fn remove_part(root: &Path, part_id: &str) -> Result<()> {
     let mut project = load(root)?;
-    if !project.part_mut(part_id)?.docs.is_empty() {
+    let part = project.part_mut(part_id)?;
+    // Entries whose file is gone do not count (see `repair`).
+    part.docs
+        .retain(|id| present(root, Section::Manuscript, id));
+    if !part.docs.is_empty() {
         return Err(Error::Invalid(
             "회차가 남아 있는 부는 지울 수 없음. 회차를 먼저 옮기거나 휴지통으로 보내 주세요."
                 .into(),
@@ -687,11 +831,11 @@ pub fn move_doc(root: &Path, doc_id: &str, part_id: Option<&str>, index: usize) 
     match (from_part, part_id) {
         (Some(_), Some(part_id)) => {
             let part = project.part_mut(part_id)?;
-            let index = index.min(part.docs.len());
+            let index = raw_index(root, Section::Manuscript, &part.docs, index);
             part.docs.insert(index, doc_id.into());
         }
         (None, None) => {
-            let index = index.min(project.planning.len());
+            let index = raw_index(root, Section::Planning, &project.planning, index);
             project.planning.insert(index, doc_id.into());
         }
         _ => {
@@ -701,6 +845,22 @@ pub fn move_doc(root: &Path, doc_id: &str, part_id: Option<&str>, index: usize) 
         }
     }
     save(root, &project)
+}
+
+/// Turns a position among the documents shown in the tree into a position in
+/// `ids`, which may also list documents whose file has not arrived yet.
+fn raw_index(root: &Path, section: Section, ids: &[String], shown_index: usize) -> usize {
+    let mut shown = 0;
+    for (i, id) in ids.iter().enumerate() {
+        if !present(root, section, id) {
+            continue;
+        }
+        if shown == shown_index {
+            return i;
+        }
+        shown += 1;
+    }
+    ids.len()
 }
 
 /// Every document id in `project.json` order, manuscript first.

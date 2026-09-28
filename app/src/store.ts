@@ -3,7 +3,12 @@ import type { Editor } from '@tiptap/core';
 import { api } from './api';
 import type {
   CardSummary,
+  Change,
+  CopyAction,
+  CopyInfo,
   Counts,
+  DriveLink,
+  DriveProvider,
   DocStatus,
   DocSummary,
   FormatCatalog,
@@ -15,11 +20,12 @@ import type {
   PartView,
   ProjectPatch,
   Section,
+  SnapshotInfo,
 } from './api/types';
 import { blocksFromNode, countBlocks } from './editor/counts';
 import { addMark, removeMarks } from './editor/notes';
-import { editorsOf } from './editor/shared';
-import { errorText } from './lib/format';
+import { editorsOf, peerOf, reloadDoc, sessionOf } from './editor/shared';
+import { errorText, shortPath } from './lib/format';
 import { flushAll } from './lib/flush';
 import { newId } from './lib/ids';
 import {
@@ -71,6 +77,16 @@ export type Dialog =
   | { kind: 'export' }
   | { kind: 'view' }
   | { kind: 'symbols' }
+  /** 둘 다 보기: this device's text next to another device's, or a document next to its copy. */
+  | { kind: 'compare'; docId: string; copy?: CopyInfo }
+  /** Every copy left by sync programs (다른 기기 사본). */
+  | { kind: 'copies' }
+  /** 기기 간 맞추기: connecting drives. */
+  | { kind: 'drives' }
+  /** Bringing a project from a drive to this device. */
+  | { kind: 'driveImport' }
+  /** Moving the project folder (저장 위치 옮기기). */
+  | { kind: 'move' }
   | {
       kind: 'prompt';
       title: string;
@@ -88,6 +104,13 @@ export type Dialog =
       danger?: boolean;
       onConfirm: () => Promise<void> | void;
     };
+
+/** A document whose text another device changed while it was being edited here. */
+export interface DocConflict {
+  /** This device's text, kept as a record when its save was refused. */
+  record: SnapshotInfo | null;
+  at: string;
+}
 
 export interface Toast {
   text: string;
@@ -126,6 +149,8 @@ interface AppState {
   pendingJump: Jump | null;
   /** Card shown over the right panel (미리보기). */
   previewCardId: string | null;
+  /** 부 picked in the tree: where 새 회차 goes, until another chapter opens. */
+  selectedPartId: string | null;
   /** For each card, in how many chapters it appears. */
   cardCounts: Record<string, number>;
   /** Every note (메모) in the project. */
@@ -134,6 +159,16 @@ interface AppState {
   focusNoteId: string | null;
   /** A note whose text to select once its document is open. */
   pendingNote: string | null;
+  /** Documents another device changed while they were being edited here. */
+  conflicts: Record<string, DocConflict>;
+  /** Bumped per card when another device changed it (open card editors reload). */
+  cardReloads: Record<string, number>;
+  /** Shown over everything while the app is busy with the whole project. */
+  busy: string | null;
+  /** The drive folder the open project is kept in step with, if any. */
+  link: DriveLink | null;
+  /** A pass with the drive is running. */
+  syncing: boolean;
 }
 
 export const useApp = create<AppState>(() => ({
@@ -159,10 +194,16 @@ export const useApp = create<AppState>(() => ({
   findRequest: null,
   pendingJump: null,
   previewCardId: null,
+  selectedPartId: null,
   cardCounts: {},
   notes: [],
   focusNoteId: null,
   pendingNote: null,
+  conflicts: {},
+  cardReloads: {},
+  busy: null,
+  link: null,
+  syncing: false,
 }));
 
 const set = useApp.setState;
@@ -282,12 +323,15 @@ function commit(panes: Pane[], focus = get().focus, split = get().split) {
   const target = tab?.target ?? null;
   const editor = tab ? (tabEditors.get(tab.key) ?? null) : null;
   const editorChanged = editor !== get().editor;
+  const docId = target?.kind === 'doc' ? target.id : null;
   set({
     panes,
     focus: f,
     split,
     activeTarget: target,
-    activeDocId: target?.kind === 'doc' ? target.id : null,
+    activeDocId: docId,
+    // Opening another chapter moves 새 회차 to that chapter's part.
+    ...(docId && docId !== get().activeDocId ? { selectedPartId: null } : {}),
     activeCardId: target?.kind === 'card' ? target.id : null,
     editor,
     ...(editorChanged
@@ -555,6 +599,7 @@ function initialDoc(ov: Overview): string | null {
 }
 
 export function enterProject(ov: Overview) {
+  stopAutoSync();
   tabEditors.clear();
   closedTabs.length = 0;
   lastReplace = null;
@@ -565,6 +610,10 @@ export function enterProject(ov: Overview) {
     notes: [],
     focusNoteId: null,
     pendingNote: null,
+    selectedPartId: null,
+    conflicts: {},
+    cardReloads: {},
+    link: null,
     save: { state: 'saved' },
     liveCounts: null,
     selection: null,
@@ -572,9 +621,17 @@ export function enterProject(ov: Overview) {
   const layout = initialLayout(ov);
   commit(layout.panes, layout.focus, layout.split);
   api.setWindowTitle(`${ov.project.title} · WriterProgram`);
+  startWatching(ov.root);
+  void loadLink(ov);
   void loadCatalog();
   void refreshCardCounts();
   void loadNotes();
+  if (ov.copies.length) {
+    showToast({
+      text: `다른 기기에서 생긴 사본 ${ov.copies.length}개가 있음`,
+      action: { label: '살펴보기', run: () => openDialog({ kind: 'copies' }) },
+    });
+  }
 }
 
 export async function loadCatalog() {
@@ -616,7 +673,10 @@ export async function openProject(path: string): Promise<boolean> {
 
 export async function leaveProject() {
   if (!(await saveEverything())) return;
+  stopWatching();
+  stopAutoSync();
   set({
+    link: null,
     overview: null,
     panes: [],
     focus: 0,
@@ -931,10 +991,326 @@ export function openNoteCounts(notes: Note[]): Map<string, number> {
   return counts;
 }
 
+/** Picks a part in the tree as the place for 새 회차. */
+export function selectPart(id: string | null) {
+  set({ selectedPartId: id });
+}
+
+/** Where 새 회차 goes: the part picked in the tree, or else the open chapter's part. */
+export function newDocPartId(): string | undefined {
+  const { overview: ov, selectedPartId, activeDocId } = get();
+  if (!ov) return undefined;
+  if (selectedPartId && ov.parts.some((p) => p.id === selectedPartId)) return selectedPartId;
+  return ov.parts.find((p) => p.docs.some((d) => d.id === activeDocId))?.id;
+}
+
 export function openNotesBoard() {
   return openTarget({ kind: 'notes', id: 'all' });
 }
 
 export function openTable(partId: string) {
   return openTarget({ kind: 'table', id: partId });
+}
+
+// ---------------------------------------------------------------------------
+// Other devices (crates/core/src/copies.rs, changes.rs)
+//
+// While a project is open, the app hears about changes it did not make:
+// another device's edits brought in by a sync program. An open document the
+// writer is not changing just takes them (its text before is kept as a
+// record); one being changed on both sides waits for the writer to pick
+// (DocPane banner, 둘 다 보기). Copies that sync programs leave are listed next
+// to their originals.
+
+let stopWatch: (() => void) | null = null;
+const later = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Runs `fn` once after a burst of calls with the same key. */
+function soon(key: string, fn: () => void, ms = 250) {
+  clearTimeout(later.get(key));
+  later.set(key, setTimeout(() => {
+    later.delete(key);
+    fn();
+  }, ms));
+}
+
+function startWatching(root: string) {
+  stopWatch?.();
+  stopWatch = api.watchProject(root, (changes) => onChanges(root, changes));
+}
+
+function stopWatching() {
+  stopWatch?.();
+  stopWatch = null;
+}
+
+function onChanges(root: string, changes: Change[]) {
+  if (get().overview?.root !== root) return;
+  let refresh = false;
+  let notes = false;
+  const cards: string[] = [];
+  for (const c of changes) {
+    switch (c.kind) {
+      case 'doc':
+        refresh = true;
+        if (c.rev) void externalDocChange(c.id, c.rev);
+        break;
+      case 'card':
+        refresh = true;
+        cards.push(c.id);
+        break;
+      case 'note':
+        notes = true;
+        break;
+      case 'records':
+        if (c.docId === get().activeDocId) set({ recordsVersion: get().recordsVersion + 1 });
+        break;
+      default:
+        refresh = true;
+    }
+  }
+  if (refresh) soon('overview', () => void refreshOverview());
+  if (notes) soon('notes', () => void loadNotes());
+  if (cards.length) {
+    const reloads = { ...get().cardReloads };
+    for (const id of cards) reloads[id] = (reloads[id] ?? 0) + 1;
+    set({ cardReloads: reloads });
+    soon('cardCounts', () => void refreshCardCounts(), 800);
+  }
+}
+
+/** Another device changed a document's text on disk (its fingerprint is now `rev`). */
+async function externalDocChange(docId: string, rev: string) {
+  const session = sessionOf(docId);
+  if (!session || session.conflict || session.base === rev) return;
+  await session.settle();
+  if (session.conflict || session.base === rev) return;
+  // Changed here too: the save finds the difference and asks the writer.
+  if (session.pending) {
+    await session.flush();
+    return;
+  }
+  const ov = get().overview;
+  const editor = peerOf(docId);
+  if (!ov || !editor) return;
+  try {
+    await api.docKeep(ov.root, docId, editor.getJSON(), 'before-reload').catch(() => null);
+    const data = await api.docLoad(ov.root, docId);
+    if (session.pending || session.conflict) {
+      await session.flush();
+      return;
+    }
+    if (data.rev === session.base) return;
+    reloadDoc(docId, data.body, data.rev);
+    patchSummary(docId, { counts: data.counts });
+    set({ recordsVersion: get().recordsVersion + 1 });
+    showToast({
+      text: '다른 기기에서 고친 내용을 불러옴',
+      action: { label: '이전 글 보기', run: () => void showRecords(docId) },
+    });
+  } catch (e) {
+    toastError('다른 기기에서 고친 내용을 불러오지 못함', e);
+  }
+}
+
+async function showRecords(docId: string) {
+  if (get().activeDocId !== docId) await selectDoc(docId);
+  set({ rightOpen: true, rightTab: 'records' });
+}
+
+export function markConflict(docId: string, record: SnapshotInfo | null) {
+  set({
+    conflicts: { ...get().conflicts, [docId]: { record, at: new Date().toISOString() } },
+    recordsVersion: get().recordsVersion + 1,
+  });
+}
+
+export function clearConflict(docId: string) {
+  if (!(docId in get().conflicts)) return;
+  const conflicts = { ...get().conflicts };
+  delete conflicts[docId];
+  set({ conflicts });
+}
+
+/** 이 기기 것으로 저장: this device's text goes over the other's, which is kept as a record. */
+export async function keepMine(docId: string) {
+  const session = sessionOf(docId);
+  if (!session) return;
+  try {
+    const out = await session.saveOver();
+    clearConflict(docId);
+    patchSummary(docId, { counts: out.counts, pages: out.pages });
+    set({ recordsVersion: get().recordsVersion + 1 });
+    showToast({ text: '이 기기에서 쓴 글로 저장함 · 다른 기기의 글은 기록에 남음' });
+  } catch (e) {
+    toastError('저장하지 못함', e);
+  }
+}
+
+/** 다른 기기 것 불러오기: this device's text is already kept as a record. */
+export async function takeTheirs(docId: string) {
+  const ov = get().overview;
+  if (!ov) return;
+  try {
+    const data = await api.docLoad(ov.root, docId);
+    reloadDoc(docId, data.body, data.rev);
+    clearConflict(docId);
+    patchSummary(docId, { counts: data.counts });
+    set({ recordsVersion: get().recordsVersion + 1 });
+    showToast({ text: '다른 기기의 글을 불러옴 · 이 기기에서 쓴 글은 기록에 남음' });
+  } catch (e) {
+    toastError('불러오지 못함', e);
+  }
+}
+
+const COPY_DONE: Record<CopyAction, string> = {
+  take: '사본으로 바꿈',
+  discard: '사본을 휴지통으로 옮김',
+  keepBoth: '사본을 따로 둠',
+};
+
+/** Deals with a copy left by a sync program (see CopyAction). */
+export async function resolveCopy(copy: CopyInfo, action: CopyAction): Promise<boolean> {
+  const ov = get().overview;
+  if (!ov) return false;
+  if (!(await saveEverything())) return false;
+  try {
+    await api.copyResolve(ov.root, copy.section, copy.file, action);
+    const isDoc = copy.section === 'manuscript' || copy.section === 'planning';
+    if (action === 'take' && isDoc && sessionOf(copy.of)) {
+      const data = await api.docLoad(ov.root, copy.of);
+      reloadDoc(copy.of, data.body, data.rev);
+    }
+    if (action === 'take' && copy.section === 'cards') {
+      set({ cardReloads: { ...get().cardReloads, [copy.of]: (get().cardReloads[copy.of] ?? 0) + 1 } });
+    }
+    await refreshOverview();
+    if (copy.section === 'notes') await loadNotes();
+    if (copy.section === 'cards') void refreshCardCounts();
+    set({ recordsVersion: get().recordsVersion + 1 });
+    const kept =
+      action !== 'take' ? '' : isDoc ? ' · 바꾸기 전 글은 기록에 남음' : ' · 바꾸기 전 것은 휴지통에 있음';
+    showToast({ text: COPY_DONE[action] + kept });
+    return true;
+  } catch (e) {
+    toastError('사본을 정리하지 못함', e);
+    return false;
+  }
+}
+
+/** Moves the project folder (for example into OneDrive) and opens it there. */
+export async function moveProject(dest: string): Promise<boolean> {
+  const ov = get().overview;
+  if (!ov) return false;
+  if (!(await saveEverything())) return false;
+  const from = ov.root;
+  set({ busy: '작품 폴더를 옮기는 중', dialog: null });
+  try {
+    await leaveProject();
+    if (get().overview) return false;
+    const out = await api.projectMove(from, dest);
+    enterProject(out.overview);
+    showToast({
+      text: out.leftBehind
+        ? `옮김 · 원래 폴더의 일부를 지우지 못해 그대로 둠 (${shortPath(from)})`
+        : `옮김 · ${shortPath(out.overview.root)}`,
+    });
+    return true;
+  } catch (e) {
+    toastError('작품 폴더를 옮기지 못함', e);
+    await openProject(from);
+    return false;
+  } finally {
+    set({ busy: null });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Keeping a project in step with a drive (crates/sync, app drives.rs)
+//
+// A linked project is brought in step when it opens, every minute while it
+// is open, and when the window comes back to the front. Changes that arrive
+// reach open documents through the folder watcher, like a sync program's.
+
+const SYNC_EVERY_MS = 60_000;
+let syncTimer: ReturnType<typeof setInterval> | undefined;
+const onFocus = () => void syncNow({ quiet: true });
+
+async function loadLink(ov: Overview) {
+  const link = await api.projectLinkGet(ov.project.id).catch(() => null);
+  if (get().overview?.root !== ov.root) return;
+  set({ link });
+  if (link) startAutoSync();
+}
+
+function startAutoSync() {
+  stopAutoSync();
+  void syncNow({ quiet: true });
+  syncTimer = setInterval(() => void syncNow({ quiet: true }), SYNC_EVERY_MS);
+  window.addEventListener('focus', onFocus);
+}
+
+function stopAutoSync() {
+  clearInterval(syncTimer);
+  syncTimer = undefined;
+  window.removeEventListener('focus', onFocus);
+}
+
+/** One pass with the drive now. Quiet passes only speak up about problems in the status bar. */
+export async function syncNow(opts: { quiet?: boolean } = {}) {
+  const ov = get().overview;
+  if (!ov || !get().link || get().syncing) return;
+  // Edits waiting to be saved go first, so they travel in this pass.
+  if (!(await saveEverything())) return;
+  set({ syncing: true });
+  try {
+    const out = await api.projectSync(ov.root, ov.project.id);
+    if (get().overview?.root !== ov.root) return;
+    set({ link: out.link });
+    const r = out.report;
+    if (r && (r.downloaded.length || r.removedHere.length || r.copies.length || r.merged)) {
+      await refreshOverview();
+      void loadNotes();
+      void refreshCardCounts();
+    }
+    if (!opts.quiet) {
+      showToast(
+        out.link.error
+          ? { text: `드라이브와 맞추지 못함 · ${out.link.error}`, tone: 'error' }
+          : { text: '드라이브와 맞춤' },
+      );
+    }
+  } catch (e) {
+    if (!opts.quiet) toastError('드라이브와 맞추지 못함', e);
+  } finally {
+    set({ syncing: false });
+  }
+}
+
+/** Starts keeping the open project in step with a drive. */
+export async function linkProject(provider: DriveProvider): Promise<boolean> {
+  const ov = get().overview;
+  if (!ov) return false;
+  try {
+    const link = await api.projectLink(ov.project.id, ov.project.title, provider);
+    set({ link });
+    startAutoSync();
+    return true;
+  } catch (e) {
+    toastError('드라이브와 맞추기를 시작하지 못함', e);
+    return false;
+  }
+}
+
+/** Stops keeping the open project in step (nothing is removed anywhere). */
+export async function unlinkProject() {
+  const ov = get().overview;
+  if (!ov) return;
+  try {
+    await api.projectUnlink(ov.project.id);
+    stopAutoSync();
+    set({ link: null });
+  } catch (e) {
+    toastError('그만두지 못함', e);
+  }
 }

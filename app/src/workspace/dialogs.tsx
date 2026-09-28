@@ -7,7 +7,11 @@ import { UNTITLED } from '../lib/labels';
 import { ACCENTS, PALETTES, previewColors } from '../lib/colors';
 import { FONT_LABEL, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
 import { NewProjectDialog } from '../screens/NewProjectDialog';
+import { CompareDialog } from './Compare';
+import { CopiesDialog } from './Copies';
+import { DriveImportDialog, DrivesDialog } from './Drives';
 import { ExportDialog } from './ExportDialog';
+import { MoveDialog } from './MoveProject';
 import { ProjectSettingsDialog } from './ProjectSettings';
 import { SymbolsDialog } from './Symbols';
 import { closeDialog, loadNotes, refreshOverview, setView, toastError, useApp, type Dialog } from '../store';
@@ -141,6 +145,7 @@ export function TrashDialog() {
             <div className="grow">
               <strong>{item.title || UNTITLED}</strong>
               <span className="meta">
+                {item.file && '다른 기기 사본 · '}
                 {item.section === 'cards'
                   ? '설정 카드'
                   : item.section === 'notes'
@@ -232,6 +237,14 @@ export function ViewDialog() {
         <label className="check">
           <input type="checkbox" checked={view.showMarks} onChange={(e) => setView({ showMarks: e.target.checked })} />
           빈칸·문단 부호 보이기 (Ctrl+Shift+8)
+        </label>
+        <label className="field">
+          <span className="field-label">편집 도구줄 (본문 아래 버튼 줄)</span>
+          <select value={view.toolbar} onChange={(e) => setView({ toolbar: e.target.value as ViewSettings['toolbar'] })}>
+            <option value="auto">터치 화면에서만</option>
+            <option value="always">늘 보이기</option>
+            <option value="never">숨기기</option>
+          </select>
         </label>
         <fieldset className="field">
           <legend className="field-label">화면 밝기</legend>
@@ -380,5 +393,15 @@ export function DialogHost() {
       return <NewProjectDialog />;
     case 'project':
       return <ProjectSettingsDialog tab={dialog.tab} />;
+    case 'compare':
+      return <CompareDialog key={`${dialog.docId}/${dialog.copy?.file ?? ''}`} docId={dialog.docId} copy={dialog.copy} />;
+    case 'copies':
+      return <CopiesDialog />;
+    case 'move':
+      return <MoveDialog />;
+    case 'drives':
+      return <DrivesDialog />;
+    case 'driveImport':
+      return <DriveImportDialog />;
   }
 }

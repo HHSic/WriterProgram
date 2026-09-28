@@ -25,7 +25,7 @@ use crate::count::{Counts, count_blocks};
 use crate::layout::PageMetrics;
 use crate::markup::{Block, parse_body, write_body};
 use crate::project::{MANUSCRIPT_DIR, PLANNING_DIR};
-use crate::store::{atomic_write, now_iso, read_text};
+use crate::store::{atomic_write, now_iso, read_text, rev_of};
 use crate::{Error, Result, project, snapshot};
 
 /// Status values. Common ones first, then web novel, then print.
@@ -97,6 +97,19 @@ impl DocMeta {
 pub struct DocFile {
     pub meta: DocMeta,
     pub body: Vec<Block>,
+}
+
+impl DocFile {
+    /// Fingerprint of the text (not the title or status). The editor keeps the
+    /// one it started from, so a save can tell when the text on disk changed
+    /// in the meantime, for example on another device.
+    pub fn rev(&self) -> String {
+        body_rev(&self.body)
+    }
+}
+
+pub fn body_rev(body: &[Block]) -> String {
+    rev_of(write_body(body).as_bytes())
 }
 
 pub(crate) fn decode_value(raw: &str) -> String {
@@ -247,18 +260,39 @@ pub struct SaveOutcome {
     pub counts: Counts,
     /// Estimated pages in the project's manuscript format; none without paper.
     pub pages: Option<u32>,
-    /// Set when this save also kept an automatic record of the previous text.
+    /// Set when this save also kept a record: an automatic one of the
+    /// previous text, or on a conflict the text that could not be saved.
     pub snapshot: Option<snapshot::SnapshotInfo>,
+    /// Fingerprint of the text now on disk (see `DocFile::rev`).
+    pub rev: String,
+    /// The text on disk changed since the editor loaded it (another device
+    /// saved it), so nothing was written. The editor's text is kept as a
+    /// "this-device" record instead, returned in `snapshot`.
+    pub conflict: bool,
+}
+
+/// How a save treats text on disk that changed since the editor loaded it.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SaveGuard<'a> {
+    /// Fingerprint of the text the editor started from. None skips the check.
+    pub base: Option<&'a str>,
+    /// Save anyway, keeping the text on disk as an "other-device" record.
+    pub force: bool,
 }
 
 /// Replaces a document's body, keeping its front matter as it is on disk, so
 /// that title or status changes made elsewhere are never overwritten by the
 /// editor. Keeps an automatic record first when one is due.
+///
+/// With a `guard.base`, a body on disk that is neither that text nor the one
+/// being saved means another device changed it: the save is refused (see
+/// `SaveOutcome::conflict`) unless `guard.force` is set.
 pub fn save_body(
     root: &Path,
     id: &str,
     body: Vec<Block>,
     auto_record_every: chrono::Duration,
+    guard: SaveGuard,
 ) -> Result<SaveOutcome> {
     let (section, path) = locate(root, id)?;
     let current = read_doc(&path)?;
@@ -275,21 +309,63 @@ pub fn save_body(
             counts,
             pages,
             snapshot: None,
+            rev: current.rev(),
+            conflict: false,
         });
     }
-    let snapshot = snapshot::auto_if_due(root, &current, auto_record_every)?;
-    write_doc_file(
-        &path,
-        &DocFile {
-            meta: current.meta,
+    let disk_rev = current.rev();
+    let changed_elsewhere = guard.base.is_some_and(|base| base != disk_rev);
+    if changed_elsewhere && !guard.force {
+        let mine = DocFile {
+            meta: current.meta.clone(),
             body,
-        },
-    )?;
+        };
+        let kept = snapshot::keep_unless_same(root, &mine, "this-device")?;
+        return Ok(SaveOutcome {
+            counts,
+            pages,
+            snapshot: kept,
+            rev: disk_rev,
+            conflict: true,
+        });
+    }
+    let snapshot = if changed_elsewhere {
+        snapshot::keep_unless_same(root, &current, "other-device")?
+    } else {
+        snapshot::auto_if_due(root, &current, auto_record_every)?
+    };
+    let saved = DocFile {
+        meta: current.meta,
+        body,
+    };
+    write_doc_file(&path, &saved)?;
     Ok(SaveOutcome {
         counts,
         pages,
         snapshot,
+        rev: saved.rev(),
+        conflict: false,
     })
+}
+
+/// Keeps a record of `body` as the text of document `id`, unless the newest
+/// record already has it. Used before the editor loads another device's text.
+pub fn keep_record(
+    root: &Path,
+    id: &str,
+    body: Vec<Block>,
+    kind: &str,
+) -> Result<Option<snapshot::SnapshotInfo>> {
+    let (_, path) = locate(root, id)?;
+    let current = read_doc(&path)?;
+    snapshot::keep_unless_same(
+        root,
+        &DocFile {
+            meta: current.meta,
+            body,
+        },
+        kind,
+    )
 }
 
 /// Fields that can be changed without touching the body. `None` leaves a field

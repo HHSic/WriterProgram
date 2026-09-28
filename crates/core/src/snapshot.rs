@@ -19,14 +19,24 @@ pub const SNAPSHOT_DIR: &str = ".snapshots";
 
 /// Kinds of records: automatic, kept by hand ("지금 원고 보관"), and the ones
 /// taken before replace-all, before going back to a record, and when revising
-/// starts.
-pub const KINDS: [&str; 5] = [
+/// starts. The last four come from edits on two devices (see copies.rs):
+/// this device's text that could not be saved over another device's,
+/// another device's text replaced by this one's, this device's text before
+/// another device's was loaded, and the text before a copy replaced it.
+pub const KINDS: [&str; 9] = [
     "auto",
     "manual",
     "before-replace",
     "before-restore",
     "before-revise",
+    "this-device",
+    "other-device",
+    "before-reload",
+    "before-copy",
 ];
+
+/// Kinds removed after a while, like automatic records.
+const PRUNED: [&str; 2] = ["auto", "before-reload"];
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -178,7 +188,18 @@ pub fn auto_if_due(
     create(root, current, "auto", "").map(Some)
 }
 
-/// Removes automatic records older than `keep`. Other kinds stay.
+/// Keeps a record of `doc` unless the newest record already has the same text.
+pub fn keep_unless_same(root: &Path, doc: &DocFile, kind: &str) -> Result<Option<SnapshotInfo>> {
+    if let Some(newest) = stems(root, &doc.meta.id)?.first()
+        && load(root, &doc.meta.id, newest)?.body == doc.body
+    {
+        return Ok(None);
+    }
+    create(root, doc, kind, "").map(Some)
+}
+
+/// Removes automatic records (and ones kept before loading another device's
+/// text) older than `keep`. Other kinds stay.
 pub fn prune(root: &Path, keep: Duration) -> Result<()> {
     let base = root.join(SNAPSHOT_DIR);
     let Ok(docs) = fs::read_dir(&base) else {
@@ -186,9 +207,15 @@ pub fn prune(root: &Path, keep: Duration) -> Result<()> {
     };
     let cutoff = Utc::now() - keep;
     for entry in docs.filter_map(|e| e.ok()) {
+        if !entry.path().is_dir() {
+            continue;
+        }
         let doc_id = entry.file_name().to_string_lossy().into_owned();
         for stem in stems(root, &doc_id)? {
-            if !stem.ends_with(".auto") {
+            if !PRUNED
+                .iter()
+                .any(|kind| stem.ends_with(&format!(".{kind}")))
+            {
                 continue;
             }
             if parse_stamp(&stem).is_some_and(|at| at < cutoff) {

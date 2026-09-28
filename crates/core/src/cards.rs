@@ -18,17 +18,17 @@
 //!
 //! Kinds (분류) and their default fields live in `project.json`.
 
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 
+use crate::doc::Section;
 use crate::doc::{decode_value, encode, split_front_matter};
 use crate::markup::{Block, parse_body, write_body};
 use crate::search::{Match, find_in_blocks};
 use crate::store::{atomic_write, new_id, now_iso, read_text};
-use crate::{Error, Result, doc, project};
+use crate::{Error, Result, copies, doc, project};
 
 pub const CARDS_DIR: &str = "cards";
 
@@ -239,24 +239,17 @@ pub fn load(root: &Path, id: &str) -> Result<Card> {
     Ok(parse_card(&read_text(&path)?, id))
 }
 
-/// Every card, sorted by name.
+/// Every card, sorted by name. Copies left by sync programs are not cards of
+/// their own (copies.rs).
 pub fn load_all(root: &Path) -> Result<Vec<Card>> {
     let dir = root.join(CARDS_DIR);
-    let entries = match fs::read_dir(&dir) {
-        Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(Error::io(&dir, e)),
-    };
     let mut cards = Vec::new();
-    for entry in entries.filter_map(|e| e.ok()) {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let Some(id) = name.strip_suffix(".md") else {
+    for id in copies::scan(root, Section::Cards)?.ids {
+        // A file a sync program is still writing is left out for now.
+        let Ok(text) = read_text(&dir.join(doc::file_name(&id))) else {
             continue;
         };
-        if name.starts_with('.') {
-            continue;
-        }
-        cards.push(parse_card(&read_text(&entry.path())?, id));
+        cards.push(parse_card(&text, &id));
     }
     cards.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(cards)

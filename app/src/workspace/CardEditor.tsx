@@ -88,6 +88,31 @@ function LoadedCard({ root, initial, locked }: { root: string; initial: Card; lo
     };
   }, [root]);
 
+  // Another device changed this card: take its version, unless it is being
+  // changed here too (then this device's save wins, as before).
+  const reloads = useApp((s) => s.cardReloads[initial.id] ?? 0);
+  const seenReloads = useRef(reloads);
+  useEffect(() => {
+    if (reloads === seenReloads.current) return;
+    seenReloads.current = reloads;
+    if (pending.current) return;
+    let alive = true;
+    api.cardLoad(root, initial.id).then(
+      (loaded) => {
+        if (!alive || pending.current) return;
+        savedName.current = loaded.name;
+        savedNames.current = namesOf(loaded);
+        setCard(loaded);
+      },
+      () => {
+        // Gone or being written; the list catches up with the next change.
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, [reloads, root, initial.id]);
+
   useAutoHeight(descriptionRef, card.description, 120);
 
   const change = (patch: Partial<Card>) => {

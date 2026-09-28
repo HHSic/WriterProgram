@@ -5,7 +5,10 @@ import { useState } from 'react';
 import { api } from '../api';
 import type { CardType } from '../api/types';
 import { Icon } from '../components/Icon';
-import { openMenu, type MenuItem } from '../components/Menu';
+import { type MenuItem, type MenuOptions } from '../components/Menu';
+import { MoreButton } from '../components/MoreButton';
+import { CopyBadge, countCopies } from './Copies';
+import { pressMenu } from '../lib/press';
 import { docNoun } from '../lib/labels';
 import {
   createCard,
@@ -23,6 +26,7 @@ export function CardsSection() {
   const activeCardId = useApp((s) => s.activeCardId);
   const previewCardId = useApp((s) => s.previewCardId);
   const counts = useApp((s) => s.cardCounts);
+  const copyCounts = countCopies(ov.copies);
   const noun = docNoun(ov.project.kind);
   const [open, setOpen] = useState<Set<string>>(() => new Set(['person']));
 
@@ -131,6 +135,7 @@ export function CardsSection() {
       {ov.cardTypes.map((kind) => {
         const cards = ov.cards.filter((c) => c.cardType === kind.id);
         const expanded = open.has(kind.id);
+        const kindOpts = (): MenuOptions => ({ title: kind.name, subtitle: `카드 ${cards.length}개` });
         return (
           <div key={kind.id} className="part">
             <div className="kind-row">
@@ -139,7 +144,7 @@ export function CardsSection() {
                 className="part-head grow"
                 aria-expanded={expanded}
                 onClick={() => toggle(kind.id)}
-                onContextMenu={(e) => openMenu(e, kindMenu(kind))}
+                {...pressMenu(() => kindMenu(kind), kindOpts)}
               >
                 <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={14} />
                 <span className="part-title">{kind.name}</span>
@@ -154,38 +159,45 @@ export function CardsSection() {
               >
                 <Icon name="plus" size={12} />
               </button>
+              <MoreButton items={() => kindMenu(kind)} opts={kindOpts} label={`${kind.name} 메뉴`} />
             </div>
             {expanded &&
-              cards.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  className={`card-item${card.id === activeCardId || card.id === previewCardId ? ' active' : ''}`}
-                  title={
-                    [
-                      card.summary,
-                      counts[card.id] === undefined
-                        ? ''
-                        : counts[card.id]
-                          ? `${counts[card.id]}개 ${noun}에 나옴`
-                          : '아직 원고에 나오지 않음',
-                    ]
-                      .filter(Boolean)
-                      .join('\n') || undefined
-                  }
-                  onClick={() => previewCard(card.id)}
-                  onDoubleClick={() => void openCard(card.id)}
-                  onContextMenu={(e) =>
-                    openMenu(e, [
-                      { label: '편집', onSelect: () => void openCard(card.id) },
-                      { separator: true },
-                      { label: '휴지통으로', danger: true, onSelect: () => void trashCard(card.id) },
-                    ])
-                  }
-                >
-                  <span className="grow ellipsis">{card.name}</span>
-                </button>
-              ))}
+              cards.map((card) => {
+                const about =
+                  [
+                    card.summary,
+                    counts[card.id] === undefined
+                      ? ''
+                      : counts[card.id]
+                        ? `${counts[card.id]}개 ${noun}에 나옴`
+                        : '아직 원고에 나오지 않음',
+                  ]
+                    .filter(Boolean)
+                    .join('\n') || undefined;
+                const cardMenu = (): MenuItem[] => [
+                  { label: '미리보기', onSelect: () => previewCard(card.id) },
+                  { label: '편집', onSelect: () => void openCard(card.id) },
+                  { separator: true },
+                  { label: '휴지통으로', danger: true, onSelect: () => void trashCard(card.id) },
+                ];
+                const cardOpts = (): MenuOptions => ({ title: card.name, subtitle: about });
+                return (
+                  <div key={card.id} className="card-row">
+                    <button
+                      type="button"
+                      className={`card-item${card.id === activeCardId || card.id === previewCardId ? ' active' : ''}`}
+                      title={about}
+                      onClick={() => previewCard(card.id)}
+                      onDoubleClick={() => void openCard(card.id)}
+                      {...pressMenu(cardMenu, cardOpts)}
+                    >
+                      <span className="grow ellipsis">{card.name}</span>
+                      <CopyBadge count={copyCounts.get(card.id) ?? 0} />
+                    </button>
+                    <MoreButton items={cardMenu} opts={cardOpts} label={`${card.name} 메뉴`} />
+                  </div>
+                );
+              })}
           </div>
         );
       })}

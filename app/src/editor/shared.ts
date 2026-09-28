@@ -4,10 +4,13 @@
 import type { Editor, JSONContent } from '@tiptap/core';
 import type { Transaction } from '@tiptap/pm/state';
 import type { SaveOutcome } from '../api/types';
+import { clearConflict } from '../store';
 import { SaveSession } from './session';
 
 /** Marks a transaction passed on from the other editor. */
 const FROM_PEER = 'fromPeer';
+/** Marks a transaction that loads the text on disk: nothing to save. */
+export const RELOAD = 'wpReload';
 
 interface Shared {
   session: SaveSession;
@@ -26,6 +29,42 @@ function replaceDoc(editor: Editor, json: JSONContent) {
   editor.view.dispatch(tr.setMeta('addToHistory', false).setMeta(FROM_PEER, true));
 }
 
+/**
+ * Shows the text on disk (another device's) in every editor of a document,
+ * without an undo step and without saving it again. The cursor stays near
+ * where it was.
+ */
+export function reloadDoc(docId: string, json: JSONContent, rev: string) {
+  const entry = open.get(docId);
+  if (!entry) return;
+  for (const editor of entry.editors) {
+    if (editor.isDestroyed) continue;
+    // Replace only the part that differs, so the cursor, the scroll position
+    // and everything around stay put.
+    const next = editor.schema.nodeFromJSON(json);
+    const current = editor.state.doc;
+    const start = current.content.findDiffStart(next.content);
+    if (start == null) continue;
+    let { a: endA, b: endB } = current.content.findDiffEnd(next.content) ?? {
+      a: current.content.size,
+      b: next.content.size,
+    };
+    const overlap = start - Math.min(endA, endB);
+    if (overlap > 0) {
+      endA += overlap;
+      endB += overlap;
+    }
+    const tr = editor.state.tr.replace(start, endA, next.slice(start, endB));
+    editor.view.dispatch(tr.setMeta('addToHistory', false).setMeta(FROM_PEER, true).setMeta(RELOAD, true));
+  }
+  entry.session.loaded(rev);
+}
+
+/** The save session of a document open in an editor. */
+export function sessionOf(docId: string): SaveSession | null {
+  return open.get(docId)?.session ?? null;
+}
+
 /** Every editor showing this document now. */
 export function editorsOf(docId: string): Editor[] {
   return [...(open.get(docId)?.editors ?? [])].filter((e) => !e.isDestroyed);
@@ -37,11 +76,13 @@ export function peerOf(docId: string): Editor | null {
   return null;
 }
 
+/** `rev` is the fingerprint of the text the editor was loaded with. */
 export function attach(
   root: string,
   docId: string,
   editor: Editor,
   onSaved: (outcome: SaveOutcome) => void,
+  rev: string,
 ): { session: SaveSession; detach: () => void } {
   let shared = open.get(docId);
   if (!shared) {
@@ -51,6 +92,7 @@ export function attach(
         docId,
         () => peerOf(docId)?.getJSON() ?? entry.lastBody ?? { type: 'doc', content: [] },
         (outcome) => entry.onSaved(outcome),
+        rev,
       ),
       editors: new Set(),
       onSaved,
@@ -95,6 +137,8 @@ export function attach(
       if (entry.editors.size === 0) {
         open.delete(docId);
         void entry.session.dispose();
+        // This device's text is in the records; the banner goes with the editor.
+        clearConflict(docId);
       }
     },
   };

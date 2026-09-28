@@ -29,6 +29,8 @@ export interface ViewSettings {
   width: number;
   /** 빈칸·문단 부호 보이기 */
   showMarks: boolean;
+  /** 편집 도구줄 under the page: on touch screens, always, or never. */
+  toolbar: 'auto' | 'always' | 'never';
 }
 
 export const FONT_LABEL: Record<BodyFont, string> = {
@@ -58,6 +60,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   indent: 0,
   width: 560,
   showMarks: false,
+  toolbar: 'auto',
 };
 
 const KEY = 'wp.view';

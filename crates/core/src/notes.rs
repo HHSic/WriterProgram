@@ -29,10 +29,11 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::doc::Section;
 use crate::doc::{decode_value, encode, split_front_matter};
 use crate::markup::{Block, Inline, Mark, parse_body, write_body};
 use crate::store::{atomic_write, new_id, now_iso, read_text};
-use crate::{Error, Result, cards, doc};
+use crate::{Error, Result, cards, copies, doc};
 
 pub const NOTES_DIR: &str = "notes";
 
@@ -228,24 +229,17 @@ pub fn load(root: &Path, id: &str) -> Result<Note> {
     Ok(parse_note(&read_text(&path)?, id))
 }
 
-/// Every note, oldest first.
+/// Every note, oldest first. Copies left by sync programs are not notes of
+/// their own (copies.rs).
 pub fn list(root: &Path) -> Result<Vec<Note>> {
     let dir = root.join(NOTES_DIR);
-    let entries = match fs::read_dir(&dir) {
-        Ok(entries) => entries,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => return Err(Error::io(&dir, e)),
-    };
     let mut notes = Vec::new();
-    for entry in entries.filter_map(|e| e.ok()) {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let Some(id) = name.strip_suffix(".md") else {
+    for id in copies::scan(root, Section::Notes)?.ids {
+        // A file a sync program is still writing is left out for now.
+        let Ok(text) = read_text(&dir.join(doc::file_name(&id))) else {
             continue;
         };
-        if name.starts_with('.') {
-            continue;
-        }
-        notes.push(parse_note(&read_text(&entry.path())?, id));
+        notes.push(parse_note(&text, &id));
     }
     notes.sort_by(|a, b| a.created.cmp(&b.created).then_with(|| a.id.cmp(&b.id)));
     Ok(notes)

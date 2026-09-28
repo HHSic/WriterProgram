@@ -14,6 +14,7 @@ export function App() {
   const palette = useApp((s) => s.view.palette);
   const accent = useApp((s) => s.view.accent);
   const customColor = useApp((s) => s.view.customColor);
+  const busy = useApp((s) => s.busy);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -30,6 +31,24 @@ export function App() {
   }, [theme, palette, accent, customColor]);
 
   useEffect(() => {
+    // On phones the keyboard covers the bottom of the page without resizing
+    // it; --kb is how much it covers, for the 편집 도구줄.
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty('--kb', `${Math.round(covered)}px`);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  useEffect(() => {
     // Finish the last save before the window closes; keep it open if saving fails.
     api.onCloseRequested(saveEverything);
   }, []);
@@ -40,6 +59,11 @@ export function App() {
       <DialogHost />
       <MenuHost />
       <ToastHost />
+      {busy && (
+        <div className="busy-cover" role="status" aria-live="polite">
+          <div className="busy-box">{busy}</div>
+        </div>
+      )}
     </>
   );
 }

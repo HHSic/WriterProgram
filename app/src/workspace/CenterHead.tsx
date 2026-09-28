@@ -1,10 +1,9 @@
-import type { Editor } from '@tiptap/core';
 import { Icon } from '../components/Icon';
-import { openMenu, type MenuItem } from '../components/Menu';
-import { marginsAt } from '../editor/paragraph';
+import { openMenu } from '../components/Menu';
 import { flushAll } from '../lib/flush';
 import { UNTITLED, docNumber } from '../lib/labels';
 import { findDoc, openDialog, splitView, unsplit, useApp } from '../store';
+import { marginMenu } from './EditToolbar';
 import { openSymbols } from './Symbols';
 
 export function CenterHead() {
@@ -12,6 +11,7 @@ export function CenterHead() {
   const activeDocId = useApp((s) => s.activeDocId);
   const editor = useApp((s) => s.editor);
   const save = useApp((s) => s.save);
+  const conflict = useApp((s) => (s.activeDocId ? s.conflicts[s.activeDocId] : undefined));
   const rightOpen = useApp((s) => s.rightOpen);
   const activeCardId = useApp((s) => s.activeCardId);
   const target = useApp((s) => s.activeTarget);
@@ -51,7 +51,14 @@ export function CenterHead() {
         )}
       </nav>
       <div className="grow" />
-      <SaveIndicator state={save.state} error={save.error} />
+      {conflict ? (
+        <span className="save-state conflict" role="status" title="다른 기기에서 고친 내용과 달라 저장을 멈춤">
+          <span className="dot-mark" />
+          다른 기기에서 바뀜
+        </span>
+      ) : (
+        <SaveIndicator state={save.state} error={save.error} />
+      )}
       {activeDocId && (
         <button
           type="button"
@@ -71,7 +78,7 @@ export function CenterHead() {
           aria-label="문단 여백"
           title="문단 여백: 문단을 통째로 들이기 (Ctrl+] / Ctrl+[)"
           disabled={!editor || !editor.isEditable}
-          onClick={(e) => editor && openMenu(e, marginMenu(editor))}
+          onClick={(e) => editor && openMenu(e, marginMenu(editor), { title: '문단 여백' })}
         >
           <Icon name="indent" size={17} />
         </button>
@@ -118,27 +125,6 @@ export function CenterHead() {
       </button>
     </div>
   );
-}
-
-/** 문단 여백 for the paragraphs the cursor or selection is in. */
-function marginMenu(editor: Editor): MenuItem[] {
-  const now = marginsAt(editor.state);
-  const run = (f: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => {
-    f(editor.chain().focus()).run();
-  };
-  return [
-    { heading: now.left || now.right ? `지금 문단: 왼쪽 ${now.left}자 · 오른쪽 ${now.right}자` : '지금 문단: 여백 없음' },
-    { label: '왼쪽 한 자 들이기 (Ctrl+])', onSelect: run((c) => c.shiftMargins(1)) },
-    { label: '왼쪽 한 자 내기 (Ctrl+[)', disabled: now.left === 0, onSelect: run((c) => c.shiftMargins(-1)) },
-    { label: '양쪽 한 자씩 들이기', onSelect: run((c) => c.shiftMargins(1, ['left', 'right'])) },
-    {
-      label: '양쪽 한 자씩 내기',
-      disabled: now.left === 0 && now.right === 0,
-      onSelect: run((c) => c.shiftMargins(-1, ['left', 'right'])),
-    },
-    { separator: true },
-    { label: '여백 없애기', disabled: now.left === 0 && now.right === 0, onSelect: run((c) => c.setMargins({ left: 0, right: 0 })) },
-  ];
 }
 
 function SaveIndicator({ state, error }: { state: 'saved' | 'saving' | 'error'; error?: string }) {
