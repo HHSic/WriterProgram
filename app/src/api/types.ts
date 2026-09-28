@@ -268,6 +268,30 @@ export interface SyncOutcome {
   report: SyncReport | null;
 }
 
+/** A page in the in-app browser, for 자료로 보관. */
+export interface PageClip {
+  url: string;
+  title: string;
+  /** Selected text, if any. */
+  text: string;
+}
+
+/** Word from the in-app browser: a page's address, title, or loading. */
+export interface PageEvent {
+  label: string;
+  url?: string;
+  title?: string;
+  loading?: boolean;
+}
+
+/** Where a browser tab sits in the window, in CSS pixels. */
+export interface Bounds {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface DriveProject {
   folder: string;
   title: string;
@@ -513,6 +537,14 @@ export interface Backend {
   projectLink(projectId: string, title: string, provider: DriveProvider): Promise<DriveLink>;
   projectUnlink(projectId: string): Promise<void>;
   projectSync(root: string, projectId: string): Promise<SyncOutcome>;
+  /** In-app browser (prototype): desktop only. */
+  browserOpen(label: string, url: string, at: Bounds): Promise<void>;
+  browserBounds(label: string, at: Bounds, visible: boolean): Promise<void>;
+  browserNavigate(label: string, url: string): Promise<string>;
+  browserStep(label: string, step: 'back' | 'forward' | 'reload'): Promise<void>;
+  browserClose(label: string): Promise<void>;
+  browserClip(label: string): Promise<PageClip>;
+  onBrowserPage(handler: (event: PageEvent) => void): () => void;
   reveal(path: string): Promise<void>;
   pickFolder(title: string, defaultPath?: string): Promise<string | null>;
   /** `extension` without the dot: txt, docx or hwpx. */

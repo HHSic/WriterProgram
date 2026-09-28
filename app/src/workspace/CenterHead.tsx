@@ -2,7 +2,7 @@ import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { flushAll } from '../lib/flush';
 import { UNTITLED, docNumber } from '../lib/labels';
-import { findDoc, openDialog, splitView, unsplit, useApp } from '../store';
+import { findDoc, openDialog, openWeb, splitView, unsplit, useApp, webPages } from '../store';
 import { marginMenu } from './EditToolbar';
 import { openSymbols } from './Symbols';
 
@@ -23,6 +23,13 @@ export function CenterHead() {
     <div className="col-head center-head">
       <nav className="crumbs" aria-label="현재 위치">
         {target?.kind === 'notes' && <strong>메모함</strong>}
+        {target?.kind === 'web' && (
+          <>
+            <span>웹</span>
+            <Icon name="chevronRight" size={12} />
+            <strong>{webPages(ov.project.id)[target.id]?.title || '새 페이지'}</strong>
+          </>
+        )}
         {target?.kind === 'table' && (
           <>
             <span>개요 표</span>
@@ -92,6 +99,15 @@ export function CenterHead() {
         onClick={() => openSymbols()}
       >
         <Icon name="symbol" size={17} />
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="웹 보기"
+        title="웹 보기: 새 탭에 브라우저 열기 (자료 조사)"
+        onClick={() => void openWeb()}
+      >
+        <Icon name="globe" size={17} />
       </button>
       <button
         type="button"

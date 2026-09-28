@@ -1,3 +1,4 @@
+mod browser;
 mod commands;
 mod drives;
 mod watch;
@@ -67,6 +68,12 @@ pub fn run() {
             commands::project_move,
             commands::project_watch,
             commands::project_unwatch,
+            browser::browser_open,
+            browser::browser_bounds,
+            browser::browser_navigate,
+            browser::browser_step,
+            browser::browser_close,
+            browser::browser_clip,
             drives::drive_status,
             drives::drive_connect,
             drives::drive_cancel,

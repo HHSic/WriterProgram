@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import type { Backend, Change } from './types';
+import type { Backend, Change, PageEvent } from './types';
 
 const FILE_TYPE_NAMES: Record<string, string> = {
   txt: '텍스트 파일',
@@ -88,6 +88,16 @@ export const tauriBackend: Backend = {
   projectLink: (projectId, title, provider) => invoke('project_link', { projectId, title, provider }),
   projectUnlink: (projectId) => invoke('project_unlink', { projectId }),
   projectSync: (root, projectId) => invoke('project_sync', { root, projectId }),
+  browserOpen: (label, url, at) => invoke('browser_open', { label, url, ...at }),
+  browserBounds: (label, at, visible) => invoke('browser_bounds', { label, ...at, visible }),
+  browserNavigate: (label, url) => invoke('browser_navigate', { label, url }),
+  browserStep: (label, step) => invoke('browser_step', { label, step }),
+  browserClose: (label) => invoke('browser_close', { label }),
+  browserClip: (label) => invoke('browser_clip', { label }),
+  onBrowserPage: (handler) => {
+    const unlisten = listen<PageEvent>('browser-page', (event) => handler(event.payload));
+    return () => void unlisten.then((stop) => stop());
+  },
   reveal: (path) => invoke('reveal', { path }),
   pickFolder: async (title, defaultPath) => {
     const picked = await open({ directory: true, multiple: false, title, defaultPath });

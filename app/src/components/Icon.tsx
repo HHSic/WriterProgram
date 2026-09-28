@@ -102,6 +102,19 @@ const PATHS = {
   undo: <path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-3" />,
   redo: <path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h3" />,
   symbol: <path d="M5 19h4.5v-2.2A6.5 6.5 0 1 1 14.5 16.8V19H19" />,
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5z" />
+    </>
+  ),
+  forward: <path d="M9 6l6 6-6 6" />,
+  reload: (
+    <>
+      <path d="M19 12a7 7 0 1 1-2.1-5" />
+      <path d="M19 4v4h-4" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

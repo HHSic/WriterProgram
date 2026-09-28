@@ -20,17 +20,23 @@ import {
   toggleLock,
   unsplit,
   useApp,
+  webPages,
   type Pane,
 } from '../store';
 import { CardEditor } from './CardEditor';
 import { DocPane } from './DocPane';
 import { NotesBoard } from './Notes';
 import { OutlineTable } from './OutlineTable';
+import { WebPane } from './WebPane';
 
 const TAB_DRAG = 'application/x-writer-tab';
 
 export function tabLabel(ov: Overview, target: Target): { label: string; icon: IconName } {
   if (target.kind === 'notes') return { label: '메모함', icon: 'note' };
+  if (target.kind === 'web') {
+    const page = webPages(ov.project.id)[target.id];
+    return { label: page?.title || '웹', icon: 'globe' };
+  }
   if (target.kind === 'table') {
     const part = ov.parts.find((p) => p.id === target.id);
     return { label: `개요 표 · ${part?.title ?? ''}`, icon: 'table' };
@@ -83,7 +89,7 @@ function PaneView({ pane, index, focused, multi }: { pane: Pane; index: number; 
         )}
         {pane.tabs.map((tab) => (
           <div key={tab.key} className={`tab-body${tab.key === pane.active ? '' : ' off'}`} aria-hidden={tab.key !== pane.active}>
-            <TabContent tab={tab} locked={pane.locked} />
+            <TabContent tab={tab} locked={pane.locked} active={tab.key === pane.active} />
           </div>
         ))}
       </div>
@@ -91,9 +97,11 @@ function PaneView({ pane, index, focused, multi }: { pane: Pane; index: number; 
   );
 }
 
-function TabContent({ tab, locked }: { tab: Tab; locked: boolean }) {
+function TabContent({ tab, locked, active }: { tab: Tab; locked: boolean; active: boolean }) {
   const t = tab.target;
   switch (t.kind) {
+    case 'web':
+      return <WebPane key={t.id} id={t.id} active={active} />;
     case 'card':
       return <CardEditor key={t.id} cardId={t.id} locked={locked} />;
     case 'notes':
@@ -107,6 +115,8 @@ function TabContent({ tab, locked }: { tab: Tab; locked: boolean }) {
 
 function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: boolean }) {
   const ov = useApp((s) => s.overview)!;
+  // Browser tabs are labeled by their page's title.
+  useApp((s) => s.webVersion);
   const [dropBefore, setDropBefore] = useState<string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
 

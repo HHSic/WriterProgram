@@ -1048,6 +1048,19 @@ export const mockBackend: Backend = {
       report: { uploaded: [], downloaded: [], removedHere: [], removedThere: [], copies: [], merged: false, later: [] },
     };
   },
+  async browserOpen() {},
+  async browserBounds() {},
+  async browserNavigate(_label, url) {
+    return url;
+  },
+  async browserStep() {},
+  async browserClose() {},
+  async browserClip() {
+    throw '앱 안 브라우저는 데스크톱 앱에서만 됨';
+  },
+  onBrowserPage() {
+    return () => {};
+  },
   watchProject(root, onChange) {
     watcher = { root, onChange };
     return () => {

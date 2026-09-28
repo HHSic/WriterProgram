@@ -1,15 +1,16 @@
 // Tabs and split panes in the middle column (docs/layout-data.md "가운데 탭",
 // "분할"). Plain data and pure helpers; the store owns the state.
 
-/** What a tab shows: a document, a setting card, 메모함 (id "all"), or the
- * 개요 표 of a part (id = the part). */
+/** What a tab shows: a document, a setting card, 메모함 (id "all"), the
+ * 개요 표 of a part (id = the part), or a web page (id = the browser tab's). */
 export type Target =
   | { kind: 'doc'; id: string }
   | { kind: 'card'; id: string }
   | { kind: 'notes'; id: 'all' }
-  | { kind: 'table'; id: string };
+  | { kind: 'table'; id: string }
+  | { kind: 'web'; id: string };
 
-const KINDS = ['doc', 'card', 'notes', 'table'];
+const KINDS = ['doc', 'card', 'notes', 'table', 'web'];
 
 export interface Tab {
   /** Stays the same while the tab shows other things (React key). */

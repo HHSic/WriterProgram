@@ -32,6 +32,11 @@ interface MenuState {
 
 const useMenu = create<{ menu: MenuState | null }>(() => ({ menu: null }));
 
+/** Whether a menu is open (the in-app browser hides under it). */
+export function useMenuOpen(): boolean {
+  return useMenu((s) => s.menu !== null);
+}
+
 /** Opens a menu at a point; after a finger it becomes a sheet. */
 export function openMenuAt(x: number, y: number, items: MenuItem[], opts: MenuOptions = {}) {
   const sheet = opts.sheet ?? (touchLike() || fingerScreen());

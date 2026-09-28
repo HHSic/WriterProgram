@@ -19,7 +19,8 @@ keyring-core = "1"
 notify-debouncer-mini = "0.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri = { version = "2", features = [] }
+# "unstable": child webviews for the in-app browser (prototype).
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 writer-core = { path = "../../crates/core" }

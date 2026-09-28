@@ -3723,6 +3723,54 @@ fieldset.plain {
   flex: 1;
 }
 
+
+/* 앱 안 브라우저 (시제품) */
+
+.web-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.web-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.web-address {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 15px;
+  background: var(--surface);
+  font-size: 12.5px;
+}
+
+.web-host {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--surface);
+}
+
+.icon-btn.spinning svg {
+  animation: web-spin 0.9s linear infinite;
+}
+
+@keyframes web-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (any-pointer: coarse) {
   .more-btn {
     opacity: 1;
