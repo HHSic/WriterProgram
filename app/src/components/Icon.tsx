@@ -38,6 +38,12 @@ const PATHS = {
   type: <path d="M5 19l5-14h1l5 14M7 14h7M17 19l2.5-7 2.5 7M18 17h3" />,
   diamond: <path d="M12 4l6 8-6 8-6-8z" />,
   back: <path d="M15 6l-6 6 6 6" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M20 20l-4-4" />
+    </>
+  ),
   restore: (
     <>
       <path d="M4 12a8 8 0 1 0 2.4-5.7" />
@@ -50,6 +56,50 @@ const PATHS = {
       <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
     </>
   ),
+  split: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M12 4.5v15" />
+    </>
+  ),
+  splitDown: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M3.5 12h17" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  unlock: (
+    <>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 7.5-2" />
+    </>
+  ),
+  person: (
+    <>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 20c1-4 4-6 7-6s6 2 7 6" />
+    </>
+  ),
+  note: (
+    <>
+      <path d="M5 4h14v12l-4 4H5z" />
+      <path d="M15 20v-4h4" />
+    </>
+  ),
+  table: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M3.5 14.5h17M9 4.5v15" />
+    </>
+  ),
+  indent: <path d="M4 5h16M10 10h10M10 14h10M4 19h16M4 9.5l3 2.5-3 2.5" />,
+  symbol: <path d="M5 19h4.5v-2.2A6.5 6.5 0 1 1 14.5 16.8V19H19" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

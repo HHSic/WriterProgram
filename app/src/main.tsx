@@ -9,5 +9,9 @@ import '@fontsource/nanum-myeongjo/400.css';
 import '@fontsource/nanum-myeongjo/700.css';
 import './styles.css';
 import { App } from './App';
+import * as store from './store';
+
+// Lets browser checks look at the app state during development.
+if (import.meta.env.DEV) Object.assign(window, { __app: store.useApp, __store: store });
 
 createRoot(document.getElementById('root')!).render(<App />);

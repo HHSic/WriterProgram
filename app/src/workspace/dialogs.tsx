@@ -1,22 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
-import type { ExportItem, TextOptions, TrashItem } from '../api/types';
+import type { TrashItem } from '../api/types';
 import { Modal } from '../components/Modal';
-import { fileSafe, num, timeLabel } from '../lib/format';
-import { UNTITLED, docNoun, docNumber } from '../lib/labels';
-import { FONT_LABEL, type BodyFont, type Theme } from '../lib/view';
+import { num, timeLabel } from '../lib/format';
+import { UNTITLED } from '../lib/labels';
+import { ACCENTS, PALETTES, previewColors } from '../lib/colors';
+import { FONT_LABEL, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
 import { NewProjectDialog } from '../screens/NewProjectDialog';
-import {
-  allManuscript,
-  closeDialog,
-  refreshOverview,
-  saveEverything,
-  setView,
-  showToast,
-  toastError,
-  useApp,
-  type Dialog,
-} from '../store';
+import { ExportDialog } from './ExportDialog';
+import { ProjectSettingsDialog } from './ProjectSettings';
+import { SymbolsDialog } from './Symbols';
+import { closeDialog, loadNotes, refreshOverview, setView, toastError, useApp, type Dialog } from '../store';
 
 export function PromptDialog({ dialog }: { dialog: Extract<Dialog, { kind: 'prompt' }> }) {
   const [value, setValue] = useState(dialog.value);
@@ -120,6 +114,7 @@ export function TrashDialog() {
     try {
       await api.trashRestore(root, item.id);
       await refreshOverview();
+      if (item.section === 'notes') await loadNotes();
       await load();
     } catch (e) {
       toastError('되살리지 못함', e);
@@ -146,7 +141,12 @@ export function TrashDialog() {
             <div className="grow">
               <strong>{item.title || UNTITLED}</strong>
               <span className="meta">
-                {item.section === 'planning' ? '기획' : '원고'} · {num(item.chars)}자 · {timeLabel(item.deletedAt)}에 지움
+                {item.section === 'cards'
+                  ? '설정 카드'
+                  : item.section === 'notes'
+                    ? '메모'
+                    : `${item.section === 'planning' ? '기획' : '원고'} · ${num(item.chars)}자`}{' '}
+                · {timeLabel(item.deletedAt)}에 지움
               </span>
             </div>
             {confirming === item.id ? (
@@ -172,151 +172,7 @@ export function TrashDialog() {
           </li>
         ))}
       </ul>
-      <p className="hint">휴지통에 넣은 문서는 30일 동안 보관한 뒤 지워집니다.</p>
-    </Modal>
-  );
-}
-
-type Scope = 'current' | 'all';
-type Target = 'file' | 'clipboard';
-
-export function ExportDialog() {
-  const ov = useApp((s) => s.overview)!;
-  const activeDocId = useApp((s) => s.activeDocId);
-  const kind = ov.project.kind;
-  const manuscript = allManuscript(ov);
-  const activeIsManuscript = manuscript.some((d) => d.id === activeDocId);
-
-  const [scope, setScope] = useState<Scope>(activeIsManuscript ? 'current' : 'all');
-  const [target, setTarget] = useState<Target>('file');
-  const [perDoc, setPerDoc] = useState(false);
-  const [includeTitles, setIncludeTitles] = useState(true);
-  const [blankLine, setBlankLine] = useState(kind === 'webnovel');
-  const [symbol, setSymbol] = useState(ov.project.sceneBreak);
-  const [busy, setBusy] = useState(false);
-
-  const items: ExportItem[] = manuscript
-    .map((doc, i) => ({ doc, n: i + 1 }))
-    .filter(({ doc }) => scope === 'all' || doc.id === activeDocId)
-    .map(({ doc, n }) => ({
-      docId: doc.id,
-      heading: `${docNumber(kind, n)}${doc.title ? ` ${doc.title}` : ''}`,
-      fileName: `${fileSafe(ov.project.title)}_${String(n).padStart(3, '0')}`,
-    }));
-
-  const opts: TextOptions = { includeTitles, blankLineBetween: blankLine, sceneBreak: symbol.trim() || '◆' };
-
-  const run = async () => {
-    if (!items.length || busy) return;
-    setBusy(true);
-    try {
-      if (!(await saveEverything())) return;
-      if (target === 'clipboard') {
-        const text = await api.exportText(ov.root, items, opts);
-        await navigator.clipboard.writeText(text);
-        closeDialog();
-        showToast({ text: `클립보드에 복사함 · ${num([...text].length)}자` });
-        return;
-      }
-      let dest: string | null;
-      if (perDoc && items.length > 1) {
-        dest = await api.pickFolder('내보낼 폴더');
-      } else {
-        const name = items.length === 1 ? `${items[0].fileName}.txt` : `${fileSafe(ov.project.title)}.txt`;
-        dest = await api.pickSaveFile('텍스트 파일로 내보내기', name);
-      }
-      if (!dest) return;
-      const files = await api.exportTxt(ov.root, items, opts, dest, perDoc && items.length > 1);
-      closeDialog();
-      showToast({
-        text: files.length > 1 ? `내보냄 · 파일 ${files.length}개` : '내보냄',
-        action: { label: '폴더 열기', run: () => void api.reveal(files[0]) },
-      });
-    } catch (e) {
-      toastError('내보내지 못함', e);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal
-      title="내보내기"
-      onClose={closeDialog}
-      width={520}
-      footer={
-        <>
-          <button type="button" className="btn" onClick={closeDialog}>
-            취소
-          </button>
-          <button type="button" className="btn primary" disabled={!items.length || busy} onClick={() => void run()}>
-            {target === 'clipboard' ? '복사하기' : '내보내기'}
-          </button>
-        </>
-      }
-    >
-      <div className="form">
-        <fieldset className="field">
-          <legend className="field-label">범위</legend>
-          <div className="segmented">
-            <label className={scope === 'current' ? 'on' : ''}>
-              <input type="radio" checked={scope === 'current'} disabled={!activeIsManuscript} onChange={() => setScope('current')} />
-              지금 {docNoun(kind)}
-            </label>
-            <label className={scope === 'all' ? 'on' : ''}>
-              <input type="radio" checked={scope === 'all'} onChange={() => setScope('all')} />
-              작품 전체 ({manuscript.length}개)
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset className="field">
-          <legend className="field-label">형식</legend>
-          <div className="segmented">
-            <label className={target === 'file' ? 'on' : ''}>
-              <input type="radio" checked={target === 'file'} onChange={() => setTarget('file')} />
-              텍스트 파일 (txt)
-            </label>
-            <label className={target === 'clipboard' ? 'on' : ''}>
-              <input type="radio" checked={target === 'clipboard'} onChange={() => setTarget('clipboard')} />
-              클립보드
-            </label>
-          </div>
-          <small className="hint">docx와 한글(HWPX) 내보내기는 다음 단계에서 붙습니다.</small>
-        </fieldset>
-
-        {target === 'file' && scope === 'all' && (
-          <fieldset className="field">
-            <legend className="field-label">파일</legend>
-            <div className="segmented">
-              <label className={!perDoc ? 'on' : ''}>
-                <input type="radio" checked={!perDoc} onChange={() => setPerDoc(false)} />
-                파일 하나로
-              </label>
-              <label className={perDoc ? 'on' : ''}>
-                <input type="radio" checked={perDoc} onChange={() => setPerDoc(true)} />
-                {docNoun(kind)}마다 파일 하나
-              </label>
-            </div>
-          </fieldset>
-        )}
-
-        <div className="field">
-          <span className="field-label">모양</span>
-          <label className="check">
-            <input type="checkbox" checked={includeTitles} onChange={(e) => setIncludeTitles(e.target.checked)} />
-            {docNoun(kind)} 제목 줄 넣기
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={blankLine} onChange={(e) => setBlankLine(e.target.checked)} />
-            문단 사이에 빈 줄 넣기 (연재 플랫폼에 붙여 넣을 때)
-          </label>
-          <label className="row">
-            <span>장면 나눔 표시</span>
-            <input className="short" value={symbol} onChange={(e) => setSymbol(e.target.value)} aria-label="장면 나눔 표시" />
-          </label>
-        </div>
-      </div>
+      <p className="hint">휴지통에 넣은 문서·카드·메모는 30일 동안 보관한 뒤 지워집니다.</p>
     </Modal>
   );
 }
@@ -354,6 +210,15 @@ export function ViewDialog() {
           onChange={(v) => setView({ lineHeight: v / 100 })}
         />
         <Slider
+          label="자간"
+          value={view.letterSpacing}
+          min={-10}
+          max={20}
+          step={1}
+          unit="%"
+          onChange={(letterSpacing) => setView({ letterSpacing })}
+        />
+        <Slider
           label="문단 사이"
           value={view.paragraphGap}
           min={0}
@@ -364,8 +229,12 @@ export function ViewDialog() {
         />
         <Slider label="첫 줄 들여쓰기" value={view.indent} min={0} max={3} step={1} unit="자" onChange={(indent) => setView({ indent })} />
         <Slider label="본문 폭" value={view.width} min={440} max={840} step={20} unit="px" onChange={(width) => setView({ width })} />
+        <label className="check">
+          <input type="checkbox" checked={view.showMarks} onChange={(e) => setView({ showMarks: e.target.checked })} />
+          빈칸·문단 부호 보이기 (Ctrl+Shift+8)
+        </label>
         <fieldset className="field">
-          <legend className="field-label">화면</legend>
+          <legend className="field-label">화면 밝기</legend>
           <div className="segmented">
             {THEMES.map((t) => (
               <label key={t.id} className={view.theme === t.id ? 'on' : ''}>
@@ -375,8 +244,88 @@ export function ViewDialog() {
             ))}
           </div>
         </fieldset>
+        <ColorFields view={view} />
       </div>
     </Modal>
+  );
+}
+
+/** 화면 색 and 강조 색, drawn as small samples in the current brightness. */
+function ColorFields({ view }: { view: ViewSettings }) {
+  const dark =
+    view.theme === 'dark' || (view.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const choice = { palette: view.palette, accent: view.accent, customColor: view.customColor };
+  const paletteAccent = PALETTES.find((p) => p.id === view.palette)?.accent ?? 'vermilion';
+  return (
+    <>
+      <fieldset className="field">
+        <legend className="field-label">화면 색</legend>
+        <div className="swatches" role="radiogroup" aria-label="화면 색">
+          {PALETTES.map((p) => {
+            const c = previewColors({ ...choice, palette: p.id, accent: 'auto' }, dark);
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="radio"
+                aria-checked={view.palette === p.id}
+                className={`swatch${view.palette === p.id ? ' on' : ''}`}
+                onClick={() => setView({ palette: p.id })}
+              >
+                <span className="swatch-chip" style={{ background: `linear-gradient(135deg, ${c.bg} 50%, ${c.surface} 50%)`, borderColor: c.border }}>
+                  <span className="swatch-dot" style={{ background: c.accent }} />
+                </span>
+                <span className="swatch-name">{p.name}</span>
+              </button>
+            );
+          })}
+          <label
+            className={`swatch${view.palette === 'custom' ? ' on' : ''}`}
+            title="색을 고르면 그 색 기운으로 배경과 원고 종이를 맞춥니다"
+            onClick={() => setView({ palette: 'custom' })}
+          >
+            <input
+              type="color"
+              className="swatch-input"
+              value={view.customColor}
+              aria-label="화면 색 직접 고르기"
+              onChange={(e) => setView({ palette: 'custom', customColor: e.target.value })}
+            />
+            {(() => {
+              const c = previewColors({ ...choice, palette: 'custom', accent: 'auto' }, dark);
+              return (
+                <span className="swatch-chip custom" style={{ background: `linear-gradient(135deg, ${c.bg} 50%, ${c.surface} 50%)`, borderColor: c.border }}>
+                  <span className="swatch-dot" style={{ background: view.customColor }} />
+                </span>
+              );
+            })()}
+            <span className="swatch-name">직접 고르기</span>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset className="field">
+        <legend className="field-label">강조 색</legend>
+        <div className="swatches" role="radiogroup" aria-label="강조 색">
+          {[{ id: 'auto' as const, name: '색에 맞춤' }, ...ACCENTS].map((a) => {
+            const color = previewColors({ ...choice, accent: a.id === 'auto' ? paletteAccent : a.id }, dark).accent;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                role="radio"
+                aria-checked={view.accent === a.id}
+                className={`swatch${view.accent === a.id ? ' on' : ''}`}
+                onClick={() => setView({ accent: a.id })}
+              >
+                <span className={`swatch-chip accent${a.id === 'auto' ? ' auto' : ''}`} style={{ background: color }} />
+                <span className="swatch-name">{a.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span className="hint">버튼, 진행 막대, 지금 보는 탭 표시에 쓰입니다.</span>
+      </fieldset>
+    </>
   );
 }
 
@@ -425,7 +374,11 @@ export function DialogHost() {
       return <ExportDialog />;
     case 'view':
       return <ViewDialog />;
+    case 'symbols':
+      return <SymbolsDialog />;
     case 'newProject':
       return <NewProjectDialog />;
+    case 'project':
+      return <ProjectSettingsDialog tab={dialog.tab} />;
   }
 }

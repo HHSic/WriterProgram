@@ -1,22 +1,34 @@
 // Writing screen settings (작성 화면 설정): per device, never written into
 // manuscript files (docs/mvp-scope.md "서식 모델").
 
+import type { AccentId, PaletteId } from './colors';
+
 export type Theme = 'system' | 'light' | 'dark';
 export type BodyFont = 'noto-serif' | 'gowun-batang' | 'nanum-myeongjo' | 'sans';
 
 export interface ViewSettings {
   theme: Theme;
+  /** 화면 색: beige (the default), a preset tint, or one made from customColor. */
+  palette: PaletteId;
+  /** 강조 색; auto takes the palette's own. */
+  accent: AccentId;
+  /** #rrggbb picked for palette custom. */
+  customColor: string;
   font: BodyFont;
   /** px */
   fontSize: number;
   /** multiple of the font size */
   lineHeight: number;
+  /** letter spacing (자간) in percent of the font size, as in 한글 */
+  letterSpacing: number;
   /** space between paragraphs, in lines */
   paragraphGap: number;
   /** first-line indent, in characters */
   indent: number;
   /** text column width, px */
   width: number;
+  /** 빈칸·문단 부호 보이기 */
+  showMarks: boolean;
 }
 
 export const FONT_LABEL: Record<BodyFont, string> = {
@@ -35,12 +47,17 @@ export const FONT_STACK: Record<BodyFont, string> = {
 
 export const DEFAULT_VIEW: ViewSettings = {
   theme: 'system',
+  palette: 'beige',
+  accent: 'auto',
+  customColor: '#e8e0c8',
   font: 'noto-serif',
   fontSize: 18,
   lineHeight: 1.95,
+  letterSpacing: 0,
   paragraphGap: 0.5,
   indent: 0,
   width: 560,
+  showMarks: false,
 };
 
 const KEY = 'wp.view';
@@ -69,6 +86,7 @@ export function viewStyle(view: ViewSettings): Record<string, string> {
     '--body-font': FONT_STACK[view.font],
     '--body-size': `${view.fontSize}px`,
     '--body-leading': String(view.lineHeight),
+    '--tracking': `${view.letterSpacing / 100}em`,
     '--para-gap': `${view.paragraphGap * view.lineHeight}em`,
     '--indent': `${view.indent}em`,
     '--measure': `${view.width}px`,

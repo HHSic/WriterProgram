@@ -19,9 +19,13 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::cards::{self, CardSummary, CardType};
 use crate::count::{Counts, count_blocks};
 use crate::doc::{self, DocFile, DocMeta, Section};
-use crate::store::{atomic_write, new_id, now_iso, read_text, safe_file_name};
+use crate::format::{self, ManuscriptFormat};
+use crate::layout::PageMetrics;
+use crate::markup::Block;
+use crate::store::{atomic_write, new_id, now_iso, read_text, safe_file_name, to_iso};
 use crate::{Error, Result, snapshot, trash};
 
 pub const PROJECT_FILE: &str = "project.json";
@@ -84,9 +88,15 @@ pub struct Project {
     /// Symbol shown for scene breaks on screen and in exports.
     #[serde(default = "default_scene_break")]
     pub scene_break: String,
-    /// Manuscript format preset (원고 서식).
+    /// Id or name of the manuscript format preset in use (원고 서식).
     #[serde(default)]
     pub preset: String,
+    /// Manuscript format. Missing in projects made before it existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manuscript_format: Option<ManuscriptFormat>,
+    /// Kinds of setting cards (인물, 장소, 용어 and user-made ones).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card_types: Option<Vec<CardType>>,
     #[serde(default)]
     pub parts: Vec<Part>,
     #[serde(default)]
@@ -101,6 +111,18 @@ fn default_scene_break() -> String {
 }
 
 impl Project {
+    /// Kinds of setting cards; projects without any use the three defaults.
+    pub fn card_types(&self) -> Vec<CardType> {
+        self.card_types.clone().unwrap_or_else(cards::default_types)
+    }
+
+    /// The manuscript format in effect; older projects fall back to their preset.
+    pub fn manuscript_format(&self) -> ManuscriptFormat {
+        self.manuscript_format.clone().unwrap_or_else(|| {
+            format::builtin(&self.preset).unwrap_or_else(|| format::default_for(self.kind))
+        })
+    }
+
     fn part_mut(&mut self, part_id: &str) -> Result<&mut Part> {
         self.parts
             .iter_mut()
@@ -213,10 +235,11 @@ pub fn create(opts: &NewProject) -> Result<PathBuf> {
         planning.push(write_new_doc(&root, Section::Planning, name)?);
     }
 
-    let (scene_break, preset) = match opts.kind {
-        ProjectKind::Webnovel => ("◆", "webnovel"),
-        ProjectKind::Print => ("*", "manuscript-a4"),
+    let scene_break = match opts.kind {
+        ProjectKind::Webnovel => "◆",
+        ProjectKind::Print => "*",
     };
+    let manuscript_format = format::default_for(opts.kind);
     let project = Project {
         app: APP_NAME.into(),
         format: FORMAT_VERSION,
@@ -231,7 +254,9 @@ pub fn create(opts: &NewProject) -> Result<PathBuf> {
             daily: None,
         },
         scene_break: scene_break.into(),
-        preset: preset.into(),
+        preset: manuscript_format.preset.clone(),
+        manuscript_format: Some(manuscript_format),
+        card_types: Some(cards::default_types()),
         parts: vec![part],
         planning,
         extra: Map::new(),
@@ -280,7 +305,7 @@ pub struct ProjectInfo {
     pub created: String,
     pub goal: Goal,
     pub scene_break: String,
-    pub preset: String,
+    pub manuscript_format: ManuscriptFormat,
 }
 
 impl From<&Project> for ProjectInfo {
@@ -293,7 +318,7 @@ impl From<&Project> for ProjectInfo {
             created: p.created.clone(),
             goal: p.goal.clone(),
             scene_break: p.scene_break.clone(),
-            preset: p.preset.clone(),
+            manuscript_format: p.manuscript_format(),
         }
     }
 }
@@ -307,10 +332,14 @@ pub struct DocSummary {
     pub status: String,
     pub target: Option<u32>,
     pub counts: Counts,
+    /// Estimated pages in the manuscript format; none without paper.
+    pub pages: Option<u32>,
+    /// When the file was last written, for 개요 표.
+    pub modified: Option<String>,
 }
 
 impl DocSummary {
-    pub fn of(doc: &DocFile) -> Self {
+    pub fn of(doc: &DocFile, metrics: Option<&PageMetrics>) -> Self {
         DocSummary {
             id: doc.meta.id.clone(),
             title: doc.meta.title.clone(),
@@ -318,8 +347,15 @@ impl DocSummary {
             status: doc.meta.status.clone(),
             target: doc.meta.target,
             counts: count_blocks(&doc.body),
+            pages: metrics.map(|m| m.chapter_pages(&doc.body, true)),
+            modified: None,
         }
     }
+}
+
+fn modified(path: &Path) -> Option<String> {
+    let time = fs::metadata(path).ok()?.modified().ok()?;
+    Some(to_iso(chrono::DateTime::<chrono::Utc>::from(time)))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -340,6 +376,10 @@ pub struct Overview {
     pub trash_count: usize,
     /// Manuscript totals (planning documents not included).
     pub total: Counts,
+    /// Estimated pages of the whole manuscript; none without paper.
+    pub total_pages: Option<u32>,
+    pub card_types: Vec<CardType>,
+    pub cards: Vec<CardSummary>,
 }
 
 /// Opens a project: brings the structure in line with the files on disk,
@@ -356,18 +396,22 @@ pub fn open(root: &Path) -> Result<Overview> {
 
 pub fn overview(root: &Path) -> Result<Overview> {
     let project = load(root)?;
-    let read = |section: Section, id: &str| -> Result<DocSummary> {
-        let path = root.join(section.dir()).join(doc::file_name(id));
-        Ok(DocSummary::of(&doc::read_doc(&path)?))
-    };
+    let metrics = PageMetrics::of(&project.manuscript_format());
+    let path = |section: Section, id: &str| root.join(section.dir()).join(doc::file_name(id));
+    let read =
+        |section: Section, id: &str| -> Result<DocFile> { doc::read_doc(&path(section, id)) };
     let mut total = Counts::default();
+    let mut bodies: Vec<Vec<Block>> = Vec::new();
     let mut parts = Vec::with_capacity(project.parts.len());
     for part in &project.parts {
         let mut docs = Vec::with_capacity(part.docs.len());
         for id in &part.docs {
-            let summary = read(Section::Manuscript, id)?;
+            let file = read(Section::Manuscript, id)?;
+            let mut summary = DocSummary::of(&file, metrics.as_ref());
+            summary.modified = modified(&path(Section::Manuscript, id));
             total.add(&summary.counts);
             docs.push(summary);
+            bodies.push(file.body);
         }
         parts.push(PartView {
             id: part.id.clone(),
@@ -378,7 +422,11 @@ pub fn overview(root: &Path) -> Result<Overview> {
     let planning = project
         .planning
         .iter()
-        .map(|id| read(Section::Planning, id))
+        .map(|id| {
+            let mut summary = DocSummary::of(&read(Section::Planning, id)?, None);
+            summary.modified = modified(&path(Section::Planning, id));
+            Ok(summary)
+        })
         .collect::<Result<Vec<_>>>()?;
     Ok(Overview {
         root: root.to_string_lossy().into_owned(),
@@ -387,7 +435,25 @@ pub fn overview(root: &Path) -> Result<Overview> {
         planning,
         trash_count: trash::list(root)?.len(),
         total,
+        total_pages: metrics.map(|m| m.pages(bodies.iter().map(Vec::as_slice), true)),
+        card_types: project.card_types(),
+        cards: cards::list(root)?,
     })
+}
+
+/// Estimated pages of the whole manuscript in `format`, for trying a format
+/// before choosing it. None when the format has no paper.
+pub fn estimate_pages(root: &Path, format: &ManuscriptFormat) -> Result<Option<u32>> {
+    let Some(metrics) = PageMetrics::of(format) else {
+        return Ok(None);
+    };
+    let project = load(root)?;
+    let mut bodies = Vec::new();
+    for id in project.parts.iter().flat_map(|p| &p.docs) {
+        let path = root.join(MANUSCRIPT_DIR).join(doc::file_name(id));
+        bodies.push(doc::read_doc(&path)?.body);
+    }
+    Ok(Some(metrics.pages(bodies.iter().map(Vec::as_slice), true)))
 }
 
 /// Document ids present as files in a section folder.
@@ -478,6 +544,7 @@ pub struct ProjectPatch {
     pub pen_name: Option<String>,
     pub goal: Option<Goal>,
     pub scene_break: Option<String>,
+    pub manuscript_format: Option<ManuscriptFormat>,
 }
 
 pub fn update(root: &Path, patch: &ProjectPatch) -> Result<ProjectInfo> {
@@ -503,6 +570,11 @@ pub fn update(root: &Path, patch: &ProjectPatch) -> Result<ProjectInfo> {
         if !symbol.is_empty() {
             project.scene_break = symbol.into();
         }
+    }
+    if let Some(format) = &patch.manuscript_format {
+        format.validate()?;
+        project.preset = format.preset.clone();
+        project.manuscript_format = Some(format.clone());
     }
     save(root, &project)?;
     Ok(ProjectInfo::from(&project))
@@ -563,8 +635,12 @@ pub struct NewDoc {
 pub fn add_doc(root: &Path, spec: &NewDoc) -> Result<String> {
     let mut project = load(root)?;
     let section = spec.section.unwrap_or(Section::Manuscript);
+    if matches!(section, Section::Cards | Section::Notes) {
+        return Err(Error::Invalid("설정 카드와 메모는 따로 만듭니다".into()));
+    }
     let id = write_new_doc(root, section, spec.title.trim())?;
     match section {
+        Section::Cards | Section::Notes => unreachable!("checked above"),
         Section::Planning => {
             let index = spec
                 .after

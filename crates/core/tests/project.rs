@@ -380,3 +380,250 @@ fn counts_fixture() {
         );
     }
 }
+
+#[test]
+fn find_and_replace_across_chapters() {
+    use writer_core::search::{self, SearchQuery};
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let first = first_doc(&root);
+    let second = project::add_doc(&root, &NewDoc::default()).unwrap();
+    doc::save_body(
+        &root,
+        &first,
+        body(&["서하는 우산을 폈다.", "서하가 웃었다."]),
+        Duration::hours(1),
+    )
+    .unwrap();
+    doc::save_body(
+        &root,
+        &second,
+        body(&["윤서하의 서점."]),
+        Duration::hours(1),
+    )
+    .unwrap();
+
+    let query = SearchQuery {
+        text: "서하".into(),
+        regex: false,
+        whole_word: false,
+        doc_ids: None,
+    };
+    let found = search::search(&root, &query).unwrap();
+    assert_eq!(found.total, 3);
+    assert_eq!(found.docs[0].doc_id, first);
+    assert_eq!(found.docs[0].matches.len(), 2);
+
+    // Only the first chapter.
+    let scoped = SearchQuery {
+        doc_ids: Some(vec![second.clone()]),
+        ..query.clone()
+    };
+    assert_eq!(search::search(&root, &scoped).unwrap().total, 1);
+
+    let outcome = search::replace_all(&root, &query, "하윤").unwrap();
+    assert_eq!(outcome.replaced, 3);
+    assert_eq!(outcome.docs.len(), 2);
+    assert_eq!(outcome.docs[0].snapshot.kind, "before-replace");
+    assert_eq!(
+        doc::load(&root, &first).unwrap().body,
+        body(&["하윤는 우산을 폈다.", "하윤가 웃었다."])
+    );
+    assert_eq!(
+        doc::load(&root, &second).unwrap().body,
+        body(&["윤하윤의 서점."])
+    );
+
+    // The record keeps the text from before, so it can be taken back.
+    snapshot::restore(&root, &first, &outcome.docs[0].snapshot.id).unwrap();
+    assert_eq!(
+        doc::load(&root, &first).unwrap().body,
+        body(&["서하는 우산을 폈다.", "서하가 웃었다."])
+    );
+}
+
+#[test]
+fn setting_cards() {
+    use writer_core::cards;
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let first = first_doc(&root);
+    let second = project::add_doc(&root, &NewDoc::default()).unwrap();
+    doc::save_body(
+        &root,
+        &first,
+        body(&["윤서하는 우산을 폈다.", "서하가 웃었다."]),
+        Duration::hours(1),
+    )
+    .unwrap();
+    doc::save_body(
+        &root,
+        &second,
+        body(&["달빛 서점은 밤에만 연다."]),
+        Duration::hours(1),
+    )
+    .unwrap();
+
+    // A new card starts with its kind's fields.
+    let mut card = cards::create(&root, "person", " 윤서하 ").unwrap();
+    assert_eq!(card.name, "윤서하");
+    assert_eq!(card.fields[0], ("나이".to_string(), String::new()));
+    card.aliases = vec!["서하".into(), "윤서하".into(), " ".into()];
+    card.fields[1].1 = "서점 주인".into();
+    let summary = cards::save(&root, &card).unwrap();
+    assert_eq!(summary.aliases, vec!["서하".to_string()]);
+    assert_eq!(summary.summary, "직업: 서점 주인");
+    let place = cards::create(&root, "place", "달빛 서점").unwrap();
+
+    let ov = project::overview(&root).unwrap();
+    assert_eq!(ov.card_types.len(), 3);
+    let names: Vec<_> = ov.cards.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, ["달빛 서점", "윤서하"]);
+
+    let seen = cards::appearances(&root, &card.id).unwrap();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].doc_id, first);
+    assert_eq!(seen[0].count, 2);
+    let counts = cards::appearance_counts(&root).unwrap();
+    assert!(counts.contains(&(card.id.clone(), 1)));
+    assert!(counts.contains(&(place.id.clone(), 1)));
+
+    // Kinds: add one, and a kind in use cannot be removed.
+    let faction = cards::add_type(&root, "세력").unwrap();
+    assert_eq!(project::overview(&root).unwrap().card_types.len(), 4);
+    assert!(cards::remove_type(&root, "person").is_err());
+    cards::remove_type(&root, &faction.id).unwrap();
+
+    // Trash and back.
+    let item = trash::trash_card(&root, &place.id).unwrap();
+    assert_eq!(project::overview(&root).unwrap().cards.len(), 1);
+    trash::restore(&root, &item.id).unwrap();
+    assert_eq!(project::overview(&root).unwrap().cards.len(), 2);
+}
+
+#[test]
+fn notes_on_text_chapters_cards_and_project() {
+    use writer_core::cards;
+    use writer_core::markup::{Inline, Mark, MemoAttrs};
+    use writer_core::notes::{self, Anchor, NewNote, Reply};
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let chapter = first_doc(&root);
+
+    // The editor marks the text first, with an id it chose, then makes the note.
+    let marked = vec![Block::Paragraph {
+        attrs: Default::default(),
+        content: vec![
+            Inline::Text {
+                text: "“영업, 끝났나요?”".into(),
+                marks: vec![Mark::Memo {
+                    attrs: MemoAttrs { id: "memo1".into() },
+                }],
+            },
+            Inline::Text {
+                text: " 남자가 물었다.".into(),
+                marks: vec![],
+            },
+        ],
+    }];
+    doc::save_body(&root, &chapter, marked, Duration::hours(1)).unwrap();
+    let file = fs::read_to_string(root.join("manuscript").join(format!("{chapter}.md"))).unwrap();
+    assert!(file.contains("<mark data-memo=\"memo1\">“영업, 끝났나요?”</mark> 남자가 물었다."));
+
+    let mut note = notes::create(
+        &root,
+        &NewNote {
+            id: Some("memo1".into()),
+            anchor: Anchor::Text,
+            target: chapter.clone(),
+            quote: "“영업, 끝났나요?”".into(),
+            text: String::new(),
+        },
+    )
+    .unwrap();
+    assert_eq!(note.id, "memo1");
+    // The same id cannot be used twice, and the target must exist.
+    let again = NewNote {
+        id: Some("memo1".into()),
+        anchor: Anchor::Doc,
+        target: chapter.clone(),
+        quote: String::new(),
+        text: String::new(),
+    };
+    assert!(notes::create(&root, &again).is_err());
+    let nowhere = NewNote {
+        id: None,
+        anchor: Anchor::Card,
+        target: "nope".into(),
+        quote: String::new(),
+        text: String::new(),
+    };
+    assert!(notes::create(&root, &nowhere).is_err());
+
+    note.text = "이 대사 너무 설명조".into();
+    note.tags = vec![" #퇴고".into(), "퇴고".into(), "".into()];
+    note.replies = vec![
+        Reply {
+            at: "2026-09-27T02:00:00.000Z".into(),
+            text: "12화에서 다시 보기".into(),
+        },
+        Reply {
+            at: "2026-09-27T02:01:00.000Z".into(),
+            text: "  ".into(),
+        },
+    ];
+    // What it hangs on cannot be changed by saving.
+    note.target = "elsewhere".into();
+    let saved = notes::save(&root, &note).unwrap();
+    assert_eq!(saved.tags, vec!["퇴고".to_string()]);
+    assert_eq!(saved.replies.len(), 1);
+    assert_eq!(saved.target, chapter);
+
+    let card = cards::create(&root, "person", "윤서하").unwrap();
+    let on_card = notes::create(
+        &root,
+        &NewNote {
+            id: None,
+            anchor: Anchor::Card,
+            target: card.id.clone(),
+            quote: String::new(),
+            text: "과거사 아직 미정".into(),
+        },
+    )
+    .unwrap();
+    let on_project = notes::create(
+        &root,
+        &NewNote {
+            id: None,
+            anchor: Anchor::Project,
+            target: "ignored".into(),
+            quote: String::new(),
+            text: "떠오른 장면".into(),
+        },
+    )
+    .unwrap();
+    assert_eq!(on_project.target, "");
+    let all = notes::list(&root).unwrap();
+    assert_eq!(all.len(), 3);
+    assert!(
+        all.iter()
+            .any(|n| n.id == on_card.id && n.anchor == Anchor::Card)
+    );
+
+    // To the trash: the mark leaves the chapter; back again, the note stays
+    // with the chapter and still shows its text.
+    let item = trash::trash_note(&root, "memo1").unwrap();
+    assert_eq!(item.section, Section::Notes);
+    assert_eq!(item.title, "이 대사 너무 설명조");
+    let file = fs::read_to_string(root.join("manuscript").join(format!("{chapter}.md"))).unwrap();
+    assert!(file.contains("“영업, 끝났나요?” 남자가 물었다."));
+    assert!(!file.contains("data-memo"));
+    assert_eq!(notes::list(&root).unwrap().len(), 2);
+    trash::restore(&root, &item.id).unwrap();
+    let back = notes::load(&root, "memo1").unwrap();
+    assert_eq!(back.quote, "“영업, 끝났나요?”");
+    assert_eq!(notes::list(&root).unwrap().len(), 3);
+}

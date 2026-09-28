@@ -4,6 +4,7 @@
 import { useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { DocSummary, PartView, ProjectKind } from '../api/types';
 import { Icon } from '../components/Icon';
+import { CardsSection } from './CardsSection';
 import { openMenu, type MenuItem } from '../components/Menu';
 import { num } from '../lib/format';
 import { KIND_LABEL, STATUS_LABEL, UNTITLED, docNoun, docNumber, statusesFor, stockCount } from '../lib/labels';
@@ -13,9 +14,15 @@ import {
   leaveProject,
   moveDoc,
   openDialog,
+  openFind,
   removePart,
   renameDoc,
   renamePart,
+  addNote,
+  openDocInNewTab,
+  openNoteCounts,
+  openNotesBoard,
+  openTable,
   selectDoc,
   setStatus,
   setTarget,
@@ -30,6 +37,12 @@ type DropTarget = { docId: string; after: boolean } | { partId: string } | null;
 export function Sidebar() {
   const ov = useApp((s) => s.overview)!;
   const activeDocId = useApp((s) => s.activeDocId);
+  // With a card open in the middle no document is shown as open.
+  const shownDocId = activeDocId;
+  const notes = useApp((s) => s.notes);
+  const notesOpen = useApp((s) => s.activeTarget?.kind === 'notes');
+  const openNotes = notes.filter((n) => !n.done).length;
+  const memoCounts = openNoteCounts(notes);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [drop, setDrop] = useState<DropTarget>(null);
   const kind = ov.project.kind;
@@ -97,6 +110,16 @@ export function Sidebar() {
         label: planning ? '아래에 새 기획 문서' : `아래에 새 ${noun}`,
         onSelect: () => void addDoc({ section: planning ? 'planning' : 'manuscript', after: doc.id }),
       },
+      { label: '새 탭에서 열기', onSelect: () => void selectDoc(doc.id, true) },
+      {
+        label: planning ? '이 문서에 메모' : `이 ${noun}에 메모`,
+        onSelect: () => {
+          void (async () => {
+            await selectDoc(doc.id);
+            await addNote({ anchor: 'doc', target: doc.id });
+          })();
+        },
+      },
     ];
     if (!planning) {
       items.push(
@@ -145,6 +168,7 @@ export function Sidebar() {
         }),
     },
     { label: `이 부에 새 ${noun}`, onSelect: () => void addDoc({ partId: part.id }) },
+    { label: '개요 표로 보기', onSelect: () => void openTable(part.id) },
     { separator: true },
     {
       label: '부 지우기',
@@ -169,7 +193,9 @@ export function Sidebar() {
         <div className="sidebar-title">
           <strong title={ov.project.title}>{ov.project.title}</strong>
           <span>
-            {KIND_LABEL[kind]} · {num(ov.total.withSpaces)}자
+            {KIND_LABEL[kind]} ·{' '}
+            {kind === 'print' ? `원고지 ${num(ov.total.manuscriptPages)}매` : `${num(ov.total.withSpaces)}자`}
+            {ov.totalPages != null && ` · 예상 ${num(ov.totalPages)}쪽`}
           </span>
         </div>
         <button type="button" className="icon-btn" aria-label="작품 목록으로" title="작품 목록으로" onClick={() => void leaveProject()}>
@@ -178,6 +204,20 @@ export function Sidebar() {
       </div>
 
       <div className="sidebar-scroll">
+        <label className="sidebar-search">
+          <Icon name="search" size={15} />
+          <input
+            type="search"
+            placeholder="작품 전체 찾기"
+            aria-label="작품 전체 찾기"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                openFind({ text: e.currentTarget.value, scope: 'all', focus: 'find' });
+              }
+            }}
+          />
+        </label>
         <section aria-label="원고" className="tree">
           <div className="section-head">
             <span className="section-label">원고</span>
@@ -195,6 +235,8 @@ export function Sidebar() {
                   type="button"
                   className={`part-head${drop && 'partId' in drop && drop.partId === part.id ? ' drop-into' : ''}`}
                   onClick={() => toggle(part.id)}
+                  onDoubleClick={() => void openTable(part.id)}
+                  title="두 번 누르면 개요 표"
                   onContextMenu={(e) => openMenu(e, partMenu(part))}
                   onDragOver={(e) => {
                     if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
@@ -218,7 +260,8 @@ export function Sidebar() {
                         kind={kind}
                         goal={doc.target ?? ov.project.goal.perDoc}
                         countSpaces={ov.project.goal.countSpaces}
-                        active={doc.id === activeDocId}
+                        active={doc.id === shownDocId}
+                        memos={memoCounts.get(doc.id) ?? 0}
                         drop={drop && 'docId' in drop && drop.docId === doc.id ? (drop.after ? 'after' : 'before') : null}
                         onDragStart={(e) => onDragStart(e, doc.id)}
                         onDragOver={(e) => onDragOverDoc(e, doc.id)}
@@ -250,10 +293,11 @@ export function Sidebar() {
               key={doc.id}
               type="button"
               draggable
-              className={`plan-item${doc.id === activeDocId ? ' active' : ''}${
+              className={`plan-item${doc.id === shownDocId ? ' active' : ''}${
                 drop && 'docId' in drop && drop.docId === doc.id ? (drop.after ? ' drop-after' : ' drop-before') : ''
               }`}
-              onClick={() => void selectDoc(doc.id)}
+              onClick={(e) => void selectDoc(doc.id, e.ctrlKey || e.metaKey)}
+              onDoubleClick={() => void openDocInNewTab(doc.id)}
               onContextMenu={(e) => openMenu(e, docMenu(doc, true))}
               onDragStart={(e) => onDragStart(e, doc.id)}
               onDragOver={(e) => onDragOverDoc(e, doc.id)}
@@ -264,6 +308,21 @@ export function Sidebar() {
               <span className="grow ellipsis">{doc.title || UNTITLED}</span>
             </button>
           ))}
+        </section>
+
+        <CardsSection />
+
+        <section aria-label="메모함" className="tree planning">
+          <button
+            type="button"
+            className={`plan-item${notesOpen ? ' active' : ''}`}
+            title="작품 메모와 모든 열린 메모"
+            onClick={() => void openNotesBoard()}
+          >
+            <Icon name="note" size={14} />
+            <span className="grow">메모함</span>
+            {openNotes > 0 && <span className="count">{openNotes}</span>}
+          </button>
         </section>
       </div>
 
@@ -297,6 +356,7 @@ function DocItem({
   goal,
   countSpaces,
   active,
+  memos,
   drop,
   onDragStart,
   onDragOver,
@@ -310,6 +370,7 @@ function DocItem({
   goal: number | null;
   countSpaces: boolean;
   active: boolean;
+  memos: number;
   drop: 'before' | 'after' | null;
   onDragStart: (e: DragEvent) => void;
   onDragOver: (e: DragEvent) => void;
@@ -325,9 +386,10 @@ function DocItem({
       draggable
       className={`doc-item${active ? ' active' : ''}${drop ? ` drop-${drop}` : ''}`}
       title={doc.synopsis || undefined}
-      aria-label={`${label} ${doc.title || UNTITLED}, ${STATUS_LABEL[doc.status]}, ${num(chars)}자`}
+      aria-label={`${label} ${doc.title || UNTITLED}, ${STATUS_LABEL[doc.status]}, ${num(chars)}자${memos ? `, 열린 메모 ${memos}개` : ''}`}
       aria-current={active ? 'true' : undefined}
-      onClick={() => void selectDoc(doc.id)}
+      onClick={(e) => void selectDoc(doc.id, e.ctrlKey || e.metaKey)}
+      onDoubleClick={() => void openDocInNewTab(doc.id)}
       onContextMenu={onMenu}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -337,6 +399,12 @@ function DocItem({
       <span className="doc-line">
         <span className="doc-no">{label}</span>
         <span className="doc-title">{doc.title || UNTITLED}</span>
+        {memos > 0 && (
+          <span className="memo-count" title={`열린 메모 ${memos}개`}>
+            <Icon name="note" size={11} />
+            {memos}
+          </span>
+        )}
         <span className={`chip status-${doc.status}`} data-kind={kind}>
           {STATUS_LABEL[doc.status]}
         </span>

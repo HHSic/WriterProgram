@@ -1,12 +1,13 @@
-//! Plain-text export (txt file or clipboard).
+//! Export: plain text (txt file or clipboard), Word (docx) and 한글 (HWPX).
 
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::markup::Block;
+use crate::format::ManuscriptFormat;
+use crate::markup::{Block, Inline, Mark};
 use crate::store::{atomic_write, safe_file_name};
-use crate::{Error, Result, doc};
+use crate::{Error, Result, doc, docx, hwpx, project};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -52,7 +53,13 @@ pub fn body_text(blocks: &[Block], opts: &TextOptions) -> String {
                     out.push('\n');
                 }
             }
-            Block::Paragraph { .. } => out.push_str(&block.lines().join("\n")),
+            Block::Paragraph { attrs, .. } => {
+                // 문단 여백 on the left as full-width spaces, the way plain text shows it.
+                let lead = "\u{3000}".repeat(usize::from(attrs.left));
+                let lines: Vec<String> =
+                    block.lines().iter().map(|l| format!("{lead}{l}")).collect();
+                out.push_str(&lines.join("\n"));
+            }
         }
     }
     out
@@ -104,25 +111,175 @@ pub fn export_txt(
         write_txt(dest, &items_text(root, items, opts)?)?;
         return Ok(vec![dest.to_path_buf()]);
     }
-    let mut written: Vec<PathBuf> = Vec::with_capacity(items.len());
+    let paths = per_doc_paths(dest, items, "txt");
+    for (item, path) in items.iter().zip(&paths) {
+        write_txt(path, &item_text(root, item, opts)?)?;
+    }
+    Ok(paths)
+}
+
+/// One file per item inside the folder `dest`, with unique names.
+fn per_doc_paths(dest: &Path, items: &[ExportItem], ext: &str) -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = Vec::with_capacity(items.len());
     for item in items {
         let base = safe_file_name(&item.file_name, &item.doc_id);
-        let mut path = dest.join(format!("{base}.txt"));
+        let mut path = dest.join(format!("{base}.{ext}"));
         let mut n = 2;
-        while written.contains(&path) {
-            path = dest.join(format!("{base} ({n}).txt"));
+        while paths.contains(&path) {
+            path = dest.join(format!("{base} ({n}).{ext}"));
             n += 1;
         }
-        write_txt(&path, &item_text(root, item, opts)?)?;
-        written.push(path);
+        paths.push(path);
     }
-    Ok(written)
+    paths
+}
+
+// ---------------------------------------------------------------------------
+// Formatted export (docx, HWPX)
+
+/// Marks that show on paper. Memo anchors are not printed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct RunStyle {
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    pub strike: bool,
+    pub dot: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Piece {
+    Text(String, RunStyle),
+    Break,
+}
+
+/// A paragraph as runs of text with one style each, and line breaks.
+pub fn pieces(content: &[Inline]) -> Vec<Piece> {
+    let mut out: Vec<Piece> = Vec::new();
+    for inline in content {
+        match inline {
+            Inline::HardBreak {} => out.push(Piece::Break),
+            Inline::Text { text, marks } => {
+                let style = RunStyle {
+                    bold: marks.contains(&Mark::Bold {}),
+                    italic: marks.contains(&Mark::Italic {}),
+                    underline: marks.contains(&Mark::Underline {}),
+                    strike: marks.contains(&Mark::Strike {}),
+                    dot: marks.contains(&Mark::Dot {}),
+                };
+                for (i, part) in text.split('\n').enumerate() {
+                    if i > 0 {
+                        out.push(Piece::Break);
+                    }
+                    if part.is_empty() {
+                        continue;
+                    }
+                    match out.last_mut() {
+                        Some(Piece::Text(prev, prev_style)) if *prev_style == style => {
+                            prev.push_str(part)
+                        }
+                        _ => out.push(Piece::Text(part.to_string(), style)),
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// One chapter to export: its heading line and text.
+pub struct ExportDoc {
+    pub heading: String,
+    pub blocks: Vec<Block>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocOptions {
+    /// Put each chapter's heading above its text.
+    pub include_titles: bool,
+    /// Symbol for scene breaks.
+    pub scene_break: String,
+}
+
+/// Document properties written into the file.
+#[derive(Debug, Clone, Default)]
+pub struct DocInfo {
+    pub title: String,
+    pub author: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FileKind {
+    Docx,
+    Hwpx,
+}
+
+impl FileKind {
+    fn ext(self) -> &'static str {
+        match self {
+            FileKind::Docx => "docx",
+            FileKind::Hwpx => "hwpx",
+        }
+    }
+
+    fn build(
+        self,
+        docs: &[ExportDoc],
+        format: &ManuscriptFormat,
+        opts: &DocOptions,
+        info: &DocInfo,
+    ) -> Result<Vec<u8>> {
+        match self {
+            FileKind::Docx => docx::docx_bytes(docs, format, opts, info),
+            FileKind::Hwpx => hwpx::hwpx_bytes(docs, format, opts, info),
+        }
+    }
+}
+
+/// Exports chapters as docx or HWPX with `format` applied: to one file at
+/// `dest`, or with `per_doc` one file per item inside the folder `dest`.
+pub fn export_file(
+    root: &Path,
+    items: &[ExportItem],
+    opts: &DocOptions,
+    format: &ManuscriptFormat,
+    kind: FileKind,
+    dest: &Path,
+    per_doc: bool,
+) -> Result<Vec<PathBuf>> {
+    if items.is_empty() {
+        return Err(Error::Invalid("내보낼 회차를 골라 주세요".into()));
+    }
+    format.validate()?;
+    let project = project::load(root)?;
+    let info = DocInfo {
+        title: project.title.clone(),
+        author: project.pen_name.clone(),
+    };
+    let load = |item: &ExportItem| -> Result<ExportDoc> {
+        Ok(ExportDoc {
+            heading: item.heading.clone(),
+            blocks: doc::load(root, &item.doc_id)?.body,
+        })
+    };
+    if !per_doc {
+        let docs = items.iter().map(load).collect::<Result<Vec<_>>>()?;
+        atomic_write(dest, &kind.build(&docs, format, opts, &info)?)?;
+        return Ok(vec![dest.to_path_buf()]);
+    }
+    let paths = per_doc_paths(dest, items, kind.ext());
+    for (item, path) in items.iter().zip(&paths) {
+        let docs = [load(item)?];
+        atomic_write(path, &kind.build(&docs, format, opts, &info)?)?;
+    }
+    Ok(paths)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markup::Block;
 
     fn opts(blank: bool) -> TextOptions {
         TextOptions {
@@ -130,6 +287,34 @@ mod tests {
             blank_line_between: blank,
             scene_break: "◆".into(),
         }
+    }
+
+    #[test]
+    fn left_margin_as_full_width_spaces() {
+        use crate::markup::{Inline, ParaAttrs};
+        let blocks = vec![
+            Block::text("그리고"),
+            Block::Paragraph {
+                attrs: ParaAttrs { left: 2, right: 1 },
+                content: vec![
+                    Inline::Text {
+                        text: "첫 줄".into(),
+                        marks: vec![],
+                    },
+                    Inline::HardBreak {},
+                    Inline::Text {
+                        text: "둘째 줄".into(),
+                        marks: vec![],
+                    },
+                ],
+            },
+        ];
+        assert_eq!(
+            body_text(&blocks, &opts(false)),
+            "그리고
+　　첫 줄
+　　둘째 줄"
+        );
     }
 
     #[test]
@@ -147,6 +332,44 @@ mod tests {
         assert_eq!(
             body_text(&blocks, &opts(false)),
             "첫 문단\n둘째\n줄바꿈\n\n◆\n\n셋째"
+        );
+    }
+
+    #[test]
+    fn pieces_merge_runs_and_keep_breaks() {
+        let content = vec![
+            Inline::Text {
+                text: "가".into(),
+                marks: vec![Mark::Bold {}],
+            },
+            Inline::Text {
+                text: "나".into(),
+                marks: vec![
+                    Mark::Bold {},
+                    Mark::Memo {
+                        attrs: crate::markup::MemoAttrs { id: "m".into() },
+                    },
+                ],
+            },
+            Inline::HardBreak {},
+            Inline::Text {
+                text: "다\n라".into(),
+                marks: vec![],
+            },
+        ];
+        let bold = RunStyle {
+            bold: true,
+            ..RunStyle::default()
+        };
+        assert_eq!(
+            pieces(&content),
+            vec![
+                Piece::Text("가나".into(), bold),
+                Piece::Break,
+                Piece::Text("다".into(), RunStyle::default()),
+                Piece::Break,
+                Piece::Text("라".into(), RunStyle::default()),
+            ]
         );
     }
 }

@@ -1,0 +1,124 @@
+// Setting card names in the manuscript: highlighted, and clicking one shows
+// the card (본문 자동 강조, docs/screens.md S8).
+
+import { Extension, type Editor } from '@tiptap/core';
+import type { Node as PmNode } from '@tiptap/pm/model';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import type { CardSummary } from '../api/types';
+import { decorateAll, redecorate, type BlockDecorator } from './decorate';
+import { blockText } from './search';
+
+/** Names shorter than this are not highlighted (too many false hits). */
+const MIN_NAME_CHARS = 2;
+
+export interface NameIndex {
+  regex: RegExp;
+  /** name → card id */
+  owners: Map<string, string>;
+}
+
+/** One pattern for all highlighted cards, longest names first. */
+export function nameIndex(cards: CardSummary[]): NameIndex | null {
+  const owners = new Map<string, string>();
+  for (const card of cards) {
+    if (!card.highlight) continue;
+    for (const raw of [card.name, ...card.aliases]) {
+      const name = raw.trim();
+      if ([...name].length >= MIN_NAME_CHARS && !owners.has(name)) owners.set(name, card.id);
+    }
+  }
+  if (!owners.size) return null;
+  const names = [...owners.keys()].sort((a, b) => [...b].length - [...a].length);
+  const source = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return { regex: new RegExp(source, 'gu'), owners };
+}
+
+/** What changes the highlighting: highlighted cards with their names. */
+export function nameKey(cards: CardSummary[]): string {
+  return cards
+    .filter((c) => c.highlight)
+    .map((c) => [c.id, c.name, ...c.aliases].join('\t'))
+    .join('\n');
+}
+
+/** Cards whose names appear in a document, with how often. */
+export function castOf(doc: PmNode, index: NameIndex | null): Map<string, number> {
+  const found = new Map<string, number>();
+  if (!index) return found;
+  doc.descendants((node, pos) => {
+    if (!node.isTextblock) return true;
+    for (const m of blockText(node, pos).text.matchAll(index.regex)) {
+      const id = index.owners.get(m[0]);
+      if (id) found.set(id, (found.get(id) ?? 0) + 1);
+    }
+    return false;
+  });
+  return found;
+}
+
+const cardKey = new PluginKey<CardState>('cardNames');
+
+interface CardState {
+  index: NameIndex | null;
+  decorations: DecorationSet;
+}
+
+function namesIn(index: NameIndex): BlockDecorator {
+  return (block, pos, out) => {
+    const { text, positions } = blockText(block, pos);
+    for (const m of text.matchAll(index.regex)) {
+      if (m.index === undefined) continue;
+      const id = index.owners.get(m[0]);
+      if (!id) continue;
+      const from = positions[m.index];
+      const to = positions[m.index + m[0].length - 1] + 1;
+      out.push(Decoration.inline(from, to, { class: 'card-name', 'data-card': id }));
+    }
+  };
+}
+
+function decorate(doc: PmNode, index: NameIndex | null): DecorationSet {
+  return index ? decorateAll(doc, namesIn(index)) : DecorationSet.empty;
+}
+
+/** Highlights card names; `onOpen` is called with a card id when one is clicked. */
+export const CardHighlight = Extension.create<{ onOpen: (cardId: string) => void }>({
+  name: 'cardHighlight',
+
+  addOptions() {
+    return { onOpen: () => {} };
+  },
+
+  addProseMirrorPlugins() {
+    const onOpen = this.options.onOpen;
+    return [
+      new Plugin<CardState>({
+        key: cardKey,
+        state: {
+          init: () => ({ index: null, decorations: DecorationSet.empty }),
+          apply(tr, prev, _old, state) {
+            const meta = tr.getMeta(cardKey) as { index: NameIndex | null } | undefined;
+            if (meta) return { index: meta.index, decorations: decorate(state.doc, meta.index) };
+            if (!tr.docChanged || !prev.index) return prev;
+            return { index: prev.index, decorations: redecorate(tr, prev.decorations, namesIn(prev.index)) };
+          },
+        },
+        props: {
+          decorations: (state) => cardKey.getState(state)?.decorations,
+          handleClick(view, _pos, event) {
+            const target = event.target instanceof HTMLElement ? event.target.closest('[data-card]') : null;
+            const id = target?.getAttribute('data-card');
+            if (id && view.editable) onOpen(id);
+            return false;
+          },
+        },
+      }),
+    ];
+  },
+});
+
+export function setCardNames(editor: Editor, index: NameIndex | null) {
+  if (editor.isDestroyed) return;
+  editor.view.dispatch(editor.state.tr.setMeta(cardKey, { index }).setMeta('addToHistory', false));
+}

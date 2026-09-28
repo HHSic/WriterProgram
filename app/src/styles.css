@@ -36,6 +36,9 @@
   --chip-blue-fg: #1e4059;
   --chip-violet-bg: #e8e4f2;
   --chip-violet-fg: #45397a;
+  --memo: rgba(212, 166, 73, 0.2);
+  --memo-line: #d4a649;
+  --memo-focus: rgba(212, 166, 73, 0.42);
 
   --ui-font: 'IBM Plex Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif;
   --body-font: 'Noto Serif KR', serif;
@@ -43,6 +46,7 @@
   --body-leading: 1.95;
   --para-gap: 0.975em;
   --indent: 0em;
+  --tracking: 0em;
   --measure: 560px;
 
   color-scheme: light;
@@ -84,11 +88,17 @@
     --chip-blue-fg: #b0cbe0;
     --chip-violet-bg: #2f2a45;
     --chip-violet-fg: #c7bdf0;
+    --memo: rgba(201, 161, 90, 0.2);
+    --memo-line: #c9a15a;
+    --memo-focus: rgba(201, 161, 90, 0.42);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
+  --memo: rgba(201, 161, 90, 0.2);
+  --memo-line: #c9a15a;
+  --memo-focus: rgba(201, 161, 90, 0.42);
   --bg: #1c1a17;
   --sidebar: #211f1b;
   --surface: #262320;
@@ -1216,7 +1226,7 @@ input[type='range'] {
   font-size: 30px;
   font-weight: 700;
   line-height: 1.35;
-  letter-spacing: -0.01em;
+  letter-spacing: calc(var(--tracking) - 0.01em);
   color: var(--text);
 }
 
@@ -1338,6 +1348,7 @@ img.ProseMirror-separator {
   color: var(--body-text);
   word-break: keep-all;
   overflow-wrap: anywhere;
+  letter-spacing: var(--tracking);
   caret-color: var(--accent);
 }
 
@@ -1652,4 +1663,1379 @@ img.ProseMirror-separator {
 
 .trash-list + .hint {
   margin-top: 12px;
+}
+
+/* Settings dialog and manuscript format ------------------------------------- */
+
+.dialog-tabs {
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+input.num {
+  width: 72px;
+  padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.margin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+}
+
+.margin-grid label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.format-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.format-side {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 10px;
+  border-radius: 12px;
+  background: var(--sidebar);
+}
+
+.estimate {
+  margin: 0;
+  min-height: 1.5em;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: center;
+}
+
+.page-preview {
+  position: relative;
+  overflow: hidden;
+  background: #fffefb;
+  color: #1f1c17;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(31, 28, 23, 0.12);
+}
+
+.page-preview.continuous {
+  mask-image: linear-gradient(to bottom, #000 70%, transparent);
+}
+
+.pv-area {
+  position: absolute;
+  overflow: hidden;
+  outline: 1px dashed rgba(184, 67, 47, 0.28);
+  font-family: var(--pv-font);
+  font-size: var(--pv-size);
+  line-height: var(--pv-leading);
+  letter-spacing: var(--pv-tracking);
+  word-break: keep-all;
+  text-align: justify;
+}
+
+.pv-title {
+  margin: 0 0 1.4em;
+  font-size: 1.6em;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.pv-para {
+  margin: 0 0 var(--pv-gap);
+  text-indent: var(--pv-indent);
+}
+
+.pv-page-number {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--pv-font);
+}
+
+.format-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 170px;
+  height: 34px;
+  padding: 0 8px 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--sidebar);
+  color: var(--text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.format-chip:hover {
+  background: var(--hover);
+}
+
+/* Find --------------------------------------------------------------------- */
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.sidebar-search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.sidebar-search input:focus {
+  box-shadow: none;
+}
+
+.find {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.find-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.segmented.small label {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.find-options {
+  gap: 14px;
+}
+
+.find-options .check {
+  font-size: 12px;
+}
+
+.find-summary {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.error-note {
+  color: var(--danger);
+}
+
+.find-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.find-doc h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.find-doc h3 .ellipsis {
+  flex: 1;
+}
+
+.find-doc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.find-hit {
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font-family: var(--body-font);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.find-hit:hover {
+  background: var(--hover);
+}
+
+.find-hit.on {
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.find-hit mark,
+.search-hit {
+  background: var(--amber-soft);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--amber);
+}
+
+.search-hit.current {
+  background: var(--amber);
+  color: #1f1c17;
+}
+
+/* 설정집 (setting cards) ------------------------------------------------------ */
+
+.kind-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kind-row .part-head {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px 0 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+.card-item:hover {
+  background: var(--hover);
+}
+
+.card-item.active {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* Names of setting cards in the manuscript. */
+.card-name {
+  text-decoration: underline dotted var(--blue);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.28em;
+}
+
+.card-page {
+  padding-bottom: 96px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.card-kind {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.card-appears {
+  min-height: 1.4em;
+  margin: 8px 0 28px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.card-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.card-section h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.chip-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: 14px;
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+  font-size: 13px;
+}
+
+.chip-tag button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+}
+
+.chip-tag button:hover {
+  background: var(--hover);
+}
+
+.chip-input {
+  flex: 1;
+  min-width: 160px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.card-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.card-field {
+  display: grid;
+  grid-template-columns: minmax(80px, 140px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-field input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.card-field input:first-child {
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.card-description {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--body-font);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+/* Right column: card preview, 등장 위치, 등장 설정 */
+
+.card-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-preview-name {
+  margin: 4px 0 0;
+  font-family: var(--body-font);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.card-preview .meta {
+  margin: 0;
+}
+
+.card-preview-fields {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.card-preview-fields div {
+  display: contents;
+}
+
+.card-preview-fields dt {
+  color: var(--muted);
+}
+
+.card-preview-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-preview-text {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--sidebar);
+  font-family: var(--body-font);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.appearances {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appearances > .section-label {
+  margin: 0;
+}
+
+.cast-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cast-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.cast-item:hover {
+  border-color: var(--border-strong);
+}
+
+.cast-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cast-summary {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+/* Panes and tabs in the middle (가운데 탭 · 분할) ---------------------------- */
+
+.panes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.panes.split-column {
+  flex-direction: column;
+}
+
+.pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panes.split-row .pane + .pane {
+  border-left: 1px solid var(--border-strong);
+}
+
+.panes.split-column .pane + .pane {
+  border-top: 1px solid var(--border-strong);
+}
+
+.pane-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Every open tab stays laid out (keeps its scroll); only one is visible. */
+.tab-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-body.off {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 6px 0 4px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+}
+
+.tab-strip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  align-self: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ctab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 200px;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border-radius: 7px 7px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.ctab:hover {
+  background: var(--hover);
+  color: var(--text-2);
+}
+
+.ctab.on {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--border);
+  clip-path: inset(-1px -1px 0 -1px);
+}
+
+.pane.focused .ctab.on {
+  box-shadow: 0 0 0 1px var(--border), inset 0 2px 0 var(--accent);
+}
+
+.ctab.drop-before::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--blue);
+}
+
+.ctab-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ctab-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0;
+}
+
+.ctab:hover .ctab-close,
+.ctab.on .ctab-close,
+.ctab-close:focus-visible {
+  opacity: 0.8;
+}
+
+.ctab-close:hover {
+  background: var(--hover);
+  opacity: 1;
+}
+
+.pane.locked .page {
+  background: var(--sidebar);
+}
+
+fieldset.plain {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* 메모 ----------------------------------------------------------------------- */
+
+/* Text a note hangs on: a pale wash and an underline, like a pencil mark. */
+.memo-mark {
+  background: var(--memo);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: inset 0 -1px 0 var(--memo-line);
+  cursor: pointer;
+}
+
+.bubble .bubble-memo {
+  width: auto;
+  padding: 0 10px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bubble-sep {
+  width: 1px;
+  margin: 5px 2px;
+  background: rgba(255, 253, 247, 0.25);
+}
+
+.notes-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.notes-tab > .btn {
+  align-self: flex-start;
+}
+
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.note.focused {
+  border-color: var(--memo-line);
+  box-shadow: 0 0 0 1px var(--memo-line);
+}
+
+.note.done {
+  opacity: 0.7;
+}
+
+.note-on {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.note-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 0;
+  border-left: 3px solid var(--memo-line);
+  border-radius: 0 6px 6px 0;
+  background: var(--memo);
+  text-align: left;
+  font-family: var(--body-font);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.note-quote-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.note-gone {
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.note-text,
+.note-reply-input {
+  width: 100%;
+  padding: 6px 8px;
+  resize: none;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.note-text {
+  min-height: 34px;
+}
+
+.note-reply-input {
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.note-replies {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-replies p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-tag.small {
+  height: 22px;
+  padding: 0 2px 0 8px;
+  font-size: 11px;
+}
+
+.chip-tag.small button {
+  width: 16px;
+  height: 16px;
+}
+
+.tag-input {
+  width: 80px;
+  height: 22px;
+  padding: 0 6px;
+  border-style: dashed;
+  font-size: 11px;
+}
+
+.note-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.small-check {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.memo-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--amber-text);
+}
+
+/* 메모함 and 개요 표 in the middle */
+
+.board {
+  width: min(100%, 880px);
+  margin: 0 auto;
+  padding: 8px 0 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-head h1 {
+  margin: 0;
+  font-family: var(--body-font);
+  font-size: 24px;
+}
+
+.board-head .meta {
+  margin: 4px 0 0;
+}
+
+.board-head select {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-toggle {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.chip-toggle.on {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.board-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.board-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.link-btn {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.otable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.otable th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.otable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.otable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.otable tbody tr:hover td {
+  background: var(--hover);
+}
+
+.otable tr.drop-before td {
+  box-shadow: inset 0 2px 0 var(--blue);
+}
+
+.otable tr.drop-after td {
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
+.otable .c-no {
+  width: 56px;
+  white-space: nowrap;
+}
+
+.otable .c-title {
+  width: 26%;
+}
+
+.otable .c-status {
+  width: 84px;
+}
+
+.otable .c-length {
+  width: 130px;
+}
+
+.otable .c-notes {
+  width: 64px;
+  text-align: center;
+}
+
+.otable .c-modified {
+  width: 96px;
+  white-space: nowrap;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 4px 6px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.cell-input:hover {
+  border-color: var(--border);
+}
+
+.cell-input:focus {
+  border-color: var(--blue);
+  background: var(--surface);
+}
+
+.cell-select {
+  height: 26px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.c-length .num-text {
+  display: block;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.c-length .bar {
+  display: block;
+}
+
+/* Margins follow the pane, not the window, so a split pane keeps a usable line. */
+.tab-body {
+  container-type: inline-size;
+}
+
+.tab-body .doc-scroll {
+  padding: 28px clamp(8px, 3cqi, 40px) 0;
+}
+
+.tab-body .page {
+  padding: 48px clamp(18px, 6cqi, 72px) 40vh;
+}
+
+.tab-body .doc-title-input {
+  font-size: clamp(22px, 5cqi, 30px);
+}
+
+.tab-body .card-page {
+  padding-bottom: 96px;
+}
+
+/* Tabs shrink before they overflow; the strip scrolls with the wheel. */
+.ctab {
+  flex: 0 1 auto;
+  min-width: 64px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+}
+
+.table-wrap .otable {
+  min-width: 640px;
+}
+
+.otable .c-title {
+  min-width: 140px;
+}
+
+.otable .c-synopsis {
+  min-width: 180px;
+}
+
+/* 화면 색 · 강조 색 samples in 보기 설정 */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+}
+
+.swatch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 58px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.swatch:hover {
+  background: var(--hover);
+}
+
+.swatch-chip {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.swatch.on .swatch-chip {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+}
+
+.swatch.on .swatch-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.swatch-dot {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+
+.swatch-chip.accent {
+  border-color: transparent;
+}
+
+.swatch-chip.auto {
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: 2px;
+}
+
+/* The color picker opens from the sample; the input itself stays out of sight. */
+.swatch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch-name {
+  white-space: nowrap;
+}
+
+/* 머리말 on the format preview page */
+.pv-head {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--pv-font);
+  color: #4a443b;
+}
+
+/* 문단 여백: a paragraph set in as a whole, in characters (editor/paragraph.ts). */
+.manuscript p {
+  margin-left: calc(var(--pl, 0) * (1em + var(--tracking)));
+  margin-right: calc(var(--pr, 0) * (1em + var(--tracking)));
+}
+
+/* 빈칸·문단 부호 보이기 (editor/marks.ts) */
+.show-marks .manuscript .ws-space,
+.show-marks .manuscript .ws-nbsp,
+.show-marks .manuscript .ws-fixed {
+  background: radial-gradient(circle, var(--mark-color) 0.09em, transparent 0.11em) center / 100% 100% no-repeat;
+}
+
+.show-marks .manuscript .ws-space {
+  --mark-color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+/* 묶음 빈칸: a dot with a small tie underneath. */
+.show-marks .manuscript .ws-nbsp {
+  --mark-color: var(--blue);
+  box-shadow: inset 0 -0.08em 0 color-mix(in srgb, var(--blue) 45%, transparent);
+}
+
+/* 고정폭 빈칸: a dot in brackets' colour, framed at the foot. */
+.show-marks .manuscript .ws-fixed {
+  --mark-color: var(--amber-text);
+  box-shadow: inset 0 -0.08em 0 color-mix(in srgb, var(--amber) 60%, transparent);
+}
+
+.show-marks .manuscript .ws-full {
+  outline: 1px dotted color-mix(in srgb, var(--muted) 60%, transparent);
+  outline-offset: -0.18em;
+}
+
+.show-marks .manuscript .ws-tab {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+/* Paragraph ends: ↵ after the text, or at the start of an empty paragraph. */
+.show-marks .manuscript p::after {
+  content: '↵';
+  padding-left: 0.15em;
+  font-family: var(--ui-font);
+  font-size: 0.8em;
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+.show-marks .manuscript p:has(> br.ProseMirror-trailingBreak:last-child)::after {
+  content: none;
+}
+
+.show-marks .manuscript p:not(.is-editor-empty):has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: '↵';
+  position: absolute;
+  font-family: var(--ui-font);
+  font-size: 0.8em;
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 문자표 */
+.symbols {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 300px;
+}
+
+.symbol-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.symbol-groups button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.symbol-groups button:hover {
+  background: var(--hover);
+}
+
+.symbol-groups button.on {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.symbol-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 4px;
+  align-content: start;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.symbol {
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-family: var(--body-font);
+  font-size: 18px;
+  color: var(--text);
+}
+
+.symbol:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+
+.space-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.space-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.space-list .btn {
+  min-width: 112px;
+}
+
+.symbol-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.symbol.space {
+  font-family: var(--ui-font);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* A narrow middle column: the path gives way to the buttons, not over them. */
+.crumbs {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.crumbs > span,
+.crumbs > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumbs > span {
+  flex: 0 1 auto;
+}
+
+.crumbs > strong {
+  flex: 0 2 auto;
+}
+
+.crumbs > svg {
+  flex-shrink: 0;
+}
+
+.center-head > .grow {
+  flex: 0 0 0;
 }

@@ -1,4 +1,5 @@
-// Right column (맥락): follows the document open in the middle.
+// Right column (맥락): follows what is open in the middle. Its tabs depend on
+// that (docs/layout-data.md); a card preview sits over them until closed.
 
 import { useEffect, useState } from 'react';
 import type { Editor } from '@tiptap/core';
@@ -9,23 +10,65 @@ import { sceneAt, scenesOf, type Scene } from '../editor/outline';
 import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { num, timeLabel } from '../lib/format';
-import { RECORD_KIND_LABEL, docNoun, withObject } from '../lib/labels';
-import { findDoc, leaveProject, openDialog, patchSummary, saveEverything, toastError, useApp, type RightTab } from '../store';
+import { RECORD_KIND_LABEL, docNoun, formatName, withObject } from '../lib/labels';
+import {
+  applyFormat,
+  findDoc,
+  leaveProject,
+  openDialog,
+  patchSummary,
+  saveEverything,
+  toastError,
+  useApp,
+  type RightTab,
+} from '../store';
+import type { MenuItem } from '../components/Menu';
+import { Appearances, CardPreview, CastTab } from './CardPanels';
+import { NotesTab } from './Notes';
+import { SearchTab } from './SearchTab';
 
-const TABS: { id: RightTab; label: string }[] = [
+type TabList = { id: RightTab; label: string }[];
+
+const CHAPTER_TABS: TabList = [
   { id: 'outline', label: '개요' },
+  { id: 'notes', label: '메모' },
+  { id: 'cast', label: '등장 설정' },
   { id: 'records', label: '기록' },
+  { id: 'find', label: '찾기' },
 ];
+const PLANNING_TABS: TabList = [
+  { id: 'outline', label: '개요' },
+  { id: 'notes', label: '메모' },
+  { id: 'records', label: '기록' },
+  { id: 'find', label: '찾기' },
+];
+const CARD_TABS: TabList = [
+  { id: 'cast', label: '등장 위치' },
+  { id: 'notes', label: '메모' },
+  { id: 'find', label: '찾기' },
+];
+/** 메모함 and 개요 표 show their own details in the middle. */
+const BOARD_TABS: TabList = [{ id: 'find', label: '찾기' }];
 
 export function RightPanel() {
-  const tab = useApp((s) => s.rightTab);
+  const rightTab = useApp((s) => s.rightTab);
   const editor = useApp((s) => s.editor);
   const activeDocId = useApp((s) => s.activeDocId);
+  const activeCardId = useApp((s) => s.activeCardId);
+  const board = useApp((s) => s.activeTarget?.kind === 'notes' || s.activeTarget?.kind === 'table');
+  const previewCardId = useApp((s) => s.previewCardId);
+  const planning = useApp((s) => (s.activeDocId ? findDoc(s.overview!, s.activeDocId)?.section === 'planning' : false));
   const kind = useApp((s) => s.overview!.project.kind);
+  const tabs = board ? BOARD_TABS : activeCardId ? CARD_TABS : planning ? PLANNING_TABS : CHAPTER_TABS;
+  // A tab missing here (e.g. 기록 while a card is open) shows the first one,
+  // and comes back when its kind of work is open again.
+  const tab = tabs.some((t) => t.id === rightTab) ? rightTab : tabs[0].id;
+  const preview = previewCardId && previewCardId !== activeCardId ? previewCardId : null;
 
   return (
     <aside className="right" aria-label="맥락">
       <div className="col-head right-head">
+        <FormatChip />
         <div className="grow" />
         <button type="button" className="btn dark" onClick={() => openDialog({ kind: 'export' })}>
           <Icon name="download" size={15} />
@@ -37,6 +80,7 @@ export function RightPanel() {
           aria-label="더 보기"
           onClick={(e) =>
             openMenu(e, [
+              { label: '작품 설정', onSelect: () => openDialog({ kind: 'project' }) },
               { label: '보기 설정', onSelect: () => openDialog({ kind: 'view' }) },
               { label: '휴지통', onSelect: () => openDialog({ kind: 'trash' }) },
               { separator: true },
@@ -48,29 +92,68 @@ export function RightPanel() {
         </button>
       </div>
       <div className="tabs" role="tablist" aria-label="맥락 패널">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             role="tab"
-            aria-selected={tab === t.id}
-            className={`tab${tab === t.id ? ' on' : ''}`}
-            onClick={() => useApp.setState({ rightTab: t.id })}
+            aria-selected={!preview && tab === t.id}
+            className={`tab${!preview && tab === t.id ? ' on' : ''}`}
+            onClick={() => useApp.setState({ rightTab: t.id, previewCardId: null })}
           >
             {t.label}
           </button>
         ))}
       </div>
       <div className="right-body">
-        {!activeDocId ? (
+        {preview ? (
+          <CardPreview key={preview} cardId={preview} />
+        ) : tab === 'find' ? (
+          <SearchTab />
+        ) : activeCardId ? (
+          tab === 'notes' ? (
+            <NotesTab key={activeCardId} on="card" targetId={activeCardId} editor={null} />
+          ) : (
+            <Appearances key={activeCardId} cardId={activeCardId} />
+          )
+        ) : !activeDocId ? (
           <p className="empty-note">왼쪽에서 {withObject(docNoun(kind))} 고르세요.</p>
         ) : tab === 'outline' ? (
           editor ? <OutlineTab editor={editor} /> : null
+        ) : tab === 'notes' ? (
+          <NotesTab key={activeDocId} on="doc" targetId={activeDocId} editor={editor} />
+        ) : tab === 'cast' ? (
+          editor ? <CastTab editor={editor} /> : null
         ) : (
           <RecordsTab docId={activeDocId} />
         )}
       </div>
     </aside>
+  );
+}
+
+/** Current manuscript format, with a quick switch between presets. */
+function FormatChip() {
+  const format = useApp((s) => s.overview!.project.manuscriptFormat);
+  const catalog = useApp((s) => s.catalog);
+  const name = formatName(format, catalog);
+  const items = (): MenuItem[] => {
+    const list: MenuItem[] = [{ heading: '원고 서식' }];
+    for (const b of catalog?.builtin ?? []) {
+      list.push({ label: b.name, checked: name === b.name, onSelect: () => void applyFormat(structuredClone(b.format)) });
+    }
+    for (const u of catalog?.user ?? []) {
+      list.push({ label: u.name, checked: name === u.name, onSelect: () => void applyFormat(structuredClone(u.format)) });
+    }
+    list.push({ separator: true }, { label: '원고 서식 자세히…', onSelect: () => openDialog({ kind: 'project', tab: 'format' }) });
+    return list;
+  };
+  return (
+    <button type="button" className="format-chip" title="원고 서식: 내보낸 파일과 예상 쪽수에 쓰입니다" onClick={(e) => openMenu(e, items())}>
+      <Icon name="doc" size={14} />
+      <span className="ellipsis">{name}</span>
+      <Icon name="chevronDown" size={12} />
+    </button>
   );
 }
 

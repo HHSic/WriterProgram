@@ -2,8 +2,13 @@
 // must stay in line with crates/core/src/markup.rs, which writes the files.
 
 import { Mark, Node, mergeAttributes, type Extensions } from '@tiptap/core';
+import { Plugin } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import StarterKit from '@tiptap/starter-kit';
+import { CardHighlight } from './cards';
+import { WhitespaceMarks } from './marks';
+import { ParagraphMargins, SpecialSpaces } from './paragraph';
+import { SearchHighlight } from './search';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -102,7 +107,71 @@ export const Dot = Mark.create({
   },
 });
 
-export function manuscriptExtensions(sceneSymbol: string): Extensions {
+/** 메모 구간: a stretch of text a note hangs on (`<mark data-memo>` in the
+ * file). Notes may overlap, and typing at either end does not widen them. */
+export const Memo = Mark.create<{ onOpen: (noteId: string) => void; onAdd: () => void }>({
+  name: 'memo',
+  inclusive: false,
+  excludes: '',
+
+  addOptions() {
+    return { onOpen: () => {}, onAdd: () => {} };
+  },
+
+  addAttributes() {
+    return {
+      id: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-memo'),
+        renderHTML: (attrs) => ({ 'data-memo': attrs.id as string }),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'mark[data-memo]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ['mark', mergeAttributes(HTMLAttributes, { class: 'memo-mark' }), 0];
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Alt-m': () => {
+        this.options.onAdd();
+        return true;
+      },
+    };
+  },
+
+  addProseMirrorPlugins() {
+    const onOpen = this.options.onOpen;
+    return [
+      new Plugin({
+        props: {
+          handleClick(_view, _pos, event) {
+            const target = event.target instanceof HTMLElement ? event.target.closest('mark[data-memo]') : null;
+            const id = target?.getAttribute('data-memo');
+            if (id) onOpen(id);
+            return false;
+          },
+        },
+      }),
+    ];
+  },
+});
+
+export interface ExtensionHooks {
+  /** A highlighted card name was clicked. */
+  onCardOpen: (cardId: string) => void;
+  /** Marked text of a note was clicked. */
+  onNoteOpen: (noteId: string) => void;
+  /** Ctrl+Alt+M: a note on the selected text. */
+  onNoteAdd: () => void;
+}
+
+export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks): Extensions {
   return [
     StarterKit.configure({
       heading: false,
@@ -118,6 +187,12 @@ export function manuscriptExtensions(sceneSymbol: string): Extensions {
     }),
     SceneBreak.configure({ symbol: sceneSymbol }),
     Dot,
+    Memo.configure({ onOpen: hooks.onNoteOpen, onAdd: hooks.onNoteAdd }),
+    ParagraphMargins,
+    SpecialSpaces,
+    WhitespaceMarks,
+    SearchHighlight,
+    CardHighlight.configure({ onOpen: hooks.onCardOpen }),
     Placeholder.configure({
       placeholder: ({ editor }) => (editor.isEmpty ? '여기에 쓰기 시작하세요' : ''),
     }),

@@ -1,5 +1,6 @@
 import { num } from '../lib/format';
 import { writtenToday } from '../lib/today';
+import { paperName } from '../lib/labels';
 import { findDoc, useApp } from '../store';
 
 export function StatusBar() {
@@ -7,8 +8,9 @@ export function StatusBar() {
   const activeDocId = useApp((s) => s.activeDocId);
   const live = useApp((s) => s.liveCounts);
   const selection = useApp((s) => s.selection);
+  const catalog = useApp((s) => s.catalog);
   const place = activeDocId ? findDoc(ov, activeDocId) : null;
-  const counts = live ?? place?.doc.counts ?? null;
+  const counts = place ? (live ?? place.doc.counts) : null;
 
   const lengths: Record<string, number> = {};
   for (const part of ov.parts) for (const d of part.docs) lengths[d.id] = d.counts.withSpaces;
@@ -33,6 +35,11 @@ export function StatusBar() {
             </>
           )}
           <span className="status-item">원고지 {num(counts.manuscriptPages)}매</span>
+          {place?.doc.pages != null && (
+            <span className="status-item" title="작품 설정의 원고 서식으로 셈">
+              {paperName(ov.project.manuscriptFormat, catalog)} 예상 {num(place.doc.pages)}쪽
+            </span>
+          )}
           {goal ? (
             <span className="status-item">
               목표 {num(goal)}자의 {Math.floor((goalChars / goal) * 100)}%

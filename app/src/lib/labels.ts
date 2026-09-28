@@ -1,6 +1,6 @@
 // Screen words for kinds and statuses (docs/terminology.md, docs/layout-data.md).
 
-import type { DocStatus, PartView, ProjectKind, SnapshotKind } from '../api/types';
+import type { DocStatus, FormatCatalog, ManuscriptFormat, PartView, ProjectKind, SnapshotKind } from '../api/types';
 
 export const KIND_LABEL: Record<ProjectKind, string> = {
   webnovel: '웹소설',
@@ -56,9 +56,34 @@ export function stockCount(parts: PartView[]): number {
   );
 }
 
+function hasFinal(word: string): boolean {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  return code >= 0 && code <= 11171 && code % 28 !== 0;
+}
+
 /** Adds the object particle: "회차를", "장을". */
 export function withObject(word: string): string {
-  const code = word.charCodeAt(word.length - 1) - 0xac00;
-  const hasFinal = code >= 0 && code <= 11171 && code % 28 !== 0;
-  return `${word}${hasFinal ? '을' : '를'}`;
+  return `${word}${hasFinal(word) ? '을' : '를'}`;
+}
+
+/** Adds the subject particle: "회차가", "장이". */
+export function withSubject(word: string): string {
+  return `${word}${hasFinal(word) ? '이' : '가'}`;
+}
+
+/** Screen name of a manuscript format: its preset's name, marked when changed. */
+export function formatName(format: ManuscriptFormat, catalog: FormatCatalog | null): string {
+  const builtin = catalog?.builtin.find((b) => b.id === format.preset);
+  const user = catalog?.user.find((u) => u.name === format.preset);
+  const base = builtin?.format ?? user?.format;
+  const name = builtin?.name ?? user?.name ?? '직접 정한 서식';
+  if (!base) return name;
+  const same = JSON.stringify({ ...base, preset: '' }) === JSON.stringify({ ...format, preset: '' });
+  return same ? name : `${name} (바꿈)`;
+}
+
+/** Paper name for "A4 예상 12쪽". */
+export function paperName(format: ManuscriptFormat, catalog: FormatCatalog | null): string {
+  if (format.paper.kind === 'custom') return `${format.paper.widthMm}×${format.paper.heightMm}mm`;
+  return catalog?.papers.find((p) => p.key === format.paper.kind)?.label ?? '';
 }

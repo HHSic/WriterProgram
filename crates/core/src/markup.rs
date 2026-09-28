@@ -9,12 +9,14 @@
 //!   paragraph is written as a single `\`.
 //! - An intentionally empty paragraph is written as `&nbsp;`.
 //! - A scene break is a line with exactly `***`.
+//! - A paragraph set in from the sides (문단 여백) is wrapped in
+//!   `<p data-left="2" data-right="1">…</p>`, in characters.
 //! - Marks: `**굵게**`, `*기울임*`, `~~취소선~~`, `<u>밑줄</u>`,
 //!   `<span class="dot">방점</span>`, `<mark data-memo="id">메모 구간</mark>`.
 //! - `\` escapes ASCII punctuation. `\` and `*` in text are always escaped;
 //!   `~` and `<` only where they would otherwise read as markup.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 pub const SCENE_BREAK_LINE: &str = "***";
 const EMPTY_PARAGRAPH: &str = "&nbsp;";
@@ -46,10 +48,48 @@ impl Body {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Block {
     Paragraph {
+        #[serde(
+            default,
+            deserialize_with = "attrs_or_plain",
+            skip_serializing_if = "ParaAttrs::is_plain"
+        )]
+        attrs: ParaAttrs,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         content: Vec<Inline>,
     },
     SceneBreak {},
+}
+
+/// Paragraph margins (문단 여백) in characters: a paragraph set in from the
+/// left and right as a whole, for letters, poems or a 상태창.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct ParaAttrs {
+    #[serde(default, deserialize_with = "margin")]
+    pub left: u8,
+    #[serde(default, deserialize_with = "margin")]
+    pub right: u8,
+}
+
+impl ParaAttrs {
+    /// Widest margin, in characters.
+    pub const MAX: u8 = 20;
+
+    pub fn is_plain(&self) -> bool {
+        self.left == 0 && self.right == 0
+    }
+}
+
+/// `attrs: null` reads as no margins.
+fn attrs_or_plain<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<ParaAttrs, D::Error> {
+    Ok(Option::<ParaAttrs>::deserialize(d)?.unwrap_or_default())
+}
+
+/// Reads a margin leniently: whatever number the editor sends is rounded and
+/// kept within 0..=MAX, so an odd value never stops a save.
+fn margin<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<u8, D::Error> {
+    let v: Option<f64> = Option::deserialize(d)?;
+    Ok(v.filter(|v| v.is_finite())
+        .map_or(0, |v| v.round().clamp(0.0, f64::from(ParaAttrs::MAX)) as u8))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -87,6 +127,14 @@ impl Mark {
 }
 
 impl Block {
+    /// A paragraph without margins.
+    pub fn para(content: Vec<Inline>) -> Block {
+        Block::Paragraph {
+            attrs: ParaAttrs::default(),
+            content,
+        }
+    }
+
     /// A paragraph of plain text without marks. Newlines become line breaks.
     pub fn text(s: &str) -> Block {
         let mut content = Vec::new();
@@ -101,7 +149,15 @@ impl Block {
                 });
             }
         }
-        Block::Paragraph { content }
+        Block::para(content)
+    }
+
+    /// Margins of a paragraph; none for a scene break.
+    pub fn attrs(&self) -> ParaAttrs {
+        match self {
+            Block::Paragraph { attrs, .. } => *attrs,
+            Block::SceneBreak {} => ParaAttrs::default(),
+        }
     }
 
     /// Lines of plain text in this paragraph (split at line breaks). A scene
@@ -109,7 +165,7 @@ impl Block {
     pub fn lines(&self) -> Vec<String> {
         match self {
             Block::SceneBreak {} => Vec::new(),
-            Block::Paragraph { content } => {
+            Block::Paragraph { content, .. } => {
                 let mut lines = vec![String::new()];
                 for inline in content {
                     match inline {
@@ -142,7 +198,7 @@ pub fn write_body(blocks: &[Block]) -> String {
         }
         match block {
             Block::SceneBreak {} => out.push_str(SCENE_BREAK_LINE),
-            Block::Paragraph { content } => out.push_str(&write_paragraph(content)),
+            Block::Paragraph { attrs, content } => out.push_str(&write_paragraph(*attrs, content)),
         }
     }
     if !out.is_empty() {
@@ -256,7 +312,35 @@ fn memo_id(id: &str) -> String {
         .collect()
 }
 
-fn write_paragraph(content: &[Inline]) -> String {
+const PARA_CLOSE: &str = "</p>";
+
+fn para_open(attrs: ParaAttrs) -> String {
+    let mut tag = String::from("<p");
+    if attrs.left > 0 {
+        tag.push_str(&format!(" data-left=\"{}\"", attrs.left));
+    }
+    if attrs.right > 0 {
+        tag.push_str(&format!(" data-right=\"{}\"", attrs.right));
+    }
+    tag.push('>');
+    tag
+}
+
+fn write_paragraph(attrs: ParaAttrs, content: &[Inline]) -> String {
+    let text = paragraph_text(content);
+    if !attrs.is_plain() {
+        let inner = if text == EMPTY_PARAGRAPH { "" } else { &text };
+        return format!("{}{inner}{PARA_CLOSE}", para_open(attrs));
+    }
+    // Text that would read as the margin tag stays text.
+    if parse_para_open(&text.chars().collect::<Vec<_>>()).is_some() {
+        format!("\\{text}")
+    } else {
+        text
+    }
+}
+
+fn paragraph_text(content: &[Inline]) -> String {
     let runs = runs(content);
     if runs.is_empty() {
         return EMPTY_PARAGRAPH.to_string();
@@ -376,25 +460,84 @@ pub fn parse_body(src: &str) -> Vec<Block> {
     blocks
 }
 
+/// Reads `<p data-left="2" data-right="1">` at the start of a paragraph:
+/// the margins and the length of the tag in chars.
+fn parse_para_open(chars: &[char]) -> Option<(ParaAttrs, usize)> {
+    if !starts_with(chars, "<p") {
+        return None;
+    }
+    let mut attrs = ParaAttrs::default();
+    let mut i = 2;
+    loop {
+        if chars.get(i) == Some(&'>') {
+            return Some((attrs, i + 1));
+        }
+        let rest = &chars[i.min(chars.len())..];
+        let (side, len) = if starts_with(rest, " data-left=\"") {
+            (&mut attrs.left, " data-left=\"".len())
+        } else if starts_with(rest, " data-right=\"") {
+            (&mut attrs.right, " data-right=\"".len())
+        } else {
+            return None;
+        };
+        i += len;
+        let digits: String = chars[i.min(chars.len())..]
+            .iter()
+            .take_while(|c| c.is_ascii_digit())
+            .take(3)
+            .collect();
+        if digits.is_empty() || chars.get(i + digits.len()) != Some(&'"') {
+            return None;
+        }
+        *side = digits
+            .parse::<u8>()
+            .unwrap_or(ParaAttrs::MAX)
+            .min(ParaAttrs::MAX);
+        i += digits.len() + 1;
+    }
+}
+
 fn parse_chunk(lines: &[&str]) -> Block {
     if lines.len() == 1 {
         if lines[0].trim() == SCENE_BREAK_LINE {
             return Block::SceneBreak {};
         }
         if lines[0] == EMPTY_PARAGRAPH {
-            return Block::Paragraph { content: vec![] };
+            return Block::para(vec![]);
         }
     }
+    // A paragraph with margins: the tag opens its first line and `</p>` ends
+    // its last one (a missing end is forgiven, as with other hand edits).
+    let first: Vec<char> = lines[0].chars().collect();
+    let (attrs, lines) = match parse_para_open(&first) {
+        Some((attrs, len)) => {
+            let mut inner: Vec<String> = lines.iter().map(|l| (*l).to_string()).collect();
+            inner[0] = first[len..].iter().collect();
+            let last = inner.len() - 1;
+            if let Some(stripped) = inner[last].strip_suffix(PARA_CLOSE) {
+                inner[last] = stripped.to_string();
+            }
+            if inner.len() == 1 && inner[0].is_empty() {
+                inner.clear();
+            }
+            (attrs, inner)
+        }
+        None => (
+            ParaAttrs::default(),
+            lines.iter().map(|l| (*l).to_string()).collect(),
+        ),
+    };
     let mut p = InlineParser::default();
     for (i, line) in lines.iter().enumerate() {
         if i > 0 {
             p.hard_break();
         }
-        if *line != EMPTY_LINE {
+        if line != EMPTY_LINE {
             p.line(line);
         }
     }
     Block::Paragraph {
+        attrs,
         content: p.finish(),
     }
 }
@@ -578,7 +721,13 @@ mod tests {
         }
     }
     fn p(content: Vec<Inline>) -> Block {
-        Block::Paragraph { content }
+        Block::para(content)
+    }
+    fn pm(left: u8, right: u8, content: Vec<Inline>) -> Block {
+        Block::Paragraph {
+            attrs: ParaAttrs { left, right },
+            content,
+        }
     }
     fn br() -> Inline {
         Inline::HardBreak {}
@@ -600,7 +749,7 @@ mod tests {
             .iter()
             .map(|b| match b {
                 Block::SceneBreak {} => Block::SceneBreak {},
-                Block::Paragraph { content } => {
+                Block::Paragraph { attrs, content } => {
                     let mut out: Vec<Inline> = Vec::new();
                     for r in runs(content) {
                         match r {
@@ -608,7 +757,10 @@ mod tests {
                             Run::Text(text, marks) => out.push(Inline::Text { text, marks }),
                         }
                     }
-                    p(out)
+                    Block::Paragraph {
+                        attrs: *attrs,
+                        content: out,
+                    }
                 }
             })
             .collect()
@@ -738,6 +890,67 @@ mod tests {
     }
 
     #[test]
+    fn paragraph_margins() {
+        let text = round_trip(vec![
+            Block::text("그리고 편지에는 이렇게 적혀 있었다."),
+            pm(2, 0, vec![t("서하에게.", &[])]),
+            pm(
+                2,
+                1,
+                vec![t("잘 지내니?", &[]), br(), t("나는 ", &[]), t("잘", &[B])],
+            ),
+            pm(0, 3, vec![]),
+            pm(1, 0, vec![br(), t("앞이 빈 줄", &[]), br()]),
+        ]);
+        assert!(text.contains("\n\n<p data-left=\"2\">서하에게.</p>\n\n"));
+        assert!(text.contains("<p data-left=\"2\" data-right=\"1\">잘 지내니?\n나는 **잘**</p>"));
+        assert!(text.contains("\n\n<p data-right=\"3\"></p>\n\n"));
+        // Text that looks like the tag stays text, and the tag inside text too.
+        round_trip(vec![Block::text("<p data-left=\"2\">가짜</p>")]);
+        round_trip(vec![
+            Block::text("<p>"),
+            pm(1, 0, vec![t("끝이 </p>", &[])]),
+        ]);
+        round_trip(vec![
+            pm(1, 1, vec![t("&nbsp;", &[])]),
+            pm(1, 0, vec![t("\\", &[])]),
+        ]);
+        // Hand edits: a missing end tag, too wide a margin, unknown attributes.
+        assert_eq!(
+            parse_body("<p data-left=\"3\">열림"),
+            vec![pm(3, 0, vec![t("열림", &[])])]
+        );
+        assert_eq!(
+            parse_body("<p data-left=\"99\">넓음</p>")[0].attrs().left,
+            ParaAttrs::MAX
+        );
+        assert_eq!(
+            parse_body("<p class=\"x\">그대로</p>"),
+            vec![Block::text("<p class=\"x\">그대로</p>")]
+        );
+        // Web novel brackets starting with <p stay readable.
+        assert_eq!(write_body(&[Block::text("<power>")]), "<power>\n");
+    }
+
+    #[test]
+    fn margins_from_the_editor() {
+        let json = r#"{"type":"doc","content":[
+            {"type":"paragraph","attrs":{"left":2,"right":0},"content":[{"type":"text","text":"편지"}]},
+            {"type":"paragraph","attrs":{"left":0,"right":0},"content":[{"type":"text","text":"본문"}]},
+            {"type":"paragraph","attrs":{"left":2.6,"right":-4,"textAlign":"left"}},
+            {"type":"paragraph","attrs":null},
+            {"type":"paragraph","attrs":{"left":null}}
+        ]}"#;
+        let body: Body = serde_json::from_str(json).unwrap();
+        assert_eq!(body.content[0].attrs(), ParaAttrs { left: 2, right: 0 });
+        assert!(body.content[1].attrs().is_plain());
+        assert_eq!(body.content[2].attrs(), ParaAttrs { left: 3, right: 0 });
+        let back = serde_json::to_string(&body).unwrap();
+        assert!(back.contains(r#""attrs":{"left":2,"right":0}"#));
+        assert!(!back.contains(r#"{"type":"paragraph","attrs":{"left":0"#));
+    }
+
+    #[test]
     fn web_novel_brackets_stay_readable() {
         let text = round_trip(vec![Block::text("<상태창>"), Block::text("[레벨 업!]")]);
         assert_eq!(text, "<상태창>\n\n[레벨 업!]\n");
@@ -780,7 +993,7 @@ mod tests {
     /// Random bodies over a tricky alphabet must survive a write and read.
     #[test]
     fn random_round_trips() {
-        let alphabet: Vec<char> = "가나 다*~<>\\/&;nbspumarkd=\"\n.".chars().collect();
+        let alphabet: Vec<char> = "가나 다*~<>\\/&;nbspumarkd=\"\n.lefti-".chars().collect();
         let all_marks = [B, I, S, U, D, memo("a"), memo("b")];
         let mut seed: u64 = 0x2545_f491_4f6c_dd1d;
         let mut next = move |n: usize| {
@@ -797,6 +1010,14 @@ mod tests {
                     continue;
                 }
                 let mut content = Vec::new();
+                let attrs = if next(3) == 0 {
+                    ParaAttrs {
+                        left: next(4) as u8,
+                        right: next(3) as u8,
+                    }
+                } else {
+                    ParaAttrs::default()
+                };
                 for _ in 0..next(5) {
                     if next(6) == 0 {
                         content.push(br());
@@ -809,7 +1030,7 @@ mod tests {
                         all_marks.iter().filter(|_| next(4) == 0).cloned().collect();
                     content.push(t(&text, &marks));
                 }
-                blocks.push(p(content));
+                blocks.push(Block::Paragraph { attrs, content });
             }
             round_trip(blocks);
         }

@@ -22,10 +22,11 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::count::{Counts, count_blocks};
+use crate::layout::PageMetrics;
 use crate::markup::{Block, parse_body, write_body};
 use crate::project::{MANUSCRIPT_DIR, PLANNING_DIR};
 use crate::store::{atomic_write, now_iso, read_text};
-use crate::{Error, Result, snapshot};
+use crate::{Error, Result, project, snapshot};
 
 /// Status values. Common ones first, then web novel, then print.
 pub const STATUSES: [&str; 10] = [
@@ -98,7 +99,7 @@ pub struct DocFile {
     pub body: Vec<Block>,
 }
 
-fn decode_value(raw: &str) -> String {
+pub(crate) fn decode_value(raw: &str) -> String {
     if raw.starts_with('"') {
         serde_json::from_str::<String>(raw).unwrap_or_else(|_| raw.trim_matches('"').to_string())
     } else {
@@ -106,7 +107,7 @@ fn decode_value(raw: &str) -> String {
     }
 }
 
-fn encode(value: &str) -> String {
+pub(crate) fn encode(value: &str) -> String {
     serde_json::to_string(value).expect("strings serialize")
 }
 
@@ -143,7 +144,7 @@ pub fn parse_doc(src: &str, fallback_id: &str) -> DocFile {
     }
 }
 
-fn split_front_matter(src: &str) -> (Option<&str>, &str) {
+pub(crate) fn split_front_matter(src: &str) -> (Option<&str>, &str) {
     let Some(rest) = src.strip_prefix("---\n") else {
         return (None, src);
     };
@@ -184,6 +185,10 @@ pub fn write_doc(doc: &DocFile) -> String {
 pub enum Section {
     Manuscript,
     Planning,
+    /// Setting cards (설정집), see cards.rs.
+    Cards,
+    /// Notes (메모), see notes.rs.
+    Notes,
 }
 
 impl Section {
@@ -191,6 +196,8 @@ impl Section {
         match self {
             Section::Manuscript => MANUSCRIPT_DIR,
             Section::Planning => PLANNING_DIR,
+            Section::Cards => crate::cards::CARDS_DIR,
+            Section::Notes => crate::notes::NOTES_DIR,
         }
     }
 }
@@ -238,6 +245,8 @@ pub fn load(root: &Path, id: &str) -> Result<DocFile> {
 #[serde(rename_all = "camelCase")]
 pub struct SaveOutcome {
     pub counts: Counts,
+    /// Estimated pages in the project's manuscript format; none without paper.
+    pub pages: Option<u32>,
     /// Set when this save also kept an automatic record of the previous text.
     pub snapshot: Option<snapshot::SnapshotInfo>,
 }
@@ -251,12 +260,20 @@ pub fn save_body(
     body: Vec<Block>,
     auto_record_every: chrono::Duration,
 ) -> Result<SaveOutcome> {
-    let (_, path) = locate(root, id)?;
+    let (section, path) = locate(root, id)?;
     let current = read_doc(&path)?;
     let counts = count_blocks(&body);
+    let pages = match section {
+        Section::Manuscript => project::load(root)
+            .ok()
+            .and_then(|p| PageMetrics::of(&p.manuscript_format()))
+            .map(|m| m.chapter_pages(&body, true)),
+        Section::Planning | Section::Cards | Section::Notes => None,
+    };
     if current.body == body {
         return Ok(SaveOutcome {
             counts,
+            pages,
             snapshot: None,
         });
     }
@@ -268,7 +285,11 @@ pub fn save_body(
             body,
         },
     )?;
-    Ok(SaveOutcome { counts, snapshot })
+    Ok(SaveOutcome {
+        counts,
+        pages,
+        snapshot,
+    })
 }
 
 /// Fields that can be changed without touching the body. `None` leaves a field

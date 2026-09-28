@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::count::count_blocks;
 use crate::doc::{self, Section};
 use crate::store::{atomic_write, parse_iso, read_text, stamp, to_iso};
-use crate::{Error, Result, project, snapshot};
+use crate::{Error, Result, cards, notes, project, snapshot};
 
 pub const TRASH_DIR: &str = ".trash";
 const ITEM_FILE: &str = "item.json";
@@ -129,6 +129,61 @@ pub fn list(root: &Path) -> Result<Vec<TrashItem>> {
     Ok(items)
 }
 
+/// Moves a setting card to the trash.
+pub fn trash_card(root: &Path, card_id: &str) -> Result<TrashItem> {
+    let card = cards::load(root, card_id)?;
+    let path = root
+        .join(Section::Cards.dir())
+        .join(doc::file_name(card_id));
+    let now = Utc::now();
+    let id = format!("{}-{card_id}", stamp(now));
+    let dir = item_dir(root, &id)?;
+    fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    let item = TrashItem {
+        id,
+        doc_id: card_id.into(),
+        section: Section::Cards,
+        title: card.name.clone(),
+        deleted_at: to_iso(now),
+        part_id: None,
+        index: 0,
+        chars: card.description.chars().count() as u32,
+    };
+    fs::rename(&path, dir.join(doc::file_name(card_id))).map_err(|e| Error::io(&path, e))?;
+    write_item(&dir, &item)?;
+    Ok(item)
+}
+
+/// Moves a note to the trash. A note on a stretch of text loses its mark in
+/// the document, so a note brought back later shows the text it was on.
+pub fn trash_note(root: &Path, note_id: &str) -> Result<TrashItem> {
+    let note = notes::load(root, note_id)?;
+    notes::unmark_file(root, &note)?;
+    let path = notes::path(root, note_id)?;
+    let now = Utc::now();
+    let id = format!("{}-{note_id}", stamp(now));
+    let dir = item_dir(root, &id)?;
+    fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    let first_line = note
+        .text
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or(&note.quote);
+    let item = TrashItem {
+        id,
+        doc_id: note_id.into(),
+        section: Section::Notes,
+        title: first_line.chars().take(40).collect(),
+        deleted_at: to_iso(now),
+        part_id: None,
+        index: 0,
+        chars: note.text.chars().count() as u32,
+    };
+    fs::rename(&path, dir.join(doc::file_name(note_id))).map_err(|e| Error::io(&path, e))?;
+    write_item(&dir, &item)?;
+    Ok(item)
+}
+
 /// Puts a document back where it was (or at the end when that place is gone).
 pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
     let item = read_item(root, id)?;
@@ -142,10 +197,18 @@ pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
         ));
     }
     let source = dir.join(doc::file_name(&item.doc_id));
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
+    }
     fs::rename(&source, &target).map_err(|e| Error::io(&source, e))?;
 
+    if matches!(item.section, Section::Cards | Section::Notes) {
+        fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+        return Ok(item);
+    }
     let mut project = project::load(root)?;
     match item.section {
+        Section::Cards | Section::Notes => {}
         Section::Manuscript => {
             project.attach_manuscript(&item.doc_id, item.part_id.as_deref(), item.index)
         }

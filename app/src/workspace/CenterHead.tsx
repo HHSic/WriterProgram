@@ -1,7 +1,11 @@
+import type { Editor } from '@tiptap/core';
 import { Icon } from '../components/Icon';
+import { openMenu, type MenuItem } from '../components/Menu';
+import { marginsAt } from '../editor/paragraph';
 import { flushAll } from '../lib/flush';
 import { UNTITLED, docNumber } from '../lib/labels';
-import { findDoc, openDialog, useApp } from '../store';
+import { findDoc, openDialog, splitView, unsplit, useApp } from '../store';
+import { openSymbols } from './Symbols';
 
 export function CenterHead() {
   const ov = useApp((s) => s.overview)!;
@@ -9,11 +13,32 @@ export function CenterHead() {
   const editor = useApp((s) => s.editor);
   const save = useApp((s) => s.save);
   const rightOpen = useApp((s) => s.rightOpen);
+  const activeCardId = useApp((s) => s.activeCardId);
+  const target = useApp((s) => s.activeTarget);
+  const split = useApp((s) => (s.panes.length > 1 ? s.split : null));
+  const card = activeCardId ? ov.cards.find((c) => c.id === activeCardId) : undefined;
   const place = activeDocId ? findDoc(ov, activeDocId) : null;
 
   return (
     <div className="col-head center-head">
       <nav className="crumbs" aria-label="현재 위치">
+        {target?.kind === 'notes' && <strong>메모함</strong>}
+        {target?.kind === 'table' && (
+          <>
+            <span>개요 표</span>
+            <Icon name="chevronRight" size={12} />
+            <strong>{ov.parts.find((p) => p.id === target.id)?.title}</strong>
+          </>
+        )}
+        {activeCardId && (
+          <>
+            <span>설정집</span>
+            <Icon name="chevronRight" size={12} />
+            <span>{ov.cardTypes.find((t) => t.id === card?.cardType)?.name}</span>
+            <Icon name="chevronRight" size={12} />
+            <strong>{card?.name || '이름 없음'}</strong>
+          </>
+        )}
         {place && (
           <>
             <span>{place.part ? place.part.title : '기획'}</span>
@@ -27,15 +52,56 @@ export function CenterHead() {
       </nav>
       <div className="grow" />
       <SaveIndicator state={save.state} error={save.error} />
+      {activeDocId && (
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="장면 나눔 넣기"
+          title="장면 나눔 넣기 (빈 줄에 ***를 쓰고 Enter)"
+          disabled={!editor || !editor.isEditable}
+          onClick={() => editor?.chain().focus().insertSceneBreak().run()}
+        >
+          <Icon name="diamond" size={16} />
+        </button>
+      )}
+      {activeDocId && (
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="문단 여백"
+          title="문단 여백: 문단을 통째로 들이기 (Ctrl+] / Ctrl+[)"
+          disabled={!editor || !editor.isEditable}
+          onClick={(e) => editor && openMenu(e, marginMenu(editor))}
+        >
+          <Icon name="indent" size={17} />
+        </button>
+      )}
       <button
         type="button"
         className="icon-btn"
-        aria-label="장면 나눔 넣기"
-        title="장면 나눔 넣기 (빈 줄에 ***를 쓰고 Enter)"
-        disabled={!editor}
-        onClick={() => editor?.chain().focus().insertSceneBreak().run()}
+        aria-label="문자표"
+        title="문자표: 특수 문자와 빈칸 넣기 (Ctrl+F10)"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => openSymbols()}
       >
-        <Icon name="diamond" size={16} />
+        <Icon name="symbol" size={17} />
+      </button>
+      <button
+        type="button"
+        className={`icon-btn${split ? ' on' : ''}`}
+        aria-label="나눠 보기"
+        aria-pressed={split !== null}
+        title="나눠 보기 (Ctrl+\)"
+        onClick={(e) =>
+          openMenu(e, [
+            { label: '좌우로 나눠 보기', checked: split === 'row', onSelect: () => splitView('row') },
+            { label: '위아래로 나눠 보기', checked: split === 'column', onSelect: () => splitView('column') },
+            { separator: true },
+            { label: '나눠 보기 닫기', disabled: split === null, onSelect: () => void unsplit() },
+          ])
+        }
+      >
+        <Icon name={split === 'column' ? 'splitDown' : 'split'} size={17} />
       </button>
       <button type="button" className="icon-btn" aria-label="보기 설정" title="보기 설정" onClick={() => openDialog({ kind: 'view' })}>
         <Icon name="type" size={18} />
@@ -52,6 +118,27 @@ export function CenterHead() {
       </button>
     </div>
   );
+}
+
+/** 문단 여백 for the paragraphs the cursor or selection is in. */
+function marginMenu(editor: Editor): MenuItem[] {
+  const now = marginsAt(editor.state);
+  const run = (f: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => {
+    f(editor.chain().focus()).run();
+  };
+  return [
+    { heading: now.left || now.right ? `지금 문단: 왼쪽 ${now.left}자 · 오른쪽 ${now.right}자` : '지금 문단: 여백 없음' },
+    { label: '왼쪽 한 자 들이기 (Ctrl+])', onSelect: run((c) => c.shiftMargins(1)) },
+    { label: '왼쪽 한 자 내기 (Ctrl+[)', disabled: now.left === 0, onSelect: run((c) => c.shiftMargins(-1)) },
+    { label: '양쪽 한 자씩 들이기', onSelect: run((c) => c.shiftMargins(1, ['left', 'right'])) },
+    {
+      label: '양쪽 한 자씩 내기',
+      disabled: now.left === 0 && now.right === 0,
+      onSelect: run((c) => c.shiftMargins(-1, ['left', 'right'])),
+    },
+    { separator: true },
+    { label: '여백 없애기', disabled: now.left === 0 && now.right === 0, onSelect: run((c) => c.setMargins({ left: 0, right: 0 })) },
+  ];
 }
 
 function SaveIndicator({ state, error }: { state: 'saved' | 'saving' | 'error'; error?: string }) {

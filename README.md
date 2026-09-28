@@ -10,7 +10,7 @@
 | 위치 | 내용 |
 |---|---|
 | `app/` | 데스크톱 앱 (화면: React + Tiptap, `app/src-tauri`: Tauri) |
-| `crates/core` | 작품 폴더 형식, 저장, 기록, 분량, 내보내기 |
+| `crates/core` | 작품 폴더 형식, 저장, 기록, 분량, 설정집, 메모, 찾기/바꾸기, 원고 서식, 내보내기 |
 | `crates/revise` | 퇴고 점검 엔진 시제품 |
 | `docs/` | 설계 문서 |
 
