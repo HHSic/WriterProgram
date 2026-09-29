@@ -41,6 +41,8 @@ pub fn run() {
             commands::export_text,
             commands::export_txt,
             commands::export_file,
+            commands::import_preview,
+            commands::import_commit,
             commands::format_catalog,
             commands::format_save_preset,
             commands::format_delete_preset,

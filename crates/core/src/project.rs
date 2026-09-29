@@ -793,32 +793,47 @@ pub fn add_doc(root: &Path, spec: &NewDoc) -> Result<String> {
                 .map_or(project.planning.len(), |i| i + 1);
             project.planning.insert(index, id.clone());
         }
-        Section::Manuscript => {
-            if project.parts.is_empty() {
-                project.parts.push(new_part("1부"));
-            }
-            let after_pos =
-                spec.after.as_ref().and_then(|a| {
-                    project.parts.iter().enumerate().find_map(|(pi, p)| {
-                        p.docs.iter().position(|d| d == a).map(|di| (pi, di + 1))
-                    })
-                });
-            let (part_index, index) = match after_pos {
-                Some(pos) => pos,
-                None => {
-                    let pi = spec
-                        .part_id
-                        .as_ref()
-                        .and_then(|id| project.parts.iter().position(|p| &p.id == id))
-                        .unwrap_or(project.parts.len() - 1);
-                    (pi, project.parts[pi].docs.len())
-                }
-            };
-            project.parts[part_index].docs.insert(index, id.clone());
-        }
+        Section::Manuscript => place_docs(
+            &mut project,
+            std::slice::from_ref(&id),
+            spec.part_id.as_deref(),
+            spec.after.as_deref(),
+        ),
     }
     save(root, &project)?;
     Ok(id)
+}
+
+/// Puts chapters into the manuscript: right after `after`, or else at the end
+/// of `part_id`, or else at the end of the last part.
+pub(crate) fn place_docs(
+    project: &mut Project,
+    ids: &[String],
+    part_id: Option<&str>,
+    after: Option<&str>,
+) {
+    if project.parts.is_empty() {
+        project.parts.push(new_part("1부"));
+    }
+    let after_pos = after.and_then(|a| {
+        project
+            .parts
+            .iter()
+            .enumerate()
+            .find_map(|(pi, p)| p.docs.iter().position(|d| d == a).map(|di| (pi, di + 1)))
+    });
+    let (part_index, index) = match after_pos {
+        Some(pos) => pos,
+        None => {
+            let pi = part_id
+                .and_then(|id| project.parts.iter().position(|p| p.id == id))
+                .unwrap_or(project.parts.len() - 1);
+            (pi, project.parts[pi].docs.len())
+        }
+    };
+    project.parts[part_index]
+        .docs
+        .splice(index..index, ids.iter().cloned());
 }
 
 /// Moves a chapter to `index` inside `part_id` (index counted after removal),

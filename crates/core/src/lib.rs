@@ -16,6 +16,7 @@ pub mod error;
 pub mod export;
 pub mod format;
 pub mod hwpx;
+pub mod import;
 pub mod indent;
 pub mod layout;
 pub mod markup;

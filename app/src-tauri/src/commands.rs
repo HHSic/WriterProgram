@@ -14,6 +14,7 @@ use writer_core::count::{Counts, count_blocks};
 use writer_core::doc::{self, DocFile, DocMeta, MetaPatch, SaveGuard, SaveOutcome, Section};
 use writer_core::export::{self, DocOptions, ExportItem, FileKind, TextOptions};
 use writer_core::format::{self, Catalog, ManuscriptFormat, UserPreset};
+use writer_core::import::{self, CommitSpec, Committed, ImportOptions, Preview};
 use writer_core::markup::Body;
 use writer_core::notes::{self, NewNote, Note};
 use writer_core::places::{self, Env, Place};
@@ -421,6 +422,27 @@ pub async fn export_file(
             .collect()
     })
     .map_err(fail)
+}
+
+/// 가져오기 미리보기: what the files would become, without making anything.
+#[tauri::command]
+pub async fn import_preview(paths: Vec<String>, opts: ImportOptions) -> Res<Preview> {
+    let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    Ok(import::preview(&paths, &opts))
+}
+
+/// Makes the chapters picked in the preview.
+#[tauri::command]
+pub async fn import_commit(
+    state: State<'_, AppState>,
+    root: String,
+    paths: Vec<String>,
+    opts: ImportOptions,
+    spec: CommitSpec,
+) -> Res<Committed> {
+    let _write = state.write();
+    let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+    import::commit(Path::new(&root), &paths, &opts, &spec).map_err(fail)
 }
 
 /// 작품 전체 찾기.

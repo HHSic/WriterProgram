@@ -668,6 +668,18 @@ input[type='range'] {
   padding: 0;
 }
 
+/* A fieldset's legend sits outside the flex flow, so the gap above doesn't reach it. */
+legend.field-label {
+  margin-bottom: 6px;
+}
+
+/* 줄 간격 [160] %: the small labels beside a number box read as body text, not headings. */
+.field label.row {
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
 .field-label output {
   font-weight: 400;
   color: var(--muted);
@@ -1050,8 +1062,10 @@ input[type='range'] {
 }
 
 .doc-no {
-  width: 34px;
+  /* 100화, 1000화 grow the column instead of running into the title. */
+  min-width: 34px;
   flex-shrink: 0;
+  white-space: nowrap;
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -1249,7 +1263,9 @@ input[type='range'] {
 
 .synopsis-label {
   flex-shrink: 0;
-  padding-top: 1px;
+  /* One line box as tall as the textarea's, so the label sits on its first line. */
+  line-height: 20.8px;
+  white-space: nowrap;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
@@ -1442,6 +1458,30 @@ img.ProseMirror-separator {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.status-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A narrow window cuts the counts short, never the sync and 오늘 on the right. */
+.status-bar > .grow {
+  flex: 1 0 0;
+}
+
+.status-bar > .grow ~ .status-item {
+  flex-shrink: 0;
+}
+
+/* The in-between counts give way before 공백 포함 and 목표. */
+.status-bar > .status-item:first-child {
+  flex-shrink: 0;
+}
+
+.status-bar > .status-item + .status-item:not(:has(+ .grow)) {
+  flex-shrink: 20;
 }
 
 .status-item.strong {
@@ -2621,7 +2661,7 @@ fieldset.plain {
 }
 
 .otable th {
-  padding: 8px 10px;
+  padding: 8px;
   border-bottom: 1px solid var(--border);
   background: var(--sidebar);
   text-align: left;
@@ -2635,6 +2675,12 @@ fieldset.plain {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+}
+
+/* Headers over input cells line up with the text inside the input (border + padding). */
+.otable th.c-title,
+.otable th.c-synopsis {
+  padding-left: 15px;
 }
 
 .otable tbody tr:last-child td {
@@ -3044,11 +3090,12 @@ fieldset.plain {
 }
 
 .crumbs > span {
-  flex: 0 1 auto;
+  /* The part name gives way first, so the open chapter's name stays readable. */
+  flex: 0 100 auto;
 }
 
 .crumbs > strong {
-  flex: 0 2 auto;
+  flex: 0 1 auto;
 }
 
 .crumbs > svg {
@@ -3137,6 +3184,12 @@ fieldset.plain {
   position: absolute;
   right: 6px;
   top: 6px;
+}
+
+/* Make room for ⋯ on the first line, so it never lands on the status chip. */
+.doc-row:hover > .doc-item > .doc-line:first-child,
+.doc-row:focus-within > .doc-item > .doc-line:first-child {
+  padding-right: 26px;
 }
 
 .plan-row > .more-btn,
@@ -4121,6 +4174,10 @@ fieldset.plain {
     min-width: 0;
   }
 
+  .doc-row > .doc-item > .doc-line:first-child {
+    padding-right: 0;
+  }
+
   .doc-row > .more-btn,
   .plan-row > .more-btn,
   .card-row > .more-btn,
@@ -4162,4 +4219,240 @@ fieldset.plain {
     height: 26px;
     opacity: 0.8;
   }
+}
+
+/* 가져오기 (ImportDialog) ---------------------------------------------- */
+
+.steps {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+}
+
+.steps li + li::before {
+  content: '';
+  width: 14px;
+  height: 1px;
+  margin-right: 6px;
+  background: var(--border-strong);
+}
+
+.steps li.on {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.steps-no {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.steps li.on .steps-no {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.steps li.done .steps-no {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.import-back {
+  margin-right: auto;
+}
+
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 28px 16px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.import-drop strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.import-drop:hover {
+  background: var(--hover);
+}
+
+.import-files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-files li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 2px 4px 2px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.import-file-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--text);
+}
+
+.import-file-note {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.import-results li.bad .import-file-note {
+  color: var(--danger);
+  white-space: normal;
+}
+
+.import-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.import-list {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.import-list.loading {
+  opacity: 0.6;
+}
+
+.import-list-head {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.import-list ul {
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.import-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.import-list li:last-child {
+  border-bottom: 0;
+}
+
+.import-list li.off {
+  opacity: 0.5;
+}
+
+.import-list li > input[type='checkbox'] {
+  margin-top: 8px;
+}
+
+.import-no {
+  flex-shrink: 0;
+  min-width: 20px;
+  margin-top: 6px;
+  font-size: 11px;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.import-chapter {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.import-snippet {
+  padding: 0 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.import-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.import-warn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--chip-amber-fg);
+  border-radius: 10px;
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+  font-size: 13px;
+}
+
+.import-warn p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.import-warn ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
 }
