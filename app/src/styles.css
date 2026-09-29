@@ -668,6 +668,18 @@ input[type='range'] {
   padding: 0;
 }
 
+/* A fieldset's legend sits outside the flex flow, so the gap above doesn't reach it. */
+legend.field-label {
+  margin-bottom: 6px;
+}
+
+/* 줄 간격 [160] %: the small labels beside a number box read as body text, not headings. */
+.field label.row {
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
 .field-label output {
   font-weight: 400;
   color: var(--muted);
