@@ -78,7 +78,7 @@ impl Layout {
         info: &DocInfo,
     ) -> Self {
         let head = &format.header;
-        let even_odd = head.facing();
+        let even_odd = head.facing() || format.footer_facing();
         let sections = head.is_on() && head.skip_chapter_first && format.chapter_new_page;
         let mut parts = Vec::new();
         let mut add = |header: bool, page: PageType, xml: String| {
@@ -92,13 +92,13 @@ impl Layout {
                 xml,
             });
         };
-        if format.page_numbers {
-            add(false, PageType::Default, footer());
+        if format.page_numbers || format.footer.is_on() {
+            add(false, PageType::Default, footer(format, false));
             if even_odd {
-                add(false, PageType::Even, footer());
+                add(false, PageType::Even, footer(format, true));
             }
             if sections {
-                add(false, PageType::First, footer());
+                add(false, PageType::First, footer(format, false));
             }
         }
         if head.is_on() {
@@ -345,10 +345,52 @@ fn settings(format: &ManuscriptFormat, layout: &Layout) -> String {
     )
 }
 
-fn footer() -> String {
+const PAGE_NUMBER: &str = r#"<w:r><w:t xml:space="preserve">- </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t xml:space="preserve"> -</w:t></w:r>"#;
+
+/// The footer of even or odd pages: the page number and the 꼬리말, each in
+/// its place. Two things on one line sit at tab stops (centre and right edge
+/// of the text area); one alone is simply aligned.
+fn footer(format: &ManuscriptFormat, even: bool) -> String {
+    let side = |align: HeadAlign| {
+        let (e, o) = align.sides();
+        if even { e } else { o }
+    };
+    // Left, centre, right.
+    let mut slots = [String::new(), String::new(), String::new()];
+    let slot = |align: HeadAlign| match align {
+        HeadAlign::Left => 0,
+        HeadAlign::Center => 1,
+        _ => 2,
+    };
+    if format.page_numbers {
+        slots[slot(side(format.page_number_align))].push_str(PAGE_NUMBER);
+    }
+    if format.footer.is_on() {
+        slots[slot(side(format.footer.align))]
+            .push_str(&text_run(format.footer.text.trim(), RunStyle::default()));
+    }
+    let filled: Vec<usize> = (0..3).filter(|i| !slots[*i].is_empty()).collect();
+    let (ppr, runs) = if filled.len() == 1 {
+        let jc = ["left", "center", "right"][filled[0]];
+        (
+            format!(r#"<w:pStyle w:val="Footer"/><w:jc w:val="{jc}"/>"#),
+            slots[filled[0]].clone(),
+        )
+    } else {
+        let (w, _) = format.page();
+        let m = format.page_margins();
+        let width = twips_mm(w - m.inside - m.outside);
+        (
+            format!(
+                r#"<w:pStyle w:val="Footer"/><w:tabs><w:tab w:val="center" w:pos="{}"/><w:tab w:val="right" w:pos="{width}"/></w:tabs><w:jc w:val="left"/>"#,
+                width / 2
+            ),
+            slots.join("<w:r><w:tab/></w:r>"),
+        )
+    };
     format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:ftr xmlns:w="{W}" xmlns:r="{R}"><w:p><w:pPr><w:pStyle w:val="Footer"/></w:pPr><w:r><w:t xml:space="preserve">- </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t xml:space="preserve"> -</w:t></w:r></w:p></w:ftr>"#
+<w:ftr xmlns:w="{W}" xmlns:r="{R}"><w:p><w:pPr>{ppr}</w:pPr>{runs}</w:p></w:ftr>"#
     )
 }
 
@@ -741,6 +783,44 @@ mod tests {
         assert_eq!(doc.matches("<w:sectPr>").count(), 1);
         assert!(unzip(&bytes, "word/_rels/document.xml.rels").contains(r#"Target="header4.xml""#));
         assert!(unzip(&bytes, "[Content_Types].xml").contains("/word/header4.xml"));
+    }
+
+    #[test]
+    fn footer_text_beside_the_page_number() {
+        let mut format = builtin("submission-a4").unwrap();
+        format.footer = crate::format::RunningFoot {
+            text: "달빛 서점 · 투고".into(),
+            align: HeadAlign::Outside,
+        };
+        format.page_number_align = HeadAlign::Center;
+        let opts = DocOptions {
+            include_titles: true,
+            scene_break: "*".into(),
+        };
+        let bytes = docx_bytes(&sample(), &format, &opts, &info()).unwrap();
+        // Outside: odd pages on the right, even pages on the left.
+        assert!(unzip(&bytes, "word/settings.xml").contains("<w:evenAndOddHeaders/>"));
+        let odd = unzip(&bytes, "word/footer3.xml");
+        let even = unzip(&bytes, "word/footer4.xml");
+        // A4 with 30mm margins: 150mm of text, 8504 twips.
+        assert!(odd.contains(
+            r#"<w:tab w:val="center" w:pos="4252"/><w:tab w:val="right" w:pos="8504"/>"#
+        ));
+        let tab = "<w:r><w:tab/></w:r>";
+        // Odd: nothing on the left, the number in the middle, the 꼬리말 on the right.
+        assert!(odd.find(tab).unwrap() < odd.find("PAGE").unwrap());
+        assert!(odd.find("PAGE").unwrap() < odd.rfind(tab).unwrap());
+        assert!(odd.rfind(tab).unwrap() < odd.find("달빛 서점").unwrap());
+        assert!(even.find("달빛 서점").unwrap() < even.find(tab).unwrap());
+        let doc = unzip(&bytes, "word/document.xml");
+        assert!(doc.contains(r#"<w:footerReference w:type="even""#));
+
+        // The 꼬리말 alone is simply aligned.
+        format.page_numbers = false;
+        format.footer.align = HeadAlign::Right;
+        let bytes = docx_bytes(&sample(), &format, &opts, &info()).unwrap();
+        let only = unzip(&bytes, "word/footer3.xml");
+        assert!(only.contains(r#"<w:jc w:val="right"/>"#) && !only.contains("PAGE"));
     }
 
     #[test]

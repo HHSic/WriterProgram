@@ -25,6 +25,7 @@ import type {
   Note,
   ManuscriptFormat,
   Overview,
+  PageSetup,
   Place,
   ProjectInfo,
   ProjectKind,
@@ -79,8 +80,19 @@ const SUBMISSION: ManuscriptFormat = {
   blankLineBetween: false,
   chapterNewPage: true,
   pageNumbers: true,
+  pageNumberAlign: 'center',
   header: { content: 'none', text: '', align: 'center', skipChapterFirst: true },
+  footer: { text: '', align: 'left' },
   indentRules: { chapterFirst: false, afterScene: false, margined: true, dialogue: false, dialogueHang: false },
+};
+/** What the sample 한글 file says about its pages. */
+const MOCK_PAGE: PageSetup = {
+  paper: { kind: 'a4', widthMm: 210, heightMm: 297 },
+  margins: { top: 20, bottom: 15, inside: 30, outside: 30, header: 15, footer: 15 },
+  header: { content: 'custom', text: '달빛 서점', align: 'center', skipChapterFirst: false },
+  pageNumbers: 'center',
+  footer: { text: '투고용 · 무단 배포 금지', align: 'right' },
+  summary: '용지 A4, 여백 위 20 · 아래 15 · 양옆 30mm. 머리말은 “달빛 서점”(가운데), 쪽 번호는 아래 가운데, 꼬리말은 “투고용 · 무단 배포 금지”(오른쪽).',
 };
 const WEBNOVEL: ManuscriptFormat = {
   ...SUBMISSION,
@@ -646,7 +658,7 @@ export const mockBackend: Backend = {
     return perDoc ? items.map((i) => `${dest}\\${i.fileName}.${kind}`) : [dest];
   },
   async pickFiles() {
-    return ['C:\\원고\\연재본.docx', 'C:\\원고\\외전.txt', 'C:\\원고\\옛 원고.hwp'];
+    return ['C:\\원고\\연재본.hwpx', 'C:\\원고\\외전.txt', 'C:\\원고\\옛 원고.hwp'];
   },
   async importPreview(paths, opts) {
     const none = { tables: 0, images: 0, footnotes: 0 };
@@ -662,17 +674,18 @@ export const mockBackend: Backend = {
       return {
         name,
         kind,
-        error: bad ? '한글 파일은 아직 읽을 수 없음 · 한글에서 docx나 txt로 저장해 주세요' : null,
+        error: bad ? '옛 한글 형식(.hwp)은 읽을 수 없음 · 한글에서 hwpx로 저장해 주세요' : null,
         encoding: kind === 'txt' ? 'euc-kr' : null,
-        rule: bad ? '' : opts.rule === 'file' ? '파일 하나가 회차 하나' : kind === 'docx' ? '제목 서식' : '제N화',
+        rule: bad ? '' : opts.rule === 'file' ? '파일 하나가 회차 하나' : kind === 'docx' || kind === 'hwpx' ? '제목 서식' : '제N화',
         chapters: 0,
+        page: kind === 'hwpx' ? MOCK_PAGE : null,
       };
     });
     const chapters: ImportChapter[] = [];
     files.forEach((f, file) => {
       if (f.error) return;
       const list: [string, number, SkipTotalsLike][] =
-        opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), 9800, none]] : f.kind === 'docx' ? sample : [['외전 · 그날의 서하', 3120, none]];
+        opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), 9800, none]] : f.kind === 'docx' || f.kind === 'hwpx' ? sample : [['외전 · 그날의 서하', 3120, none]];
       for (const [title, chars, skipped] of list) {
         chapters.push({ index: chapters.length, file, title, chars, paragraphs: Math.round(chars / 60), snippet: '서하는 매일 밤 열한 시에 서점 문을 닫았다. 할머니가 그랬고, 할머니의 어머니도 그랬다고 했다.', skipped });
       }
@@ -698,7 +711,20 @@ export const mockBackend: Backend = {
     const withAfter = spec.after ? p.parts.find((x) => x.docs.includes(spec.after!)) : undefined;
     if (withAfter) withAfter.docs.splice(withAfter.docs.indexOf(spec.after!) + 1, 0, ...ids);
     else (p.parts.find((x) => x.id === spec.partId) ?? p.parts[p.parts.length - 1]).docs.push(...ids);
-    return { docs: ids, notes: 0 };
+    const page = spec.pageSetup ? preview.files.find((f) => f.page)?.page : undefined;
+    if (page) {
+      const f = p.info.manuscriptFormat;
+      p.info.manuscriptFormat = {
+        ...f,
+        paper: page.paper,
+        margins: page.margins,
+        header: page.header,
+        pageNumbers: page.pageNumbers !== null,
+        pageNumberAlign: page.pageNumbers ?? f.pageNumberAlign,
+        footer: page.footer,
+      };
+    }
+    return { docs: ids, notes: 0, format: !!page };
   },
   async search(root, query) {
     const p = project(root);

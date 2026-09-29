@@ -1801,12 +1801,31 @@ input.num {
   text-indent: var(--pv-indent);
 }
 
-.pv-page-number {
+.pv-foot {
   position: absolute;
-  left: 0;
-  right: 0;
-  text-align: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
   font-family: var(--pv-font);
+  white-space: nowrap;
+}
+
+.pv-foot > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pv-foot-left {
+  text-align: left;
+}
+
+.pv-foot-center {
+  text-align: center;
+}
+
+.pv-foot-right {
+  text-align: right;
 }
 
 .format-chip {
@@ -4432,6 +4451,20 @@ fieldset.plain {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.import-page {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.import-page .hint {
+  margin: 0;
+  line-height: 1.6;
 }
 
 .import-warn {

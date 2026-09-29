@@ -34,11 +34,17 @@ pub struct ManuscriptFormat {
     pub blank_line_between: bool,
     /// Each chapter starts on a new page.
     pub chapter_new_page: bool,
-    /// Page numbers at the bottom centre.
+    /// Page numbers at the bottom of the pages.
     pub page_numbers: bool,
+    /// Where the page number sits.
+    #[serde(default)]
+    pub page_number_align: HeadAlign,
     /// 머리말: a line at the top of the pages.
     #[serde(default)]
     pub header: RunningHead,
+    /// 꼬리말: a line of the writer's own at the bottom, beside the page number.
+    #[serde(default)]
+    pub footer: RunningFoot,
     /// Where the first-line indent is left out (indent.rs).
     #[serde(default)]
     pub indent_rules: IndentRules,
@@ -96,6 +102,22 @@ pub enum HeadAlign {
     Outside,
 }
 
+impl HeadAlign {
+    /// Where it lands on even and odd pages.
+    pub fn sides(self) -> (HeadAlign, HeadAlign) {
+        match self {
+            HeadAlign::Outside => (HeadAlign::Left, HeadAlign::Right),
+            a => (a, a),
+        }
+    }
+
+    /// Lands in the same place as `other` on some page.
+    pub fn meets(self, other: HeadAlign) -> bool {
+        let (a, b) = (self.sides(), other.sides());
+        a.0 == b.0 || a.1 == b.1
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct RunningHead {
@@ -136,6 +158,30 @@ impl RunningHead {
             self.content,
             HeadContent::Chapter | HeadContent::TitleChapter
         )
+    }
+}
+
+/// 꼬리말: text the writer typed, shown at the bottom of every page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct RunningFoot {
+    /// Empty when there is no 꼬리말.
+    pub text: String,
+    pub align: HeadAlign,
+}
+
+impl Default for RunningFoot {
+    fn default() -> Self {
+        RunningFoot {
+            text: String::new(),
+            align: HeadAlign::Left,
+        }
+    }
+}
+
+impl RunningFoot {
+    pub fn is_on(&self) -> bool {
+        !self.text.trim().is_empty()
     }
 }
 
@@ -253,7 +299,9 @@ pub fn builtin_presets() -> Vec<(&'static str, &'static str, ManuscriptFormat)> 
         blank_line_between: false,
         chapter_new_page: true,
         page_numbers: true,
+        page_number_align: HeadAlign::Center,
         header: RunningHead::default(),
+        footer: RunningFoot::default(),
         indent_rules: IndentRules {
             margined: true,
             ..IndentRules::default()
@@ -334,6 +382,17 @@ impl ManuscriptFormat {
         self.paper.kind != "none"
     }
 
+    /// The 꼬리말 and the page number would sit on top of each other.
+    pub fn footer_clash(&self) -> bool {
+        self.page_numbers && self.footer.is_on() && self.footer.align.meets(self.page_number_align)
+    }
+
+    /// Something at the bottom differs between even and odd pages.
+    pub fn footer_facing(&self) -> bool {
+        (self.page_numbers && self.page_number_align == HeadAlign::Outside)
+            || (self.footer.is_on() && self.footer.align == HeadAlign::Outside)
+    }
+
     /// Paper used when writing a file: continuous formats print on A4.
     pub fn page(&self) -> (f64, f64) {
         if self.has_paper() {
@@ -384,6 +443,12 @@ impl ManuscriptFormat {
         }
         if self.header.text.chars().count() > 100 {
             return bad("머리말은 100자까지 적을 수 있습니다");
+        }
+        if self.footer.text.chars().count() > 100 {
+            return bad("꼬리말은 100자까지 적을 수 있습니다");
+        }
+        if self.footer_clash() {
+            return bad("꼬리말과 쪽 번호가 같은 자리에 있습니다. 한쪽 자리를 바꿔 주세요");
         }
         Ok(())
     }
@@ -555,6 +620,37 @@ mod tests {
             serde_json::from_str(r#"{"content":"titleChapter","align":"outside"}"#).unwrap();
         assert!(head.facing() && head.follows_chapter());
         assert!(head.skip_chapter_first);
+    }
+
+    #[test]
+    fn footer_and_page_number_keep_apart() {
+        let mut value = serde_json::to_value(default_for(ProjectKind::Print)).unwrap();
+        let obj = value.as_object_mut().unwrap();
+        obj.remove("footer");
+        obj.remove("pageNumberAlign");
+        let mut f: ManuscriptFormat = serde_json::from_value(value).unwrap();
+        assert_eq!(f.page_number_align, HeadAlign::Center);
+        assert!(!f.footer.is_on() && !f.footer_facing());
+
+        f.footer.text = "달빛 서점 · 투고 원고".into();
+        f.footer.align = HeadAlign::Center;
+        assert!(
+            f.validate()
+                .unwrap_err()
+                .user_message()
+                .contains("같은 자리")
+        );
+        f.footer.align = HeadAlign::Left;
+        f.validate().unwrap();
+        // Outside is left on even pages: it meets a page number on the left.
+        f.page_number_align = HeadAlign::Outside;
+        assert!(f.footer_clash() && f.footer_facing());
+        f.page_number_align = HeadAlign::Right;
+        f.footer.align = HeadAlign::Left;
+        assert!(!f.footer_clash());
+        f.page_numbers = false;
+        f.footer.align = HeadAlign::Right;
+        assert!(!f.footer_clash());
     }
 
     #[test]

@@ -75,7 +75,7 @@ export type Dialog =
   | { kind: 'project'; tab?: SettingsTab }
   | { kind: 'trash' }
   | { kind: 'export' }
-  /** 가져오기: txt, md, docx into chapters, into `partId` when given. */
+  /** 가져오기: txt, md, docx, hwpx into chapters, into `partId` when given. */
   | { kind: 'import'; partId?: string }
   | { kind: 'view' }
   | { kind: 'symbols' }

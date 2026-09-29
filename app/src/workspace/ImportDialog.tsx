@@ -1,4 +1,4 @@
-// 가져오기 (S3): txt, md and docx files become chapters, in three steps:
+// 가져오기 (S3): txt, md, docx and hwpx files become chapters, in three steps:
 // pick files, see how they are cut into chapters, confirm where they go.
 // Tables, pictures and footnotes are never imported; the last step says so
 // and asks whether to leave them out or cancel.
@@ -78,6 +78,7 @@ export function ImportDialog({ partId }: { partId?: string }) {
   const [loading, setLoading] = useState(false);
   const [target, setTarget] = useState(() => partId ?? newDocPartId() ?? ov.parts[ov.parts.length - 1]?.id ?? '');
   const [leaveNotes, setLeaveNotes] = useState(true);
+  const [followPage, setFollowPage] = useState(false);
   const [busy, setBusy] = useState(false);
   const asked = useRef(0);
 
@@ -129,6 +130,8 @@ export function ImportDialog({ partId }: { partId?: string }) {
   const totalChars = chosen.reduce((n, c) => n + c.chars, 0);
   const leaving = hasSkips(skipped);
   const readable = preview?.files.filter((f) => !f.error).length ?? 0;
+  // A 한글 file's paper, margins, 머리말, 꼬리말 and page numbers.
+  const paged = preview?.files.find((f) => !f.error && f.page) ?? null;
 
   const run = async () => {
     if (busy || !preview) return;
@@ -140,12 +143,13 @@ export function ImportDialog({ partId }: { partId?: string }) {
         after: null,
         picks: rows.filter((r) => r.on).map((r) => ({ index: r.index, title: r.title.trim() })),
         leaveNotes: leaving && leaveNotes,
+        pageSetup: !!paged && followPage,
       });
       await refreshOverview();
       if (result.notes > 0) await loadNotes();
       closeDialog();
       showToast({
-        text: `${noun} ${result.docs.length}개를 가져왔습니다${result.notes > 0 ? ` · 빠진 자리에 메모 ${result.notes}개` : ''}`,
+        text: `${noun} ${result.docs.length}개를 가져왔습니다${result.notes > 0 ? ` · 빠진 자리에 메모 ${result.notes}개` : ''}${result.format ? ' · 원고 서식도 맞췄습니다' : ''}`,
       });
       if (result.docs[0]) await selectDoc(result.docs[0]);
     } catch (e) {
@@ -200,7 +204,7 @@ export function ImportDialog({ partId }: { partId?: string }) {
           <button type="button" className="import-drop" onClick={() => void pick()}>
             <Icon name="plus" size={18} />
             <strong>파일 고르기</strong>
-            <span>txt · md · docx, 여러 개를 한꺼번에 고를 수 있습니다</span>
+            <span>txt · md · docx · 한글(hwpx), 여러 개를 한꺼번에 고를 수 있습니다</span>
           </button>
           {paths.length > 0 && (
             <ul className="import-files">
@@ -218,7 +222,7 @@ export function ImportDialog({ partId }: { partId?: string }) {
             </ul>
           )}
           <p className="hint">
-            표, 그림, 각주는 가져오지 않습니다. 한글 파일(.hwp, .hwpx)은 한글에서 docx나 txt로 저장한 뒤 골라 주세요.
+            표, 그림, 각주는 가져오지 않습니다. 옛 한글 파일(.hwp)은 한글에서 한글 문서(.hwpx)로 저장한 뒤 골라 주세요.
           </p>
         </div>
       )}
@@ -289,7 +293,7 @@ export function ImportDialog({ partId }: { partId?: string }) {
                     </span>
                     <span className="import-file-note">
                       {f.error ??
-                        `${noun} ${f.chapters}개 · ${f.rule}${f.encoding && f.kind !== 'docx' ? ` · ${f.encoding.toUpperCase()}` : ''}`}
+                        `${noun} ${f.chapters}개 · ${f.rule}${f.encoding && f.kind !== 'docx' && f.kind !== 'hwpx' ? ` · ${f.encoding.toUpperCase()}` : ''}`}
                     </span>
                   </li>
                 ))}
@@ -365,6 +369,20 @@ export function ImportDialog({ partId }: { partId?: string }) {
           <p className="dialog-text">
             {noun} <strong>{chosen.length}개</strong> · 공백 포함 <strong>{num(totalChars)}자</strong>를 가져옵니다. 이미 있는 {noun}는 그대로입니다.
           </p>
+          {paged?.page && (
+            <div className="import-page">
+              <label className="check">
+                <input type="checkbox" checked={followPage} onChange={(e) => setFollowPage(e.target.checked)} />
+                원고 서식도 {paged.name}의 쪽 모양에 맞추기
+              </label>
+              <p className="hint">{paged.page.summary}</p>
+              <p className="hint">
+                {followPage
+                  ? '글꼴, 글자 크기, 줄 간격은 지금 원고 서식 그대로 둡니다. 작품 설정에서 언제든 다시 바꿀 수 있습니다.'
+                  : '켜지 않으면 머리말·꼬리말·쪽 번호는 가져오지 않고, 원고 서식도 그대로입니다.'}
+              </p>
+            </div>
+          )}
           {leaving && (
             <div className="import-warn" role="alert">
               <strong>표·그림은 가져올 수 없습니다</strong>

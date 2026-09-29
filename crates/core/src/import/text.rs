@@ -249,6 +249,7 @@ pub(super) fn read(bytes: &[u8], opts: &ImportOptions, md: bool) -> Result<Raw, 
     Ok(Raw {
         items: reader.items,
         encoding: Some(encoding.into()),
+        page: None,
     })
 }
 

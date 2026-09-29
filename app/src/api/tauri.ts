@@ -110,7 +110,7 @@ export const tauriBackend: Backend = {
       multiple: true,
       directory: false,
       title,
-      filters: [{ name: '원고 파일 (txt, md, docx)', extensions: ['txt', 'md', 'markdown', 'docx'] }],
+      filters: [{ name: '원고 파일 (txt, md, docx, hwpx)', extensions: ['txt', 'md', 'markdown', 'docx', 'hwpx', 'hwp'] }],
     });
     return Array.isArray(picked) ? picked : typeof picked === 'string' ? [picked] : [];
   },

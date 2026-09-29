@@ -55,6 +55,8 @@ const PARA_MARGINS: usize = 25;
 
 /// Style id of 한글's 머리말 style in the list written by `header`.
 const STYLE_HEAD: usize = 14;
+/// 장 제목: chapter titles, so 한글 lists them and 가져오기 finds them again.
+const STYLE_TITLE: usize = 23;
 
 /// Builds the .hwpx file in memory.
 pub fn hwpx_bytes(
@@ -524,7 +526,7 @@ fn header(format: &ManuscriptFormat, run_styles: &[RunStyle], margins: &[ParaAtt
     }
     out.push_str("</hh:paraProperties>");
 
-    let styles: [(&str, &str, &str, usize, usize, usize); 23] = [
+    let styles: [(&str, &str, &str, usize, usize, usize); 24] = [
         ("PARA", "바탕글", "Normal", 0, 0, 0),
         ("PARA", "본문", "Body", 1, 0, 1),
         ("PARA", "개요 1", "Outline 1", 2, 0, 2),
@@ -548,6 +550,14 @@ fn header(format: &ManuscriptFormat, run_styles: &[RunStyle], margins: &[ParaAtt
         ("PARA", "차례 2", "TOC 2", 14, 6, 20),
         ("PARA", "차례 3", "TOC 3", 15, 6, 21),
         ("PARA", "캡션", "Caption", 19, 0, 22),
+        (
+            "PARA",
+            "장 제목",
+            "Chapter Title",
+            PARA_TITLE,
+            CHAR_TITLE,
+            0,
+        ),
     ];
     let _ = write!(out, r#"<hh:styles itemCnt="{}">"#, styles.len());
     for (id, (kind, name, eng, para, chr, next)) in styles.iter().enumerate() {
@@ -623,7 +633,12 @@ impl ParagraphWriter {
         };
         let _ = write!(
             self.out,
-            r#"<hp:p id="{id}" paraPrIDRef="{para_pr}" styleIDRef="0" pageBreak="{}" columnBreak="0" merged="0">{lead}{runs}</hp:p>"#,
+            r#"<hp:p id="{id}" paraPrIDRef="{para_pr}" styleIDRef="{}" pageBreak="{}" columnBreak="0" merged="0">{lead}{runs}</hp:p>"#,
+            if para_pr == PARA_TITLE {
+                STYLE_TITLE
+            } else {
+                0
+            },
             u8::from(page_break)
         );
     }
@@ -639,9 +654,15 @@ fn sec_pr(format: &ManuscriptFormat) -> String {
         "LEFT_ONLY"
     };
     let page_num = if format.page_numbers {
-        r#"<hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl>"#
+        let pos = match format.page_number_align {
+            HeadAlign::Left => "BOTTOM_LEFT",
+            HeadAlign::Center => "BOTTOM_CENTER",
+            HeadAlign::Right => "BOTTOM_RIGHT",
+            HeadAlign::Outside => "OUTSIDE_BOTTOM",
+        };
+        format!(r#"<hp:ctrl><hp:pageNum pos="{pos}" formatType="DIGIT" sideChar="-"/></hp:ctrl>"#)
     } else {
-        ""
+        String::new()
     };
     format!(
         r##"<hp:run charPrIDRef="0"><hp:secPr id="" textDirection="HORIZONTAL" spaceColumns="1134" tabStop="8000" tabStopVal="4000" tabStopUnit="HWPUNIT" outlineShapeIDRef="1" memoShapeIDRef="0" textVerticalWidthHead="0" masterPageCnt="0"><hp:grid lineGrid="0" charGrid="0" wonggojiFormat="0"/><hp:startNum pageStartsOn="BOTH" page="0" pic="0" tbl="0" equation="0"/><hp:visibility hideFirstHeader="0" hideFirstFooter="0" hideFirstMasterPage="0" border="SHOW_ALL" fill="SHOW_ALL" hideFirstPageNum="0" hideFirstEmptyLine="0" showLineNumber="0"/><hp:lineNumberShape restartType="0" countBy="0" distance="0" startNumber="0"/><hp:pagePr landscape="WIDELY" width="{w}" height="{h}" gutterType="{gutter}"><hp:margin header="{header}" footer="{footer}" gutter="0" left="{left}" right="{right}" top="{top}" bottom="{bottom}"/></hp:pagePr><hp:footNotePr><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="" suffixChar=")" supscript="0"/><hp:noteLine length="-1" type="SOLID" width="0.12 mm" color="#000000"/><hp:noteSpacing betweenNotes="283" belowLine="567" aboveLine="850"/><hp:numbering type="CONTINUOUS" newNum="1"/><hp:placement place="EACH_COLUMN" beneathText="0"/></hp:footNotePr><hp:endNotePr><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="" suffixChar=")" supscript="0"/><hp:noteLine length="14692344" type="SOLID" width="0.12 mm" color="#000000"/><hp:noteSpacing betweenNotes="0" belowLine="567" aboveLine="850"/><hp:numbering type="CONTINUOUS" newNum="1"/><hp:placement place="END_OF_DOCUMENT" beneathText="0"/></hp:endNotePr><hp:pageBorderFill type="BOTH" borderFillIDRef="1" textBorder="PAPER" headerInside="0" footerInside="0" fillArea="PAPER"><hp:offset left="1417" right="1417" top="1417" bottom="1417"/></hp:pageBorderFill><hp:pageBorderFill type="EVEN" borderFillIDRef="1" textBorder="PAPER" headerInside="0" footerInside="0" fillArea="PAPER"><hp:offset left="1417" right="1417" top="1417" bottom="1417"/></hp:pageBorderFill><hp:pageBorderFill type="ODD" borderFillIDRef="1" textBorder="PAPER" headerInside="0" footerInside="0" fillArea="PAPER"><hp:offset left="1417" right="1417" top="1417" bottom="1417"/></hp:pageBorderFill></hp:secPr><hp:ctrl><hp:colPr id="" type="NEWSPAPER" layout="LEFT" colCount="1" sameSz="1" sameGap="0"/></hp:ctrl>{page_num}"##,
@@ -656,12 +677,31 @@ fn sec_pr(format: &ManuscriptFormat) -> String {
     )
 }
 
-/// Writes 머리말 controls.
+/// Paragraph shape of a 머리말 or 꼬리말 line on even and odd pages.
+fn head_paras(align: HeadAlign) -> (usize, usize) {
+    let para = |align: HeadAlign| match align {
+        HeadAlign::Left => PARA_HEAD_LEFT,
+        HeadAlign::Center => PARA_HEAD_CENTER,
+        HeadAlign::Right | HeadAlign::Outside => PARA_HEAD_RIGHT,
+    };
+    let (even, odd) = align.sides();
+    (para(even), para(odd))
+}
+
+/// The page area a running line goes in.
+#[derive(Clone, Copy, PartialEq)]
+enum Area {
+    Header,
+    Footer,
+}
+
+/// Writes 머리말 and 꼬리말 controls.
 struct Heads {
     next_id: u32,
-    /// Text area width and header height in HWPUNIT.
+    /// Text area width and header and footer heights in HWPUNIT.
     width: i64,
-    height: i64,
+    head_height: i64,
+    foot_height: i64,
     odd_para: usize,
     even_para: usize,
     facing: bool,
@@ -671,34 +711,41 @@ impl Heads {
     fn new(format: &ManuscriptFormat) -> Self {
         let (w, _) = format.page();
         let m = format.page_margins();
-        let para = |align: HeadAlign| match align {
-            HeadAlign::Left => PARA_HEAD_LEFT,
-            HeadAlign::Center => PARA_HEAD_CENTER,
-            HeadAlign::Right | HeadAlign::Outside => PARA_HEAD_RIGHT,
-        };
         let align = format.header.align;
+        let (even_para, odd_para) = head_paras(align);
         Heads {
             next_id: 1,
             width: hu_mm(w - m.inside - m.outside),
-            height: hu_mm(m.header),
-            odd_para: para(align),
-            even_para: if align == HeadAlign::Outside {
-                PARA_HEAD_LEFT
-            } else {
-                para(align)
-            },
+            head_height: hu_mm(m.header),
+            foot_height: hu_mm(m.footer),
+            odd_para,
+            even_para,
             facing: align == HeadAlign::Outside,
         }
     }
 
     fn ctrl(&mut self, w: &mut ParagraphWriter, pages: &str, para_pr: usize, text: &str) -> String {
+        self.area_ctrl(w, Area::Header, pages, para_pr, text)
+    }
+
+    fn area_ctrl(
+        &mut self,
+        w: &mut ParagraphWriter,
+        area: Area,
+        pages: &str,
+        para_pr: usize,
+        text: &str,
+    ) -> String {
         let id = self.next_id;
         self.next_id += 1;
         let p_id = w.take_id();
+        let (tag, valign, height) = match area {
+            Area::Header => ("header", "TOP", self.head_height),
+            Area::Footer => ("footer", "BOTTOM", self.foot_height),
+        };
         format!(
-            r#"<hp:ctrl><hp:header id="{id}" applyPageType="{pages}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="{}" textHeight="{}" hasTextRef="0" hasNumRef="0"><hp:p id="{p_id}" paraPrIDRef="{para_pr}" styleIDRef="{STYLE_HEAD}" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{CHAR_HEAD}"><hp:t>{}</hp:t></hp:run></hp:p></hp:subList></hp:header></hp:ctrl>"#,
+            r#"<hp:ctrl><hp:{tag} id="{id}" applyPageType="{pages}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="{valign}" linkListIDRef="0" linkListNextIDRef="0" textWidth="{}" textHeight="{height}" hasTextRef="0" hasNumRef="0"><hp:p id="{p_id}" paraPrIDRef="{para_pr}" styleIDRef="{STYLE_HEAD}" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="{CHAR_HEAD}"><hp:t>{}</hp:t></hp:run></hp:p></hp:subList></hp:{tag}></hp:ctrl>"#,
             self.width,
-            self.height,
             t_content(text)
         )
     }
@@ -712,6 +759,19 @@ impl Heads {
             format!("{even}{odd}")
         } else {
             self.ctrl(w, "BOTH", self.odd_para, text)
+        }
+    }
+
+    /// 꼬리말: the writer's line at the bottom of every page.
+    fn footer(&mut self, w: &mut ParagraphWriter, format: &ManuscriptFormat) -> String {
+        let text = format.footer.text.trim();
+        let (even_para, odd_para) = head_paras(format.footer.align);
+        if format.footer.align == HeadAlign::Outside {
+            let even = self.area_ctrl(w, Area::Footer, "EVEN", even_para, text);
+            let odd = self.area_ctrl(w, Area::Footer, "ODD", odd_para, text);
+            format!("{even}{odd}")
+        } else {
+            self.area_ctrl(w, Area::Footer, "BOTH", odd_para, text)
         }
     }
 }
@@ -779,6 +839,10 @@ fn section(
             if skip_first {
                 ctrls.push_str(HIDE_HEAD);
             }
+            w.pending_ctrls.push_str(&ctrls);
+        }
+        if first && format.footer.is_on() {
+            let ctrls = heads.footer(&mut w, format);
             w.pending_ctrls.push_str(&ctrls);
         }
         if opts.include_titles && !doc.heading.trim().is_empty() {
@@ -1045,5 +1109,46 @@ mod tests {
         assert!(section.contains(r#"gutterType="LEFT_RIGHT""#));
         assert!(section.contains(r#"width="43087" height="63780""#));
         assert_eq!(section.matches(r#"pageBreak="1""#).count(), 1);
+    }
+
+    #[test]
+    fn footer_beside_the_page_number() {
+        let mut format = builtin("submission-a4").unwrap();
+        format.page_number_align = HeadAlign::Outside;
+        format.footer = crate::format::RunningFoot {
+            text: "달빛 서점 · 투고".into(),
+            align: HeadAlign::Center,
+        };
+        let opts = DocOptions {
+            include_titles: true,
+            scene_break: "* * *".into(),
+        };
+        let bytes = hwpx_bytes(&sample(), &format, &opts, &DocInfo::default()).unwrap();
+        let files = entries(&bytes);
+        let section = files
+            .iter()
+            .find(|f| f.0 == "Contents/section0.xml")
+            .unwrap()
+            .1
+            .clone();
+        assert!(section.contains(r#"<hp:pageNum pos="OUTSIDE_BOTTOM""#));
+        // One 꼬리말, in the first chapter only, centred, at the bottom.
+        assert_eq!(section.matches("<hp:footer ").count(), 1);
+        assert!(section.contains(r#"<hp:footer id="1" applyPageType="BOTH"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="BOTTOM""#));
+        assert!(section.contains(&format!(
+            r#"paraPrIDRef="{PARA_HEAD_CENTER}" styleIDRef="{STYLE_HEAD}""#
+        )));
+        assert!(section.contains("<hp:t>달빛 서점 · 투고</hp:t>"));
+
+        format.footer.align = HeadAlign::Outside;
+        format.page_number_align = HeadAlign::Center;
+        let bytes = hwpx_bytes(&sample(), &format, &opts, &DocInfo::default()).unwrap();
+        let section = entries(&bytes)
+            .into_iter()
+            .find(|f| f.0 == "Contents/section0.xml")
+            .unwrap()
+            .1;
+        assert!(section.contains(r#"<hp:footer id="1" applyPageType="EVEN""#));
+        assert!(section.contains(r#"<hp:footer id="2" applyPageType="ODD""#));
     }
 }

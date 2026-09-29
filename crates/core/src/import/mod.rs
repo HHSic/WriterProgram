@@ -1,4 +1,4 @@
-//! 가져오기: txt, md and docx files become chapters.
+//! 가져오기: txt, md, docx and hwpx files become chapters.
 //!
 //! A file is read into a flat list of [`Item`]s (paragraphs, scene breaks,
 //! headings, and marks of what cannot be imported). The items are then split
@@ -11,8 +11,12 @@
 //! [`commit`] once. `commit` reads the files again with the same options, so
 //! the chapters it makes are the ones the preview listed.
 
+mod hangul;
+mod page;
 mod text;
 mod word;
+
+pub use page::PageSetup;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -107,6 +111,8 @@ pub(crate) struct Raw {
     pub items: Vec<Item>,
     /// txt and md only.
     pub encoding: Option<String>,
+    /// hwpx only.
+    pub page: Option<PageSetup>,
 }
 
 /// A place in a chapter where something was left out: after the first `at`
@@ -407,10 +413,9 @@ fn read_raw(path: &Path, opts: &ImportOptions) -> std::result::Result<Raw, Strin
         "md" | "markdown" => text::read(&read()?, opts, true),
         "docx" => word::read(&read()?),
         "doc" => Err("옛 Word 형식(.doc)은 읽을 수 없음 · Word에서 docx로 저장해 주세요".into()),
-        "hwp" | "hwpx" => {
-            Err("한글 파일은 아직 읽을 수 없음 · 한글에서 docx나 txt로 저장해 주세요".into())
-        }
-        _ => Err("가져올 수 없는 파일 형식 (txt, md, docx)".into()),
+        "hwpx" => hangul::read(&read()?),
+        "hwp" => Err("옛 한글 형식(.hwp)은 읽을 수 없음 · 한글에서 hwpx로 저장해 주세요".into()),
+        _ => Err("가져올 수 없는 파일 형식 (txt, md, docx, hwpx)".into()),
     }
 }
 
@@ -428,6 +433,8 @@ pub struct FileInfo {
     /// The way the file was cut into chapters, in screen words.
     pub rule: String,
     pub chapters: usize,
+    /// Paper, margins, 머리말, 꼬리말 and page numbers (hwpx).
+    pub page: Option<PageSetup>,
 }
 
 fn read_files(paths: &[PathBuf], opts: &ImportOptions) -> (Vec<FileInfo>, Vec<Chapter>) {
@@ -453,10 +460,12 @@ fn read_files(paths: &[PathBuf], opts: &ImportOptions) -> (Vec<FileInfo>, Vec<Ch
             encoding: None,
             rule: String::new(),
             chapters: 0,
+            page: None,
         };
         let result = read_raw(path, opts).and_then(|raw| {
             let how = resolve(&raw.items, opts)?;
             info.encoding = raw.encoding;
+            info.page = raw.page;
             info.rule = how.label(opts.rule).into();
             let made = split(raw.items, &how, &stem, index);
             if made.is_empty() {
@@ -590,12 +599,17 @@ pub struct CommitSpec {
     pub leave_notes: bool,
     #[serde(default)]
     pub status: Option<String>,
+    /// Make the 원고 서식 follow the pages of the first 한글 file.
+    #[serde(default)]
+    pub page_setup: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Committed {
     pub docs: Vec<String>,
     pub notes: usize,
+    /// The 원고 서식 now follows the file's pages.
+    pub format: bool,
 }
 
 /// Wording of a 메모 for what was left out near a paragraph.
@@ -696,7 +710,7 @@ pub fn commit(
         .as_deref()
         .filter(|s| STATUSES.contains(s))
         .unwrap_or("draft");
-    let (_, chapters) = read_files(paths, opts);
+    let (files, chapters) = read_files(paths, opts);
     let mut picks = spec.picks.clone();
     picks.sort_by_key(|p| p.index);
     picks.dedup_by_key(|p| p.index);
@@ -707,6 +721,17 @@ pub fn commit(
     }
 
     let mut project = project::load(root)?;
+    // The format is checked before anything is made.
+    if spec.page_setup {
+        let setup = files
+            .iter()
+            .find_map(|f| f.page.as_ref())
+            .ok_or_else(|| Error::Invalid("원고 서식에 맞출 쪽 모양이 파일에 없음".into()))?;
+        let mut format = project.manuscript_format();
+        setup.apply(&mut format);
+        format.validate()?;
+        project.manuscript_format = Some(format);
+    }
     let dir = root.join(MANUSCRIPT_DIR);
     let mut made: Vec<String> = Vec::new();
     let mut note_ids: Vec<String> = Vec::new();
@@ -758,5 +783,6 @@ pub fn commit(
     Ok(Committed {
         docs: made,
         notes: note_ids.len(),
+        format: spec.page_setup,
     })
 }

@@ -4,7 +4,7 @@
 // values; the one being typed in lights up its line here.
 
 import { useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import type { IndentRules, ManuscriptFormat, RunningHead } from '../api/types';
+import type { HeadAlign, IndentRules, ManuscriptFormat, RunningHead } from '../api/types';
 
 export type Guide = 'top' | 'header' | 'footer' | 'bottom' | 'inside' | 'outside' | 'indent';
 
@@ -80,6 +80,11 @@ function previewHead(head: RunningHead, title: string, penName: string): string 
     default:
       return '';
   }
+}
+
+/** Where a running line lands on the first page shown (an odd page). */
+function oddSide(align: HeadAlign): 'left' | 'center' | 'right' {
+  return align === 'outside' ? 'right' : align;
 }
 
 const RULER = 20;
@@ -299,9 +304,23 @@ export function PageEditor({
             {previewHead(shown.header, title, penName)}
           </div>
         )}
-        {shown.pageNumbers && (
-          <div className="pv-page-number" style={{ bottom: sm.bottom * scale * 0.5, fontSize: sizePx * 0.9 }}>
-            - 1 -
+        {(shown.pageNumbers || shown.footer.text.trim() !== '') && (
+          <div
+            className="pv-foot"
+            style={{
+              left: sm.inside * scale,
+              right: sm.outside * scale,
+              top: (H - sm.bottom - sm.footer) * scale,
+              height: sm.footer * scale,
+              fontSize: sizePx * 0.9,
+            }}
+          >
+            {(['left', 'center', 'right'] as const).map((slot) => (
+              <span key={slot} className={`pv-foot-${slot}`}>
+                {shown.pageNumbers && oddSide(shown.pageNumberAlign) === slot && <span className="pv-page-number">- 1 -</span>}
+                {shown.footer.text.trim() !== '' && oddSide(shown.footer.align) === slot && shown.footer.text}
+              </span>
+            ))}
           </div>
         )}
         {guides.map((g) => (

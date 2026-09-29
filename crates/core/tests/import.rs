@@ -90,6 +90,7 @@ fn docx_headings_marks_and_what_is_left_out() {
             .collect(),
         leave_notes: true,
         status: None,
+        page_setup: false,
     };
     let done = import::commit(&root, &[path], &ImportOptions::default(), &spec).unwrap();
     assert_eq!(done.docs.len(), 2);
@@ -178,13 +179,7 @@ fn unsupported_files_say_why() {
     fs::write(&hwp, b"x").unwrap();
     fs::write(&bad, b"not a zip").unwrap();
     let preview = import::preview(&[hwp, bad], &ImportOptions::default());
-    assert!(
-        preview.files[0]
-            .error
-            .as_deref()
-            .unwrap()
-            .contains("docx나 txt")
-    );
+    assert!(preview.files[0].error.as_deref().unwrap().contains("hwpx"));
     assert!(preview.files[1].error.is_some());
     assert!(preview.chapters.is_empty());
 }
@@ -220,6 +215,7 @@ fn commit_after_a_chapter_and_nothing_left_behind_on_error() {
         picks,
         leave_notes: false,
         status: Some("stock".into()),
+        page_setup: false,
     };
     let done = import::commit(&root, std::slice::from_ref(&path), &opts, &spec).unwrap();
     let overview = project::overview(&root).unwrap();
@@ -244,6 +240,7 @@ fn commit_after_a_chapter_and_nothing_left_behind_on_error() {
         }],
         leave_notes: false,
         status: None,
+        page_setup: false,
     };
     assert!(import::commit(&root, &[path], &opts, &stale).is_err());
     let files = fs::read_dir(root.join("manuscript")).unwrap().count();
@@ -252,7 +249,16 @@ fn commit_after_a_chapter_and_nothing_left_behind_on_error() {
 
 #[test]
 fn our_own_docx_export_comes_back_in_chapters() {
-    use writer_core::export::{self, DocOptions, ExportItem, FileKind};
+    own_export_comes_back(writer_core::export::FileKind::Docx, "out.docx");
+}
+
+#[test]
+fn our_own_hwpx_export_comes_back_in_chapters() {
+    own_export_comes_back(writer_core::export::FileKind::Hwpx, "out.hwpx");
+}
+
+fn own_export_comes_back(kind: writer_core::export::FileKind, name: &str) {
+    use writer_core::export::{self, DocOptions, ExportItem};
     use writer_core::format;
 
     let dir = tempfile::tempdir().unwrap();
@@ -286,7 +292,7 @@ fn our_own_docx_export_comes_back_in_chapters() {
             file_name: String::new(),
         });
     }
-    let out = dir.path().join("out.docx");
+    let out = dir.path().join(name);
     let opts = DocOptions {
         include_titles: true,
         scene_break: "◆".into(),
@@ -296,8 +302,7 @@ fn our_own_docx_export_comes_back_in_chapters() {
         .next()
         .map(|p| p.2)
         .unwrap();
-    let files =
-        export::export_file(&root, &items, &opts, &fmt, FileKind::Docx, &out, false).unwrap();
+    let files = export::export_file(&root, &items, &opts, &fmt, kind, &out, false).unwrap();
     let preview = import::preview(&files, &ImportOptions::default());
     assert!(
         preview.files[0].error.is_none(),
@@ -307,4 +312,93 @@ fn our_own_docx_export_comes_back_in_chapters() {
     let titles: Vec<_> = preview.chapters.iter().map(|c| c.title.as_str()).collect();
     assert_eq!(titles, ["문 닫는 시간", "빗소리가 들리는 밤"]);
     assert_eq!(preview.chapters[0].paragraphs, 3);
+}
+
+#[test]
+fn hwpx_pages_can_become_the_format() {
+    use writer_core::export::{self, DocOptions, ExportItem, FileKind};
+    use writer_core::format::{self, HeadAlign, HeadContent, RunningFoot, RunningHead};
+
+    let dir = tempfile::tempdir().unwrap();
+    let from = new_project(&dir.path().join("a"));
+    let id = project::add_doc(
+        &from,
+        &project::NewDoc {
+            title: "문 닫는 시간".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    doc::save_body(
+        &from,
+        &id,
+        vec![Block::text("첫 문단.")],
+        chrono::Duration::minutes(10),
+        Default::default(),
+    )
+    .unwrap();
+    let mut fmt = format::builtin("book-shinguk").unwrap();
+    fmt.header = RunningHead {
+        content: HeadContent::Custom,
+        text: "달빛 서점".into(),
+        align: HeadAlign::Outside,
+        skip_chapter_first: true,
+    };
+    fmt.page_number_align = HeadAlign::Center;
+    fmt.footer = RunningFoot {
+        text: "투고용 · 무단 배포 금지".into(),
+        align: HeadAlign::Right,
+    };
+    let out = dir.path().join("책.hwpx");
+    let items = vec![ExportItem {
+        doc_id: id,
+        heading: "1화 문 닫는 시간".into(),
+        file_name: String::new(),
+    }];
+    let opts = DocOptions {
+        include_titles: true,
+        scene_break: "◆".into(),
+    };
+    let files =
+        export::export_file(&from, &items, &opts, &fmt, FileKind::Hwpx, &out, false).unwrap();
+
+    let preview = import::preview(&files, &ImportOptions::default());
+    let page = preview.files[0].page.clone().expect("page setup");
+    assert_eq!(page.paper.kind, "shinguk");
+    assert_eq!(page.header.content, HeadContent::Custom);
+    assert_eq!(page.header.text, "달빛 서점");
+    assert_eq!(page.header.align, HeadAlign::Outside);
+    assert_eq!(page.page_numbers, Some(HeadAlign::Center));
+    assert_eq!(page.footer.text, "투고용 · 무단 배포 금지");
+    assert_eq!(page.footer.align, HeadAlign::Right);
+    assert!(
+        page.summary
+            .starts_with("용지 신국판, 여백 위 22 · 아래 20 · 안쪽 22 · 바깥쪽 20mm."),
+        "{}",
+        page.summary
+    );
+
+    // Into a web novel, which had no paper: it takes the book's pages.
+    let root = new_project(&dir.path().join("b"));
+    let spec = CommitSpec {
+        part_id: None,
+        after: None,
+        picks: vec![Pick {
+            index: 0,
+            title: "문 닫는 시간".into(),
+        }],
+        leave_notes: false,
+        status: None,
+        page_setup: true,
+    };
+    let done = import::commit(&root, &files, &ImportOptions::default(), &spec).unwrap();
+    assert!(done.format);
+    let got = project::load(&root).unwrap().manuscript_format();
+    assert_eq!(got.paper, fmt.paper);
+    assert_eq!(got.margins, fmt.margins);
+    assert_eq!(got.header, fmt.header);
+    assert_eq!(got.footer, fmt.footer);
+    assert!(got.page_numbers);
+    // The type stays the project's own.
+    assert_eq!(got.font, "dotum");
 }

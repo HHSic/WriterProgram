@@ -54,8 +54,12 @@ export interface ManuscriptFormat {
   blankLineBetween: boolean;
   chapterNewPage: boolean;
   pageNumbers: boolean;
+  /** Where the page number sits at the bottom. */
+  pageNumberAlign: HeadAlign;
   /** 머리말 (crates/core/src/format.rs RunningHead). */
   header: RunningHead;
+  /** 꼬리말: the writer's own line at the bottom, beside the page number. */
+  footer: RunningFoot;
   /** Where the first-line indent is left out (crates/core/src/indent.rs). */
   indentRules: IndentRules;
 }
@@ -83,6 +87,12 @@ export interface RunningHead {
   align: HeadAlign;
   /** Left off each chapter's first page (when chapters start on a new page). */
   skipChapterFirst: boolean;
+}
+
+export interface RunningFoot {
+  /** Empty when there is no 꼬리말. */
+  text: string;
+  align: HeadAlign;
 }
 
 export interface UserPreset {
@@ -487,6 +497,18 @@ export interface ImportFile {
   /** The way the file was cut into chapters, in screen words. */
   rule: string;
   chapters: number;
+  /** What a 한글 file says about its pages (crates/core/src/import/page.rs). */
+  page: PageSetup | null;
+}
+
+export interface PageSetup {
+  paper: ManuscriptFormat['paper'];
+  margins: ManuscriptFormat['margins'];
+  header: RunningHead;
+  pageNumbers: HeadAlign | null;
+  footer: RunningFoot;
+  /** The same in a sentence. */
+  summary: string;
 }
 
 /** What is left out: tables, pictures and footnotes are never imported. */
@@ -517,11 +539,15 @@ export interface ImportSpec {
   after: string | null;
   picks: { index: number; title: string }[];
   leaveNotes: boolean;
+  /** Make the 원고 서식 follow the pages of the first 한글 file. */
+  pageSetup: boolean;
 }
 
 export interface Imported {
   docs: string[];
   notes: number;
+  /** The 원고 서식 now follows the file's pages. */
+  format: boolean;
 }
 
 export interface Backend {
@@ -626,7 +652,7 @@ export interface Backend {
   onBrowserPage(handler: (event: PageEvent) => void): () => void;
   reveal(path: string): Promise<void>;
   pickFolder(title: string, defaultPath?: string): Promise<string | null>;
-  /** Files to import (txt, md, docx); empty when the writer cancels. */
+  /** Files to import (txt, md, docx, hwpx); empty when the writer cancels. */
   pickFiles(title: string): Promise<string[]>;
   /** `extension` without the dot: txt, docx or hwpx. */
   pickSaveFile(title: string, defaultName: string, extension: string): Promise<string | null>;

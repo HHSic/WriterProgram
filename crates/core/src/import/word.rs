@@ -14,11 +14,11 @@ use super::{Item, Raw, SkipKind};
 use crate::markup::{Inline, Mark};
 
 /// Largest XML part read, against files made to swell.
-const PART_LIMIT: u64 = 256 * 1024 * 1024;
+pub(super) const PART_LIMIT: u64 = 256 * 1024 * 1024;
 
-type Attrs = Vec<(String, String)>;
+pub(super) type Attrs = Vec<(String, String)>;
 
-enum Tok {
+pub(super) enum Tok {
     Start(String, Attrs),
     Empty(String, Attrs),
     End(String),
@@ -44,7 +44,7 @@ fn attrs(e: &quick_xml::events::BytesStart<'_>) -> Attrs {
         .collect()
 }
 
-fn val<'a>(attrs: &'a Attrs, key: &str) -> Option<&'a str> {
+pub(super) fn val<'a>(attrs: &'a Attrs, key: &str) -> Option<&'a str> {
     attrs
         .iter()
         .find(|(k, _)| k == key)
@@ -52,7 +52,7 @@ fn val<'a>(attrs: &'a Attrs, key: &str) -> Option<&'a str> {
 }
 
 /// Calls `f` for each token of an XML part until it returns false.
-fn walk(xml: &str, mut f: impl FnMut(Tok)) -> Result<(), String> {
+pub(super) fn walk(xml: &str, mut f: impl FnMut(Tok)) -> Result<(), String> {
     let mut reader = Reader::from_str(xml);
     loop {
         let event = reader
@@ -71,7 +71,7 @@ fn walk(xml: &str, mut f: impl FnMut(Tok)) -> Result<(), String> {
     }
 }
 
-fn read_part(
+pub(super) fn read_part(
     archive: &mut ZipArchive<Cursor<&[u8]>>,
     name: &str,
 ) -> Option<Result<String, String>> {
@@ -167,16 +167,16 @@ impl Styles {
 // Body
 
 #[derive(Default, Clone, Copy)]
-struct Run {
-    bold: bool,
-    italic: bool,
-    strike: bool,
-    underline: bool,
-    dot: bool,
+pub(super) struct Run {
+    pub bold: bool,
+    pub italic: bool,
+    pub strike: bool,
+    pub underline: bool,
+    pub dot: bool,
 }
 
 impl Run {
-    fn marks(self) -> Vec<Mark> {
+    pub(super) fn marks(self) -> Vec<Mark> {
         let mut marks = Vec::new();
         if self.underline {
             marks.push(Mark::Underline {});
@@ -198,15 +198,15 @@ impl Run {
 }
 
 #[derive(Default)]
-struct Para {
-    style: Option<String>,
-    outline: Option<u8>,
-    inlines: Vec<Inline>,
-    skips: Vec<(SkipKind, u32)>,
+pub(super) struct Para {
+    pub style: Option<String>,
+    pub outline: Option<u8>,
+    pub inlines: Vec<Inline>,
+    pub skips: Vec<(SkipKind, u32)>,
 }
 
 impl Para {
-    fn add_text(&mut self, text: &str, run: Run) {
+    pub(super) fn add_text(&mut self, text: &str, run: Run) {
         if text.is_empty() {
             return;
         }
@@ -226,7 +226,7 @@ impl Para {
         });
     }
 
-    fn skip(&mut self, kind: SkipKind) {
+    pub(super) fn skip(&mut self, kind: SkipKind) {
         match self.skips.iter_mut().find(|(k, _)| *k == kind) {
             Some((_, n)) => *n += 1,
             None => self.skips.push((kind, 1)),
@@ -236,7 +236,7 @@ impl Para {
 
 /// Takes spaces (and the full-width space some writers indent with) off both
 /// ends of a paragraph, and line breaks with them.
-fn trim_ends(inlines: &mut Vec<Inline>) {
+pub(super) fn trim_ends(inlines: &mut Vec<Inline>) {
     loop {
         match inlines.first_mut() {
             Some(Inline::HardBreak {}) => {
@@ -468,5 +468,6 @@ pub(super) fn read(bytes: &[u8]) -> Result<Raw, String> {
     Ok(Raw {
         items: body(&document, &styles)?,
         encoding: None,
+        page: None,
     })
 }
