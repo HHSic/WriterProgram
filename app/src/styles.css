@@ -1050,8 +1050,10 @@ input[type='range'] {
 }
 
 .doc-no {
-  width: 34px;
+  /* 100화, 1000화 grow the column instead of running into the title. */
+  min-width: 34px;
   flex-shrink: 0;
+  white-space: nowrap;
   font-size: 11px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -1249,7 +1251,9 @@ input[type='range'] {
 
 .synopsis-label {
   flex-shrink: 0;
-  padding-top: 1px;
+  /* One line box as tall as the textarea's, so the label sits on its first line. */
+  line-height: 20.8px;
+  white-space: nowrap;
   font-size: 11px;
   font-weight: 600;
   color: var(--muted);
@@ -1442,6 +1446,30 @@ img.ProseMirror-separator {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
+}
+
+.status-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A narrow window cuts the counts short, never the sync and 오늘 on the right. */
+.status-bar > .grow {
+  flex: 1 0 0;
+}
+
+.status-bar > .grow ~ .status-item {
+  flex-shrink: 0;
+}
+
+/* The in-between counts give way before 공백 포함 and 목표. */
+.status-bar > .status-item:first-child {
+  flex-shrink: 0;
+}
+
+.status-bar > .status-item + .status-item:not(:has(+ .grow)) {
+  flex-shrink: 20;
 }
 
 .status-item.strong {
@@ -2621,7 +2649,7 @@ fieldset.plain {
 }
 
 .otable th {
-  padding: 8px 10px;
+  padding: 8px;
   border-bottom: 1px solid var(--border);
   background: var(--sidebar);
   text-align: left;
@@ -2635,6 +2663,12 @@ fieldset.plain {
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
+}
+
+/* Headers over input cells line up with the text inside the input (border + padding). */
+.otable th.c-title,
+.otable th.c-synopsis {
+  padding-left: 15px;
 }
 
 .otable tbody tr:last-child td {
@@ -3025,11 +3059,12 @@ fieldset.plain {
 }
 
 .crumbs > span {
-  flex: 0 1 auto;
+  /* The part name gives way first, so the open chapter's name stays readable. */
+  flex: 0 100 auto;
 }
 
 .crumbs > strong {
-  flex: 0 2 auto;
+  flex: 0 1 auto;
 }
 
 .crumbs > svg {
@@ -3118,6 +3153,12 @@ fieldset.plain {
   position: absolute;
   right: 6px;
   top: 6px;
+}
+
+/* Make room for ⋯ on the first line, so it never lands on the status chip. */
+.doc-row:hover > .doc-item > .doc-line:first-child,
+.doc-row:focus-within > .doc-item > .doc-line:first-child {
+  padding-right: 26px;
 }
 
 .plan-row > .more-btn,
@@ -3740,6 +3781,10 @@ fieldset.plain {
   .card-row > .card-item {
     flex: 1;
     min-width: 0;
+  }
+
+  .doc-row > .doc-item > .doc-line:first-child {
+    padding-right: 0;
   }
 
   .doc-row > .more-btn,
