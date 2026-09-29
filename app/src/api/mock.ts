@@ -76,6 +76,7 @@ const SUBMISSION: ManuscriptFormat = {
   chapterNewPage: true,
   pageNumbers: true,
   header: { content: 'none', text: '', align: 'center', skipChapterFirst: true },
+  indentRules: { chapterFirst: false, afterScene: false, margined: true, dialogue: false, dialogueHang: false },
 };
 const WEBNOVEL: ManuscriptFormat = {
   ...SUBMISSION,

@@ -238,6 +238,10 @@ export function ViewDialog() {
           <input type="checkbox" checked={view.showMarks} onChange={(e) => setView({ showMarks: e.target.checked })} />
           빈칸·문단 부호 보이기 (Ctrl+Shift+8)
         </label>
+        <label className="check">
+          <input type="checkbox" checked={view.ruler} onChange={(e) => setView({ ruler: e.target.checked })} />
+          눈금자 보이기 (문단 여백·첫 줄을 끌어서 조절)
+        </label>
         <label className="field">
           <span className="field-label">편집 도구줄 (본문 아래 버튼 줄)</span>
           <select value={view.toolbar} onChange={(e) => setView({ toolbar: e.target.value as ViewSettings['toolbar'] })}>

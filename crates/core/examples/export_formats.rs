@@ -53,7 +53,11 @@ fn chapters() -> Vec<ExportDoc> {
         },
         Block::text("대여 카드 뒷면에는 짧은 편지가 붙어 있었다."),
         Block::Paragraph {
-            attrs: ParaAttrs { left: 3, right: 2 },
+            attrs: ParaAttrs {
+                left: 3,
+                right: 2,
+                indent: None,
+            },
             content: vec![
                 text("서하에게.", &[]),
                 Inline::HardBreak {},

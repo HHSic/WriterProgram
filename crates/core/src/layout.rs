@@ -5,7 +5,7 @@
 //! spaces (어절 단위), as 한글 and Word are set up to do in exported files.
 //! Good enough to answer "about how many pages is this in 신국판?".
 
-use crate::format::ManuscriptFormat;
+use crate::format::{IndentRules, ManuscriptFormat};
 use crate::markup::Block;
 
 const MM_PER_PT: f64 = 25.4 / 72.0;
@@ -35,6 +35,7 @@ pub struct PageMetrics {
     /// Extra advance per character in ems (letter spacing).
     tracking: f64,
     indent: f64,
+    rules: IndentRules,
     lines_per_page: u32,
     blank_line_between: bool,
     chapter_new_page: bool,
@@ -60,6 +61,7 @@ impl PageMetrics {
             width: text_w / size_mm,
             tracking: f64::from(format.letter_spacing) / 100.0,
             indent: format.indent,
+            rules: format.indent_rules,
             lines_per_page: lines.max(1),
             blank_line_between: format.blank_line_between,
             chapter_new_page: format.chapter_new_page,
@@ -129,7 +131,7 @@ impl PageMetrics {
     /// Body lines of one chapter, without its title.
     pub fn body_lines(&self, blocks: &[Block]) -> u32 {
         let mut lines = 0;
-        for block in blocks {
+        for block in &crate::indent::apply(blocks, self.indent, self.rules) {
             match block {
                 Block::SceneBreak {} => lines += if self.blank_line_between { 1 } else { 3 },
                 Block::Paragraph { attrs, .. } => {
@@ -137,7 +139,8 @@ impl PageMetrics {
                     let sides = f64::from(attrs.left) + f64::from(attrs.right);
                     let width = (self.width - sides * (1.0 + self.tracking)).max(1.0);
                     for (i, line) in block.lines().iter().enumerate() {
-                        lines += self.wrap_in(line, if i == 0 { self.indent } else { 0.0 }, width);
+                        let first = attrs.indent.map_or(self.indent, f64::from);
+                        lines += self.wrap_in(line, if i == 0 { first } else { 0.0 }, width);
                     }
                 }
             }
@@ -211,7 +214,11 @@ mod tests {
         let text = "가".repeat(40);
         let plain = Block::text(&text);
         let letter = Block::Paragraph {
-            attrs: ParaAttrs { left: 4, right: 2 },
+            attrs: ParaAttrs {
+                left: 4,
+                right: 2,
+                indent: None,
+            },
             content: vec![Inline::Text {
                 text: text.clone(),
                 marks: vec![],

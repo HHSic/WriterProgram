@@ -511,6 +511,10 @@ fn header(format: &ManuscriptFormat, run_styles: &[RunStyle], margins: &[ParaAtt
         paras.push(ParaShape {
             left: (f64::from(m.left) * char_hu(format)).round() as i64,
             right: (f64::from(m.right) * char_hu(format)).round() as i64,
+            // The paragraph's own first line; negative is 내어쓰기.
+            indent: m
+                .indent
+                .map_or(body.indent, |i| hu_pt(f64::from(i) * format.size_pt)),
             ..body
         });
     }
@@ -881,7 +885,11 @@ mod tests {
                     Block::SceneBreak {},
                     Block::para(vec![]),
                     Block::Paragraph {
-                        attrs: ParaAttrs { left: 2, right: 1 },
+                        attrs: ParaAttrs {
+                            left: 2,
+                            right: 1,
+                            indent: None,
+                        },
                         content: vec![Inline::Text {
                             text: "편지\u{a0}묶음".into(),
                             marks: vec![],

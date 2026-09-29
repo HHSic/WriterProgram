@@ -60,23 +60,42 @@ pub enum Block {
     SceneBreak {},
 }
 
-/// Paragraph margins (문단 여백) in characters: a paragraph set in from the
-/// left and right as a whole, for letters, poems or a 상태창.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+/// Paragraph shape (문단 모양) in characters: margins that set the paragraph
+/// in from the left and right as a whole (letters, poems, a 상태창), and the
+/// paragraph's own first line: in (들여쓰기, positive), out (내어쓰기,
+/// negative) or flush (0). Without one the paragraph follows the manuscript
+/// format's indent and its rules (indent.rs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct ParaAttrs {
     #[serde(default, deserialize_with = "margin")]
     pub left: u8,
     #[serde(default, deserialize_with = "margin")]
     pub right: u8,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "first_line"
+    )]
+    pub indent: Option<i8>,
 }
 
 impl ParaAttrs {
     /// Widest margin, in characters.
     pub const MAX: u8 = 20;
+    /// Deepest first-line indent either way, in characters.
+    pub const MAX_INDENT: i8 = 10;
 
     pub fn is_plain(&self) -> bool {
-        self.left == 0 && self.right == 0
+        self.left == 0 && self.right == 0 && self.indent.is_none()
     }
+}
+
+/// Reads a first-line indent leniently, like `margin`; null is none.
+fn first_line<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Option<i8>, D::Error> {
+    let v: Option<f64> = Option::deserialize(d)?;
+    let max = f64::from(ParaAttrs::MAX_INDENT);
+    Ok(v.filter(|v| v.is_finite())
+        .map(|v| v.round().clamp(-max, max) as i8))
 }
 
 /// `attrs: null` reads as no margins.
@@ -322,6 +341,9 @@ fn para_open(attrs: ParaAttrs) -> String {
     if attrs.right > 0 {
         tag.push_str(&format!(" data-right=\"{}\"", attrs.right));
     }
+    if let Some(indent) = attrs.indent {
+        tag.push_str(&format!(" data-indent=\"{indent}\""));
+    }
     tag.push('>');
     tag
 }
@@ -460,8 +482,8 @@ pub fn parse_body(src: &str) -> Vec<Block> {
     blocks
 }
 
-/// Reads `<p data-left="2" data-right="1">` at the start of a paragraph:
-/// the margins and the length of the tag in chars.
+/// Reads `<p data-left="2" data-right="1" data-indent="-1">` at the start of
+/// a paragraph: the shape and the length of the tag in chars.
 fn parse_para_open(chars: &[char]) -> Option<(ParaAttrs, usize)> {
     if !starts_with(chars, "<p") {
         return None;
@@ -473,14 +495,20 @@ fn parse_para_open(chars: &[char]) -> Option<(ParaAttrs, usize)> {
             return Some((attrs, i + 1));
         }
         let rest = &chars[i.min(chars.len())..];
-        let (side, len) = if starts_with(rest, " data-left=\"") {
-            (&mut attrs.left, " data-left=\"".len())
+        let (key, len) = if starts_with(rest, " data-left=\"") {
+            ('l', " data-left=\"".len())
         } else if starts_with(rest, " data-right=\"") {
-            (&mut attrs.right, " data-right=\"".len())
+            ('r', " data-right=\"".len())
+        } else if starts_with(rest, " data-indent=\"") {
+            ('i', " data-indent=\"".len())
         } else {
             return None;
         };
         i += len;
+        let negative = key == 'i' && chars.get(i) == Some(&'-');
+        if negative {
+            i += 1;
+        }
         let digits: String = chars[i.min(chars.len())..]
             .iter()
             .take_while(|c| c.is_ascii_digit())
@@ -489,10 +517,15 @@ fn parse_para_open(chars: &[char]) -> Option<(ParaAttrs, usize)> {
         if digits.is_empty() || chars.get(i + digits.len()) != Some(&'"') {
             return None;
         }
-        *side = digits
-            .parse::<u8>()
-            .unwrap_or(ParaAttrs::MAX)
-            .min(ParaAttrs::MAX);
+        let n = digits.parse::<u8>().unwrap_or(u8::MAX);
+        match key {
+            'l' => attrs.left = n.min(ParaAttrs::MAX),
+            'r' => attrs.right = n.min(ParaAttrs::MAX),
+            _ => {
+                let n = n.min(ParaAttrs::MAX_INDENT as u8) as i8;
+                attrs.indent = Some(if negative { -n } else { n });
+            }
+        }
         i += digits.len() + 1;
     }
 }
@@ -725,10 +758,36 @@ mod tests {
     }
     fn pm(left: u8, right: u8, content: Vec<Inline>) -> Block {
         Block::Paragraph {
-            attrs: ParaAttrs { left, right },
+            attrs: ParaAttrs {
+                left,
+                right,
+                indent: None,
+            },
             content,
         }
     }
+    #[test]
+    fn first_line_round_trips() {
+        let shaped = |left: u8, indent: Option<i8>| Block::Paragraph {
+            attrs: ParaAttrs {
+                left,
+                right: 0,
+                indent,
+            },
+            content: vec![t("문단", &[])],
+        };
+        let blocks = vec![shaped(0, Some(-2)), shaped(2, Some(0)), shaped(0, Some(3))];
+        let text = write_body(&blocks);
+        assert!(text.contains("<p data-indent=\"-2\">문단</p>"));
+        assert!(text.contains("<p data-left=\"2\" data-indent=\"0\">문단</p>"));
+        assert_eq!(parse_body(&text), blocks);
+        // Too deep either way is kept within reach.
+        assert_eq!(
+            parse_body("<p data-indent=\"-99\">x</p>")[0].attrs().indent,
+            Some(-10)
+        );
+    }
+
     fn br() -> Inline {
         Inline::HardBreak {}
     }
@@ -942,9 +1001,23 @@ mod tests {
             {"type":"paragraph","attrs":{"left":null}}
         ]}"#;
         let body: Body = serde_json::from_str(json).unwrap();
-        assert_eq!(body.content[0].attrs(), ParaAttrs { left: 2, right: 0 });
+        assert_eq!(
+            body.content[0].attrs(),
+            ParaAttrs {
+                left: 2,
+                right: 0,
+                indent: None
+            }
+        );
         assert!(body.content[1].attrs().is_plain());
-        assert_eq!(body.content[2].attrs(), ParaAttrs { left: 3, right: 0 });
+        assert_eq!(
+            body.content[2].attrs(),
+            ParaAttrs {
+                left: 3,
+                right: 0,
+                indent: None
+            }
+        );
         let back = serde_json::to_string(&body).unwrap();
         assert!(back.contains(r#""attrs":{"left":2,"right":0}"#));
         assert!(!back.contains(r#"{"type":"paragraph","attrs":{"left":0"#));
@@ -1014,6 +1087,11 @@ mod tests {
                     ParaAttrs {
                         left: next(4) as u8,
                         right: next(3) as u8,
+                        // None, or a first line from -2 to 2 characters.
+                        indent: match next(6) {
+                            0 => None,
+                            n => Some(n as i8 - 3),
+                        },
                     }
                 } else {
                     ParaAttrs::default()

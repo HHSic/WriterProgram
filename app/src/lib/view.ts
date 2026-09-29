@@ -31,6 +31,9 @@ export interface ViewSettings {
   showMarks: boolean;
   /** 편집 도구줄 under the page: on touch screens, always, or never. */
   toolbar: 'auto' | 'always' | 'never';
+  /** 눈금자 over the page (paragraph margins and first line). Off: the
+   * margins are set in 원고 서식, a paragraph's own in the 문단 여백 menu. */
+  ruler: boolean;
 }
 
 export const FONT_LABEL: Record<BodyFont, string> = {
@@ -61,6 +64,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   width: 560,
   showMarks: false,
   toolbar: 'auto',
+  ruler: false,
 };
 
 const KEY = 'wp.view';

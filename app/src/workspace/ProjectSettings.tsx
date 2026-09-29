@@ -1,10 +1,11 @@
 // 작품 설정 (S12): basic information, goals and the manuscript format
 // (원고 서식) with a live page preview and page estimate.
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api';
 import type { FormatCatalog, Goal, HeadAlign, HeadContent, ManuscriptFormat, ProjectKind, RunningHead } from '../api/types';
 import { Modal } from '../components/Modal';
+import { PageEditor, type Guide } from './PageEditor';
 import { placeNote, usePlaceOf } from '../components/PlacePicker';
 import { ProjectDriveField } from './Drives';
 import { num } from '../lib/format';
@@ -52,7 +53,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
     <Modal
       title="작품 설정"
       onClose={closeDialog}
-      width={tab === 'format' ? 860 : 560}
+      width={tab === 'format' ? 1040 : 560}
       footer={
         <>
           <button type="button" className="btn" onClick={closeDialog}>
@@ -203,23 +204,6 @@ function NumberInput({
 // ---------------------------------------------------------------------------
 // 원고 서식
 
-const PREVIEW_FONT: Record<string, string> = {
-  batang: "'Batang', 'Noto Serif KR', serif",
-  dotum: "'Malgun Gothic', 'IBM Plex Sans KR', sans-serif",
-  'nanum-myeongjo': "'Nanum Myeongjo', serif",
-  'noto-serif': "'Noto Serif KR', serif",
-  'gowun-batang': "'Gowun Batang', serif",
-};
-
-const SAMPLE = [
-  '셔터를 반쯤 내렸을 때 종이 울렸다. 이 시간에 문을 여는 사람은 없었다. 적어도 지난 삼 년 동안은 그랬다.',
-  '“영업, 끝났나요?”',
-  '“끝났어요. 그런데 들어오세요. 그 봉투가 젖으면 곤란할 것 같으니까.”',
-  '윤서하는 계산대 아래에서 우산을 꺼내 들었다. 문턱에 선 남자는 우산도 없이 젖어 있었고, 품에 안은 종이봉투만은 이상하리만치 말라 있었다.',
-  '남자가 봉투에서 꺼낸 것은 책이 아니라 대여 카드였다. 누렇게 바랜 칸마다 같은 이름이 적혀 있었다.',
-  '마지막 칸의 날짜는 서하가 태어나기도 전이었다. 서하는 카드를 뒤집어 보았다.',
-];
-
 function FormatEditor({
   format,
   onChange,
@@ -238,6 +222,11 @@ function FormatEditor({
   const [estimate, setEstimate] = useState<number | null | undefined>(undefined);
   const [naming, setNaming] = useState(false);
   const [presetName, setPresetName] = useState('');
+  // The line on the page for the number being typed in.
+  const [lit, setLit] = useState<Guide | null>(null);
+  const light = (g: Guide) => ({ onFocus: () => setLit(g), onBlur: () => setLit(null) });
+  const rules = format.indentRules;
+  const setRule = (patch: Partial<typeof rules>) => set({ indentRules: { ...rules, ...patch } });
   const hasPaper = format.paper.kind !== 'none';
   const userPreset = catalog?.user.find((u) => u.name === format.preset);
 
@@ -398,22 +387,22 @@ function FormatEditor({
             <span className="field-label">여백 (mm)</span>
             <div className="margin-grid">
               <label>
-                위 <Num value={format.margins.top} onChange={(v) => setMargin('top', v)} label="위 여백" />
+                위 <Num value={format.margins.top} onChange={(v) => setMargin('top', v)} {...light('top')} label="위 여백" />
               </label>
               <label>
-                아래 <Num value={format.margins.bottom} onChange={(v) => setMargin('bottom', v)} label="아래 여백" />
+                아래 <Num value={format.margins.bottom} onChange={(v) => setMargin('bottom', v)} {...light('bottom')} label="아래 여백" />
               </label>
               <label>
-                왼쪽(안쪽) <Num value={format.margins.inside} onChange={(v) => setMargin('inside', v)} label="왼쪽 여백" />
+                왼쪽(안쪽) <Num value={format.margins.inside} onChange={(v) => setMargin('inside', v)} {...light('inside')} label="왼쪽 여백" />
               </label>
               <label>
-                오른쪽(바깥쪽) <Num value={format.margins.outside} onChange={(v) => setMargin('outside', v)} label="오른쪽 여백" />
+                오른쪽(바깥쪽) <Num value={format.margins.outside} onChange={(v) => setMargin('outside', v)} {...light('outside')} label="오른쪽 여백" />
               </label>
               <label>
-                머리말 <Num value={format.margins.header} onChange={(v) => setMargin('header', v)} label="머리말 여백" />
+                머리말 <Num value={format.margins.header} onChange={(v) => setMargin('header', v)} {...light('header')} label="머리말 여백" />
               </label>
               <label>
-                꼬리말 <Num value={format.margins.footer} onChange={(v) => setMargin('footer', v)} label="꼬리말 여백" />
+                꼬리말 <Num value={format.margins.footer} onChange={(v) => setMargin('footer', v)} {...light('footer')} label="꼬리말 여백" />
               </label>
             </div>
           </div>
@@ -445,10 +434,50 @@ function FormatEditor({
               자간 <Num value={format.letterSpacing} step={1} onChange={(letterSpacing) => set({ letterSpacing: Math.round(letterSpacing) })} label="자간" allowNegative /> %
             </label>
             <label className="row">
-              첫 줄 들여쓰기 <Num value={format.indent} step={0.5} onChange={(indent) => set({ indent })} label="첫 줄 들여쓰기" /> 자
+              첫 줄 들여쓰기 <Num value={format.indent} step={0.5} onChange={(indent) => set({ indent })} label="첫 줄 들여쓰기" {...light('indent')} /> 자
             </label>
           </div>
         </div>
+
+        {format.indent > 0 && (
+          <fieldset className="field">
+            <legend className="field-label">첫 줄을 들이지 않을 곳</legend>
+            <div className="rule-grid">
+              <label className="check">
+                <input type="checkbox" checked={rules.margined} onChange={(e) => setRule({ margined: e.target.checked })} />
+                여백 준 문단 (편지·인용)
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={rules.chapterFirst} onChange={(e) => setRule({ chapterFirst: e.target.checked })} />
+                장·회차 첫 문단
+              </label>
+              <label className="check">
+                <input type="checkbox" checked={rules.afterScene} onChange={(e) => setRule({ afterScene: e.target.checked })} />
+                장면 나눔 바로 뒤 문단
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={rules.dialogue}
+                  onChange={(e) => setRule({ dialogue: e.target.checked, dialogueHang: e.target.checked ? false : rules.dialogueHang })}
+                />
+                대화문 (따옴표로 시작)
+              </label>
+            </div>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={rules.dialogueHang}
+                disabled={rules.dialogue}
+                onChange={(e) => setRule({ dialogueHang: e.target.checked })}
+              />
+              대화문을 원고지처럼: 모든 줄을 한 칸 들이기
+            </label>
+            <small className="hint">
+              한국 소설책은 보통 여백 준 문단만 켭니다. 영미권 책처럼 하려면 장 첫 문단과 장면 나눔 뒤도 켜세요. 문단마다 따로 정한 첫 줄(눈금자, 문단 여백 메뉴)이 이 규칙보다 먼저입니다.
+            </small>
+          </fieldset>
+        )}
 
         <div className="field">
           <label className="check">
@@ -473,7 +502,15 @@ function FormatEditor({
       </div>
 
       <div className="format-side">
-        <PagePreview format={format} title={title} penName={penName} />
+        <PageEditor
+          format={format}
+          onChange={onChange}
+          title={title}
+          penName={penName}
+          lit={lit}
+          maxHeight={Math.max(300, Math.min(560, window.innerHeight * 0.8 - 300))}
+        />
+        {hasPaper && <small className="hint">자·선을 끌어 여백과 첫 줄 들여쓰기를 맞춥니다.</small>}
         <p className="estimate">
           {!hasPaper
             ? '용지 없이 이어지는 원고입니다. docx·한글로 내보내면 A4에 담깁니다.'
@@ -557,12 +594,16 @@ function Num({
   label,
   step = 1,
   allowNegative = false,
+  onFocus,
+  onBlur,
 }: {
   value: number;
   onChange: (v: number) => void;
   label: string;
   step?: number;
   allowNegative?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const [text, setText] = useState(String(value));
   useEffect(() => setText(String(value)), [value]);
@@ -574,98 +615,15 @@ function Num({
       min={allowNegative ? undefined : 0}
       value={text}
       aria-label={label}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      onMouseEnter={onFocus}
+      onMouseLeave={onBlur}
       onChange={(e) => {
         setText(e.target.value);
         const v = Number.parseFloat(e.target.value);
         if (Number.isFinite(v)) onChange(v);
       }}
     />
-  );
-}
-
-/** What 머리말 shows on the previewed page (the first page, an odd one). */
-function previewHead(head: RunningHead, title: string, penName: string): string {
-  switch (head.content) {
-    case 'title':
-      return title;
-    case 'chapter':
-    case 'titleChapter':
-      return '1장 비에 젖은 손님';
-    case 'author':
-      return penName || '필명';
-    case 'custom':
-      return head.text;
-    default:
-      return '';
-  }
-}
-
-/** A page drawn to scale with the format's type, spacing and margins. */
-function PagePreview({ format, title, penName }: { format: ManuscriptFormat; title: string; penName: string }) {
-  const hasPaper = format.paper.kind !== 'none';
-  const width = 300;
-  const [w, h] = hasPaper ? [format.paper.widthMm, format.paper.heightMm] : [210, 297];
-  const scale = width / w; // px per mm
-  const m = format.margins;
-  const sizePx = format.sizePt * (25.4 / 72) * scale;
-  const style = useMemo(
-    () =>
-      ({
-        width,
-        height: h * scale,
-        '--pv-font': PREVIEW_FONT[format.font] ?? PREVIEW_FONT.batang,
-        '--pv-size': `${sizePx}px`,
-        '--pv-leading': String(format.lineSpacing / 100),
-        '--pv-tracking': `${format.letterSpacing / 100}em`,
-        '--pv-indent': `${format.indent}em`,
-        '--pv-gap': format.blankLineBetween ? `${format.lineSpacing / 100}em` : '0',
-      }) as CSSProperties,
-    [format, h, scale, sizePx],
-  );
-  const area: CSSProperties = hasPaper
-    ? {
-        left: m.inside * scale,
-        right: m.outside * scale,
-        top: (m.top + m.header) * scale,
-        bottom: (m.bottom + m.footer) * scale,
-      }
-    : { left: 30 * scale, right: 30 * scale, top: 20 * scale, bottom: 0 };
-
-  return (
-    <div className={`page-preview${hasPaper ? '' : ' continuous'}`} style={style} aria-label="원고 서식 미리보기">
-      <div className="pv-area" style={area}>
-        <p className="pv-title">1장 비에 젖은 손님</p>
-        {SAMPLE.map((p, i) => (
-          <p key={i} className="pv-para">
-            {p}
-          </p>
-        ))}
-        {Array.from({ length: 8 }, (_, i) => (
-          <p key={`more-${i}`} className="pv-para">
-            {SAMPLE[i % SAMPLE.length]}
-          </p>
-        ))}
-      </div>
-      {hasPaper && format.header.content !== 'none' && (
-        <div
-          className="pv-head"
-          style={{
-            left: m.inside * scale,
-            right: m.outside * scale,
-            top: m.top * scale,
-            height: m.header * scale,
-            fontSize: sizePx * 0.9,
-            textAlign: format.header.align === 'outside' ? 'right' : format.header.align,
-          }}
-        >
-          {previewHead(format.header, title, penName)}
-        </div>
-      )}
-      {hasPaper && format.pageNumbers && (
-        <div className="pv-page-number" style={{ bottom: m.bottom * scale * 0.5, fontSize: sizePx * 0.9 }}>
-          - 1 -
-        </div>
-      )}
-    </div>
   );
 }

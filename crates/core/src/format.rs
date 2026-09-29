@@ -39,6 +39,31 @@ pub struct ManuscriptFormat {
     /// 머리말: a line at the top of the pages.
     #[serde(default)]
     pub header: RunningHead,
+    /// Where the first-line indent is left out (indent.rs).
+    #[serde(default)]
+    pub indent_rules: IndentRules,
+}
+
+/// Paragraphs whose first line is not indented, though the format indents.
+/// A paragraph's own first line (문단 모양) always wins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndentRules {
+    /// The first paragraph of a chapter (common in English-language books).
+    #[serde(default)]
+    pub chapter_first: bool,
+    /// The first paragraph after a scene break.
+    #[serde(default)]
+    pub after_scene: bool,
+    /// Paragraphs set in with margins (letters, quotations).
+    #[serde(default)]
+    pub margined: bool,
+    /// Dialogue: paragraphs opening with a quotation mark.
+    #[serde(default)]
+    pub dialogue: bool,
+    /// Dialogue as on 원고지: every line set in, the first no further.
+    #[serde(default)]
+    pub dialogue_hang: bool,
 }
 
 /// What 머리말 shows.
@@ -229,6 +254,10 @@ pub fn builtin_presets() -> Vec<(&'static str, &'static str, ManuscriptFormat)> 
         chapter_new_page: true,
         page_numbers: true,
         header: RunningHead::default(),
+        indent_rules: IndentRules {
+            margined: true,
+            ..IndentRules::default()
+        },
     };
     let webnovel = ManuscriptFormat {
         preset: "webnovel".into(),

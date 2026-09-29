@@ -7,6 +7,7 @@ import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { api } from '../api';
 import type { DocData, MetaPatch } from '../api/types';
 import { setCardNames } from '../editor/cards';
+import { setIndentRules } from '../editor/indent';
 import { setWhitespaceMarks } from '../editor/marks';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
@@ -34,6 +35,7 @@ import { touchCapable, touchLike } from '../lib/pointer';
 import { useNameIndex } from './CardPanels';
 import { DocBanners } from './Copies';
 import { EditToolbar } from './EditToolbar';
+import { Ruler } from './Ruler';
 
 export function DocPane({ docId, tabKey, locked }: { docId: string; tabKey: string; locked: boolean }) {
   const root = useApp((s) => s.overview!.root);
@@ -152,6 +154,10 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   const showMarks = useApp((s) => s.view.showMarks);
   useEffect(() => setWhitespaceMarks(editor, showMarks), [editor, showMarks]);
 
+  // The manuscript format's first-line rules, for chapters (planning documents follow no rules).
+  const rules = useApp((s) => s.overview!.project.manuscriptFormat.indentRules);
+  useEffect(() => setIndentRules(editor, isPlanning ? null : (rules ?? null)), [editor, rules, isPlanning]);
+
   // Back where the cursor was last time, unless going somewhere on purpose.
   useEffect(() => {
     const jump = useApp.getState().pendingJump;
@@ -209,12 +215,14 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   }, [jump, docId, tabKey, editor]);
 
   const toolbarMode = useApp((s) => s.view.toolbar);
+  const showRuler = useApp((s) => s.view.ruler);
   const toolbar = toolbarMode === 'always' || (toolbarMode === 'auto' && touchCapable());
 
   return (
     <>
       <DocBanners docId={docId} />
       <div className="doc-scroll">
+        {showRuler && <Ruler editor={editor} planning={isPlanning} />}
         <article className="page">
           <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked} />
           <EditorContent editor={editor} />

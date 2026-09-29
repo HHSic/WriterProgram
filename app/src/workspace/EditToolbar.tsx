@@ -7,13 +7,14 @@ import type { Editor } from '@tiptap/core';
 import type { ReactNode } from 'react';
 import { Icon } from '../components/Icon';
 import { openMenu, type MenuItem } from '../components/Menu';
-import { marginsAt } from '../editor/paragraph';
+import { firstLineAt, marginsAt } from '../editor/paragraph';
 import { addTextNote, openFind } from '../store';
 import { openSymbols } from './Symbols';
 
 /** 문단 여백 for the paragraphs the cursor or selection is in. */
 export function marginMenu(editor: Editor): MenuItem[] {
   const now = marginsAt(editor.state);
+  const first = firstLineAt(editor.state);
   const run = (f: (chain: ReturnType<Editor['chain']>) => ReturnType<Editor['chain']>) => () => {
     f(editor.chain().focus()).run();
   };
@@ -27,6 +28,13 @@ export function marginMenu(editor: Editor): MenuItem[] {
       disabled: now.left === 0 && now.right === 0,
       onSelect: run((c) => c.shiftMargins(-1, ['left', 'right'])),
     },
+    { heading: first === null ? '첫 줄: 서식대로' : first >= 0 ? `첫 줄: 들여쓰기 ${first}자` : `첫 줄: 내어쓰기 ${-first}자` },
+    { label: '첫 줄 서식대로', checked: first === null, onSelect: run((c) => c.setFirstLine(null)) },
+    { label: '첫 줄 들여쓰기 1자', checked: first === 1, onSelect: run((c) => c.setFirstLine(1)) },
+    { label: '첫 줄 들여쓰기 2자', checked: first === 2, onSelect: run((c) => c.setFirstLine(2)) },
+    { label: '내어쓰기 1자', checked: first === -1, onSelect: run((c) => c.setFirstLine(-1)) },
+    { label: '내어쓰기 2자', checked: first === -2, onSelect: run((c) => c.setFirstLine(-2)) },
+    { label: '첫 줄 들이지 않기', checked: first === 0, onSelect: run((c) => c.setFirstLine(0)) },
     { separator: true },
     {
       label: '여백 없애기',

@@ -408,16 +408,29 @@ impl Para {
     }
 }
 
-/// 문단 여백 as Word indents: in characters, with the first-line indent kept.
+/// 문단 모양 as Word indents, in characters: margins, and the first line
+/// (the paragraph's own, or the format's).
 fn margin_ind(format: &ManuscriptFormat, attrs: ParaAttrs) -> String {
     let char_pt = format.size_pt * (1.0 + f64::from(format.letter_spacing) / 100.0);
     let side = |n: u8| (u32::from(n) * 100, twips_pt(f64::from(n) * char_pt));
     let (left_chars, left) = side(attrs.left);
     let (right_chars, right) = side(attrs.right);
+    let first = attrs.indent.map_or(format.indent, f64::from);
+    let first_line = if first < 0.0 {
+        format!(
+            r#"w:hangingChars="{}" w:hanging="{}""#,
+            (-first * 100.0).round() as i64,
+            twips_pt(-first * format.size_pt)
+        )
+    } else {
+        format!(
+            r#"w:firstLineChars="{}" w:firstLine="{}""#,
+            (first * 100.0).round() as i64,
+            twips_pt(first * format.size_pt)
+        )
+    };
     format!(
-        r#"<w:ind w:leftChars="{left_chars}" w:left="{left}" w:rightChars="{right_chars}" w:right="{right}" w:firstLineChars="{}" w:firstLine="{}"/>"#,
-        (format.indent * 100.0).round() as i64,
-        twips_pt(format.indent * format.size_pt),
+        r#"<w:ind w:leftChars="{left_chars}" w:left="{left}" w:rightChars="{right_chars}" w:right="{right}" {first_line}/>"#
     )
 }
 
@@ -653,7 +666,11 @@ mod tests {
         let docs = vec![ExportDoc {
             heading: String::new(),
             blocks: vec![Block::Paragraph {
-                attrs: ParaAttrs { left: 2, right: 1 },
+                attrs: ParaAttrs {
+                    left: 2,
+                    right: 1,
+                    indent: None,
+                },
                 content: vec![Inline::Text {
                     text: "편지".into(),
                     marks: vec![],
@@ -667,6 +684,38 @@ mod tests {
         assert!(doc.contains(
             r#"<w:ind w:leftChars="200" w:left="400" w:rightChars="100" w:right="200" w:firstLineChars="100" w:firstLine="200"/>"#
         ));
+    }
+
+    #[test]
+    fn own_first_lines_become_indents() {
+        let format = builtin("submission-a4").unwrap();
+        let opts = DocOptions {
+            include_titles: false,
+            scene_break: "*".into(),
+        };
+        let para = |indent| Block::Paragraph {
+            attrs: ParaAttrs {
+                left: 0,
+                right: 0,
+                indent,
+            },
+            content: vec![Inline::Text {
+                text: "문단".into(),
+                marks: vec![],
+            }],
+        };
+        let docs = vec![ExportDoc {
+            heading: String::new(),
+            blocks: vec![para(Some(-1)), para(Some(0)), para(None)],
+        }];
+        let doc = unzip(
+            &docx_bytes(&docs, &format, &opts, &info()).unwrap(),
+            "word/document.xml",
+        );
+        assert!(doc.contains(r#"w:hangingChars="100" w:hanging="200"/>"#));
+        assert!(doc.contains(r#"w:firstLineChars="0" w:firstLine="0"/>"#));
+        // The third follows the style (Normal) and needs no indent of its own.
+        assert_eq!(doc.matches("<w:ind ").count(), 2);
     }
 
     #[test]

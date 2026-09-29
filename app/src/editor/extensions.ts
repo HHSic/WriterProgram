@@ -6,6 +6,7 @@ import { Plugin } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import StarterKit from '@tiptap/starter-kit';
 import { CardHighlight } from './cards';
+import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
 import { SearchHighlight } from './search';
@@ -191,6 +192,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     ParagraphMargins,
     SpecialSpaces,
     WhitespaceMarks,
+    IndentRulesExtension,
     SearchHighlight,
     CardHighlight.configure({ onOpen: hooks.onCardOpen }),
     Placeholder.configure({

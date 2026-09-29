@@ -56,6 +56,21 @@ export interface ManuscriptFormat {
   pageNumbers: boolean;
   /** 머리말 (crates/core/src/format.rs RunningHead). */
   header: RunningHead;
+  /** Where the first-line indent is left out (crates/core/src/indent.rs). */
+  indentRules: IndentRules;
+}
+
+export interface IndentRules {
+  /** The first paragraph of a chapter. */
+  chapterFirst: boolean;
+  /** The first paragraph after a scene break. */
+  afterScene: boolean;
+  /** Paragraphs set in with margins (letters, quotations). */
+  margined: boolean;
+  /** Dialogue (opening with a quotation mark). */
+  dialogue: boolean;
+  /** Dialogue as on 원고지: every line one cell in. */
+  dialogueHang: boolean;
 }
 
 export type HeadContent = 'none' | 'title' | 'chapter' | 'titleChapter' | 'author' | 'custom';

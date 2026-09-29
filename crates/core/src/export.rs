@@ -261,7 +261,11 @@ pub fn export_file(
     let load = |item: &ExportItem| -> Result<ExportDoc> {
         Ok(ExportDoc {
             heading: item.heading.clone(),
-            blocks: doc::load(root, &item.doc_id)?.body,
+            blocks: crate::indent::apply(
+                &doc::load(root, &item.doc_id)?.body,
+                format.indent,
+                format.indent_rules,
+            ),
         })
     };
     if !per_doc {
@@ -295,7 +299,11 @@ mod tests {
         let blocks = vec![
             Block::text("그리고"),
             Block::Paragraph {
-                attrs: ParaAttrs { left: 2, right: 1 },
+                attrs: ParaAttrs {
+                    left: 2,
+                    right: 1,
+                    indent: None,
+                },
                 content: vec![
                     Inline::Text {
                         text: "첫 줄".into(),
