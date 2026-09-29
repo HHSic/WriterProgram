@@ -81,6 +81,7 @@ export function RightPanel() {
           onClick={(e) =>
             openMenu(e, [
               { label: '작품 설정', onSelect: () => openDialog({ kind: 'project' }) },
+              { label: '원고 가져오기…', onSelect: () => openDialog({ kind: 'import' }) },
               { label: '보기 설정', onSelect: () => openDialog({ kind: 'view' }) },
               { label: '휴지통', onSelect: () => openDialog({ kind: 'trash' }) },
               { separator: true },

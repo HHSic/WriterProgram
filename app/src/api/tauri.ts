@@ -40,6 +40,8 @@ export const tauriBackend: Backend = {
   exportTxt: (root, items, opts, dest, perDoc) => invoke('export_txt', { root, items, opts, dest, perDoc }),
   exportFile: (root, items, opts, format, kind, dest, perDoc) =>
     invoke('export_file', { root, items, opts, format, kind, dest, perDoc }),
+  importPreview: (paths, opts) => invoke('import_preview', { paths, opts }),
+  importCommit: (root, paths, opts, spec) => invoke('import_commit', { root, paths, opts, spec }),
   search: (root, query) => invoke('search', { root, query }),
   replaceAll: (root, query, replacement) => invoke('replace_all', { root, query, replacement }),
   cardLoad: (root, cardId) => invoke('card_load', { root, cardId }),
@@ -92,6 +94,15 @@ export const tauriBackend: Backend = {
   pickFolder: async (title, defaultPath) => {
     const picked = await open({ directory: true, multiple: false, title, defaultPath });
     return typeof picked === 'string' ? picked : null;
+  },
+  pickFiles: async (title) => {
+    const picked = await open({
+      multiple: true,
+      directory: false,
+      title,
+      filters: [{ name: '원고 파일 (txt, md, docx)', extensions: ['txt', 'md', 'markdown', 'docx'] }],
+    });
+    return Array.isArray(picked) ? picked : typeof picked === 'string' ? [picked] : [];
   },
   pickSaveFile: (title, defaultName, extension) =>
     save({ title, defaultPath: defaultName, filters: [{ name: FILE_TYPE_NAMES[extension] ?? extension, extensions: [extension] }] }),

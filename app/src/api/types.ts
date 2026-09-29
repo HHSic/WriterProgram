@@ -425,6 +425,66 @@ export interface ExportItem {
   fileName: string;
 }
 
+// 가져오기 (import.rs)
+
+export type SplitRule = 'auto' | 'file' | 'heading' | 'episode' | 'chapter' | 'number' | 'regex';
+export type LineMode = 'auto' | 'line' | 'blank';
+
+export interface ImportOptions {
+  rule: SplitRule;
+  /** Used with the `regex` rule. */
+  pattern: string;
+  lineMode: LineMode;
+  /** `utf-8` or `euc-kr` for txt and md; found out when null. */
+  encoding: string | null;
+}
+
+export interface ImportFile {
+  name: string;
+  kind: string;
+  /** Why the file cannot be imported. */
+  error: string | null;
+  encoding: string | null;
+  /** The way the file was cut into chapters, in screen words. */
+  rule: string;
+  chapters: number;
+}
+
+/** What is left out: tables, pictures and footnotes are never imported. */
+export interface SkipTotals {
+  tables: number;
+  images: number;
+  footnotes: number;
+}
+
+export interface ImportChapter {
+  index: number;
+  file: number;
+  title: string;
+  chars: number;
+  paragraphs: number;
+  snippet: string;
+  skipped: SkipTotals;
+}
+
+export interface ImportPreview {
+  files: ImportFile[];
+  chapters: ImportChapter[];
+  skipped: SkipTotals;
+}
+
+export interface ImportSpec {
+  partId: string | null;
+  after: string | null;
+  picks: { index: number; title: string }[];
+  leaveNotes: boolean;
+}
+
+export interface Imported {
+  docs: string[];
+  notes: number;
+}
+
 export interface Backend {
   /** True in the desktop app, false in the browser preview. */
   isDesktop: boolean;
@@ -502,6 +562,10 @@ export interface Backend {
    */
   watchProject(root: string, onChange: (changes: Change[]) => void): () => void;
   driveStatus(): Promise<DriveStatus>;
+  /** What the files would become; nothing is made. */
+  importPreview(paths: string[], opts: ImportOptions): Promise<ImportPreview>;
+  /** Makes the chapters picked in the preview. */
+  importCommit(root: string, paths: string[], opts: ImportOptions, spec: ImportSpec): Promise<Imported>;
   /** Opens the drive's sign-in page in the browser and waits for the writer. */
   driveConnect(provider: DriveProvider): Promise<DriveAccount>;
   driveCancel(): Promise<void>;
@@ -515,6 +579,8 @@ export interface Backend {
   projectSync(root: string, projectId: string): Promise<SyncOutcome>;
   reveal(path: string): Promise<void>;
   pickFolder(title: string, defaultPath?: string): Promise<string | null>;
+  /** Files to import (txt, md, docx); empty when the writer cancels. */
+  pickFiles(title: string): Promise<string[]>;
   /** `extension` without the dot: txt, docx or hwpx. */
   pickSaveFile(title: string, defaultName: string, extension: string): Promise<string | null>;
   /**

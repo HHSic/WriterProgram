@@ -8,6 +8,8 @@ import { buildRegex } from '../editor/search';
 import type {
   Appearance,
   Backend,
+  ImportChapter,
+  ImportPreview,
   Card,
   Change,
   CopyInfo,
@@ -55,6 +57,8 @@ interface MockProject {
   /** Copies "left by a sync program" (see otherDevice below). */
   copies: { info: CopyInfo; doc?: MockDoc; card?: Card }[];
 }
+
+type SkipTotalsLike = { tables: number; images: number; footnotes: number };
 
 const projects = new Map<string, MockProject>();
 /** The screen's handler for changes "from another device", while a project is watched. */
@@ -639,6 +643,61 @@ export const mockBackend: Backend = {
   async exportFile(_root, items, opts, format, kind, dest, perDoc) {
     console.info('[mock] export file', { kind, dest, perDoc, format, opts, items });
     return perDoc ? items.map((i) => `${dest}\\${i.fileName}.${kind}`) : [dest];
+  },
+  async pickFiles() {
+    return ['C:\\원고\\연재본.docx', 'C:\\원고\\외전.txt', 'C:\\원고\\옛 원고.hwp'];
+  },
+  async importPreview(paths, opts) {
+    const none = { tables: 0, images: 0, footnotes: 0 };
+    const sample: [string, number, SkipTotalsLike][] = [
+      ['문 닫는 시간', 4210, { tables: 0, images: 0, footnotes: 0 }],
+      ['빗소리가 들리는 밤', 5032, { tables: 1, images: 2, footnotes: 0 }],
+      ['비에 젖은 손님', 4876, { tables: 0, images: 0, footnotes: 1 }],
+    ];
+    const files: ImportPreview['files'] = paths.map((path) => {
+      const name = path.split('\\').pop() ?? path;
+      const kind = name.split('.').pop() ?? '';
+      const bad = kind === 'hwp';
+      return {
+        name,
+        kind,
+        error: bad ? '한글 파일은 아직 읽을 수 없음 · 한글에서 docx나 txt로 저장해 주세요' : null,
+        encoding: kind === 'txt' ? 'euc-kr' : null,
+        rule: bad ? '' : opts.rule === 'file' ? '파일 하나가 회차 하나' : kind === 'docx' ? '제목 서식' : '제N화',
+        chapters: 0,
+      };
+    });
+    const chapters: ImportChapter[] = [];
+    files.forEach((f, file) => {
+      if (f.error) return;
+      const list: [string, number, SkipTotalsLike][] =
+        opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), 9800, none]] : f.kind === 'docx' ? sample : [['외전 · 그날의 서하', 3120, none]];
+      for (const [title, chars, skipped] of list) {
+        chapters.push({ index: chapters.length, file, title, chars, paragraphs: Math.round(chars / 60), snippet: '서하는 매일 밤 열한 시에 서점 문을 닫았다. 할머니가 그랬고, 할머니의 어머니도 그랬다고 했다.', skipped });
+      }
+      f.chapters = list.length;
+    });
+    const skipped = { ...none };
+    for (const c of chapters) {
+      skipped.tables += c.skipped.tables;
+      skipped.images += c.skipped.images;
+      skipped.footnotes += c.skipped.footnotes;
+    }
+    return { files, chapters, skipped };
+  },
+  async importCommit(root, paths, opts, spec) {
+    const p = project(root);
+    const preview = await mockBackend.importPreview(paths, opts);
+    const ids: string[] = [];
+    for (const pick of [...spec.picks].sort((a, b) => a.index - b.index)) {
+      const chapter = preview.chapters[pick.index];
+      const d = newDoc(p, 'manuscript', pick.title, body(chapter?.snippet ?? ''));
+      ids.push(d.meta.id);
+    }
+    const withAfter = spec.after ? p.parts.find((x) => x.docs.includes(spec.after!)) : undefined;
+    if (withAfter) withAfter.docs.splice(withAfter.docs.indexOf(spec.after!) + 1, 0, ...ids);
+    else (p.parts.find((x) => x.id === spec.partId) ?? p.parts[p.parts.length - 1]).docs.push(...ids);
+    return { docs: ids, notes: 0 };
   },
   async search(root, query) {
     const p = project(root);

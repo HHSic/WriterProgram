@@ -11,6 +11,7 @@ import { CompareDialog } from './Compare';
 import { CopiesDialog } from './Copies';
 import { DriveImportDialog, DrivesDialog } from './Drives';
 import { ExportDialog } from './ExportDialog';
+import { ImportDialog } from './ImportDialog';
 import { MoveDialog } from './MoveProject';
 import { ProjectSettingsDialog } from './ProjectSettings';
 import { SymbolsDialog } from './Symbols';
@@ -385,6 +386,8 @@ export function DialogHost() {
       return <TrashDialog />;
     case 'export':
       return <ExportDialog />;
+    case 'import':
+      return <ImportDialog partId={dialog.partId} />;
     case 'view':
       return <ViewDialog />;
     case 'symbols':

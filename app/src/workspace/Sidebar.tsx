@@ -261,6 +261,13 @@ export function Sidebar() {
         void addDoc({ partId: part.id });
       },
     },
+    {
+      label: `이 부로 ${noun} 가져오기…`,
+      onSelect: () => {
+        expand(part.id);
+        openDialog({ kind: 'import', partId: part.id });
+      },
+    },
     { label: '개요 표로 보기', onSelect: () => void openTable(part.id) },
     {
       label: '이름 바꾸기',

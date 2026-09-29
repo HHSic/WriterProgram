@@ -61,7 +61,7 @@ fn docx_headings_marks_and_what_is_left_out() {
     ]
     .concat();
     let path = docx(dir.path(), "a.docx", &body);
-    let preview = import::preview(&[path.clone()], &ImportOptions::default());
+    let preview = import::preview(std::slice::from_ref(&path), &ImportOptions::default());
     assert!(
         preview.files[0].error.is_none(),
         "{:?}",
@@ -145,7 +145,7 @@ fn one_file_one_chapter_and_bad_pattern() {
     let path = dir.path().join("한 편.txt");
     fs::write(&path, "가\n나\n").unwrap();
     let opts = ImportOptions::default();
-    let preview = import::preview(&[path.clone()], &opts);
+    let preview = import::preview(std::slice::from_ref(&path), &opts);
     assert_eq!(preview.chapters.len(), 1);
     assert_eq!(preview.chapters[0].title, "한 편");
 
@@ -155,7 +155,7 @@ fn one_file_one_chapter_and_bad_pattern() {
         ..Default::default()
     };
     assert!(
-        import::preview(&[path.clone()], &bad).files[0]
+        import::preview(std::slice::from_ref(&path), &bad).files[0]
             .error
             .is_some()
     );
@@ -221,7 +221,7 @@ fn commit_after_a_chapter_and_nothing_left_behind_on_error() {
         leave_notes: false,
         status: Some("stock".into()),
     };
-    let done = import::commit(&root, &[path.clone()], &opts, &spec).unwrap();
+    let done = import::commit(&root, std::slice::from_ref(&path), &opts, &spec).unwrap();
     let overview = project::overview(&root).unwrap();
     let ids: Vec<_> = overview.parts[0]
         .docs
