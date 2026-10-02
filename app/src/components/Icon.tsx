@@ -103,6 +103,12 @@ const PATHS = {
     </>
   ),
   forward: <path d="M9 6l6 6-6 6" />,
+  speaker: (
+    <>
+      <path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" />
+      <path d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10" />
+    </>
+  ),
   reload: (
     <>
       <path d="M19 12a7 7 0 1 1-2.1-5" />

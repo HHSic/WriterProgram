@@ -34,7 +34,14 @@ export interface ViewSettings {
   /** 눈금자 over the page (paragraph margins and first line). Off: the
    * margins are set in 원고 서식, a paragraph's own in the 문단 여백 menu. */
   ruler: boolean;
+  /** 소리 내어 읽기: speed, 0.7 to 1.5 times normal. */
+  readRate: number;
+  /** 소리 내어 읽기: voiceURI of the chosen Korean voice; empty takes the first one. */
+  readVoice: string;
 }
+
+/** Speeds offered for 소리 내어 읽기. */
+export const READ_RATES = [0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5];
 
 export const FONT_LABEL: Record<BodyFont, string> = {
   'noto-serif': '본명조 (Noto Serif KR)',
@@ -65,6 +72,8 @@ export const DEFAULT_VIEW: ViewSettings = {
   showMarks: false,
   toolbar: 'auto',
   ruler: false,
+  readRate: 1,
+  readVoice: '',
 };
 
 const KEY = 'wp.view';

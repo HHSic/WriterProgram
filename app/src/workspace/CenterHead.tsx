@@ -2,7 +2,7 @@ import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { flushAll } from '../lib/flush';
 import { UNTITLED, docNumber } from '../lib/labels';
-import { findDoc, openDialog, openWeb, splitView, unsplit, useApp, webPages } from '../store';
+import { findDoc, openDialog, openWeb, splitView, toggleReading, unsplit, useApp, webPages } from '../store';
 import { marginMenu } from './EditToolbar';
 import { openSymbols } from './Symbols';
 
@@ -16,6 +16,7 @@ export function CenterHead() {
   const activeCardId = useApp((s) => s.activeCardId);
   const target = useApp((s) => s.activeTarget);
   const split = useApp((s) => (s.panes.length > 1 ? s.split : null));
+  const reading = useApp((s) => s.reading !== null && s.reading.status !== 'noVoice' && s.reading.editor === s.editor);
   const card = activeCardId ? ov.cards.find((c) => c.id === activeCardId) : undefined;
   const place = activeDocId ? findDoc(ov, activeDocId) : null;
 
@@ -88,6 +89,20 @@ export function CenterHead() {
           onClick={(e) => editor && openMenu(e, marginMenu(editor), { title: '문단 여백' })}
         >
           <Icon name="indent" size={17} />
+        </button>
+      )}
+      {activeDocId && (
+        <button
+          type="button"
+          className={`icon-btn${reading ? ' on' : ''}`}
+          aria-label={reading ? '소리 내어 읽기 멈춤' : '소리 내어 읽기'}
+          aria-pressed={reading}
+          title={reading ? '소리 내어 읽기 멈춤 (Ctrl+Shift+R)' : '소리 내어 읽기: 커서가 있는 문장부터, 고른 글이 있으면 그 글만 (Ctrl+Shift+R)'}
+          disabled={!editor}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={toggleReading}
+        >
+          <Icon name="speaker" size={17} />
         </button>
       )}
       <button

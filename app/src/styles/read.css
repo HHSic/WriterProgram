@@ -1,0 +1,83 @@
+/* 소리 내어 읽기 (editor/readAloud.ts, workspace/ReadingBar.tsx) ------------- */
+
+/* The sentence being read. */
+.reading-now {
+  background: var(--blue-soft);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px var(--blue-soft);
+  transition: background 0.2s;
+}
+
+.scene-break.reading-now {
+  box-shadow: none;
+}
+
+/* Rides at the bottom of the chapter's scroll area while reading. */
+.reading-bar {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 12px auto 12px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.reading-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 6.5em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.reading-state.on {
+  color: var(--blue-strong);
+}
+
+.reading-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.reading-rate select {
+  height: 30px;
+  color: var(--text);
+}
+
+.reading-bar.notice {
+  align-items: flex-start;
+  max-width: min(520px, calc(100% - 16px));
+}
+
+.reading-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.reading-notice span {
+  color: var(--text-2);
+}
+
+.read-aloud-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

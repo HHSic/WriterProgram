@@ -10,6 +10,8 @@ import {
   reopenClosedTab,
   setView,
   splitView,
+  stopReading,
+  toggleReading,
   unsplit,
   useApp,
 } from '../store';
@@ -71,6 +73,15 @@ export function Workspace() {
       if (mod && e.shiftKey && e.code === 'Digit8') {
         e.preventDefault();
         setView({ showMarks: !useApp.getState().view.showMarks });
+      }
+      // Ctrl+Shift+R: 소리 내어 읽기, or stop it. Esc stops it too.
+      if (mod && e.shiftKey && !e.altKey && e.code === 'KeyR') {
+        e.preventDefault();
+        toggleReading();
+      }
+      if (e.key === 'Escape' && !e.isComposing) {
+        const { reading, dialog } = useApp.getState();
+        if (reading && reading.status !== 'noVoice' && !dialog) stopReading();
       }
       // F7: 원고 서식 (편집 용지 in 한글). Ctrl+F10: 문자표.
       if (e.key === 'F7' && !mod && !e.altKey) {

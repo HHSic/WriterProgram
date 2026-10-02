@@ -9,6 +9,7 @@ import { CardHighlight } from './cards';
 import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
+import { ReadAloudHighlight } from './readAloud';
 import { SearchHighlight } from './search';
 
 declare module '@tiptap/core' {
@@ -194,6 +195,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     WhitespaceMarks,
     IndentRulesExtension,
     SearchHighlight,
+    ReadAloudHighlight,
     CardHighlight.configure({ onOpen: hooks.onCardOpen }),
     Placeholder.configure({
       placeholder: ({ editor }) => (editor.isEmpty ? '여기에 쓰기 시작하세요' : ''),

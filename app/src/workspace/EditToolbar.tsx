@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import { openMenu, type MenuItem } from '../components/Menu';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { firstLineAt, marginsAt } from '../editor/paragraph';
-import { addTextNote, openFind } from '../store';
+import { addTextNote, openFind, toggleReading, useApp } from '../store';
 import { openSymbols } from './Symbols';
 
 /** The marks in the 편집 도구줄, in its order (방점 next to 굵게). */
@@ -83,6 +83,7 @@ export function EditToolbar({ editor }: { editor: Editor }) {
   );
 
   const chain = () => editor.chain().focus();
+  const reading = useApp((s) => s.reading?.editor === editor && s.reading.status !== 'noVoice');
 
   return (
     <div className="edit-toolbar" role="toolbar" aria-label="편집 도구줄">
@@ -118,6 +119,17 @@ export function EditToolbar({ editor }: { editor: Editor }) {
         onClick={() => openFind({ scope: 'doc', focus: 'find' })}
       >
         <Icon name="search" size={17} />
+      </button>
+      <button
+        type="button"
+        className={`tool${reading ? ' on' : ''}`}
+        aria-label={reading ? '소리 내어 읽기 멈춤' : '소리 내어 읽기'}
+        aria-pressed={reading}
+        title={reading ? '소리 내어 읽기 멈춤' : '소리 내어 읽기'}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={toggleReading}
+      >
+        <Icon name="speaker" size={17} />
       </button>
     </div>
   );

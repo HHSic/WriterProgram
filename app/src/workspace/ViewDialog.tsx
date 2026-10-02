@@ -1,9 +1,12 @@
 // 보기 설정: how the writing screen looks on this device (font, spacing, colours).
 
+import { useEffect, useState } from 'react';
 import { Modal } from '../components/Modal';
+import { koreanVoices, loadVoices, pickVoice, sayOnce, speechAvailable } from '../editor/readAloud';
 import { ACCENTS, PALETTES, previewColors } from '../lib/colors';
-import { FONT_LABEL, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
+import { FONT_LABEL, READ_RATES, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
 import { closeDialog, setView, useApp } from '../store';
+import { NO_VOICE_HELP, rateLabel } from './ReadingBar';
 
 const THEMES: { id: Theme; label: string }[] = [
   { id: 'system', label: '시스템 따라' },
@@ -85,6 +88,7 @@ export function ViewDialog() {
           </div>
         </fieldset>
         <ColorFields view={view} />
+        <ReadAloudFields view={view} />
       </div>
     </Modal>
   );
@@ -169,6 +173,67 @@ function ColorFields({ view }: { view: ViewSettings }) {
   );
 }
 
+/** 소리 내어 읽기: which Korean voice and how fast. */
+function ReadAloudFields({ view }: { view: ViewSettings }) {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadVoices().then((all) => alive && setVoices(koreanVoices(all)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const voice = voices ? pickVoice(voices, view.readVoice) : null;
+
+  return (
+    <fieldset className="field read-aloud-fields">
+      <legend className="field-label">소리 내어 읽기 (Ctrl+Shift+R)</legend>
+      {!speechAvailable() ? (
+        <span className="hint">이 기기에서는 소리 내어 읽을 수 없습니다.</span>
+      ) : voices === null ? (
+        <span className="hint">목소리를 찾는 중</span>
+      ) : voices.length === 0 ? (
+        <span className="hint">한국어 목소리가 없습니다. {NO_VOICE_HELP}</span>
+      ) : (
+        <>
+          <label className="field">
+            <span className="field-label">목소리</span>
+            <select value={voice?.voiceURI ?? ''} onChange={(e) => setView({ readVoice: e.target.value })}>
+              {voices.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name}
+                  {v.localService ? '' : ' (인터넷 연결 필요)'}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Slider
+            label="빠르기"
+            value={view.readRate}
+            min={READ_RATES[0]}
+            max={READ_RATES[READ_RATES.length - 1]}
+            step={0.1}
+            unit=""
+            show={rateLabel}
+            onChange={(v) => setView({ readRate: Math.round(v * 10) / 10 })}
+          />
+          <div>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!voice}
+              onClick={() => voice && sayOnce('소리 내어 읽기는 이 목소리와 빠르기로 읽습니다.', voice, view.readRate)}
+            >
+              들어 보기
+            </button>
+          </div>
+        </>
+      )}
+      <span className="hint">커서가 있는 문장부터 끝까지, 고른 글이 있으면 그 글만 읽습니다. 글을 고치기 시작하면 멈춥니다.</span>
+    </fieldset>
+  );
+}
+
 function Slider({
   label,
   value,
@@ -176,6 +241,7 @@ function Slider({
   max,
   step,
   unit,
+  show,
   onChange,
 }: {
   label: string;
@@ -184,16 +250,15 @@ function Slider({
   max: number;
   step: number;
   unit: string;
+  /** How the value is written next to the label, when not just number + unit. */
+  show?: (v: number) => string;
   onChange: (v: number) => void;
 }) {
   return (
     <label className="field slider">
       <span className="field-label">
         {label}
-        <output>
-          {value}
-          {unit}
-        </output>
+        <output>{show ? show(value) : `${value}${unit}`}</output>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     </label>

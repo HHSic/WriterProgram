@@ -36,6 +36,7 @@ import { touchCapable, touchLike } from '../lib/pointer';
 import { useNameIndex } from './CardPanels';
 import { DocBanners } from './Copies';
 import { EditToolbar } from './EditToolbar';
+import { ReadingBar } from './ReadingBar';
 import { Ruler } from './Ruler';
 
 export function DocPane({ docId, tabKey, locked }: { docId: string; tabKey: string; locked: boolean }) {
@@ -229,6 +230,7 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
           <EditorContent editor={editor} />
         </article>
         <FormatBubble editor={editor} />
+        <ReadingBar editor={editor} />
       </div>
       {toolbar && <EditToolbar editor={editor} />}
     </>

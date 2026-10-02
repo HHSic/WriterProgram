@@ -132,6 +132,14 @@ interface AppState {
   syncing: boolean;
   /** Bumped when a browser tab's page or title changes (tab labels follow). */
   webVersion: number;
+  /** 소리 내어 읽기 going on in `editor` (or, `noVoice`, asked for there with
+   * no Korean voice installed). */
+  reading: Reading | null;
+}
+
+export interface Reading {
+  status: 'reading' | 'paused' | 'noVoice';
+  editor: Editor;
 }
 
 export const useApp = create<AppState>(() => ({
@@ -168,6 +176,7 @@ export const useApp = create<AppState>(() => ({
   link: null,
   syncing: false,
   webVersion: 0,
+  reading: null,
 }));
 
 export const set = useApp.setState;
