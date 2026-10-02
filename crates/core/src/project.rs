@@ -15,6 +15,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -26,7 +27,9 @@ use crate::doc::{self, DocFile, DocMeta, Section};
 use crate::format::{self, ManuscriptFormat};
 use crate::layout::PageMetrics;
 use crate::markup::Block;
-use crate::store::{atomic_write, new_id, now_iso, read_text, safe_file_name, to_iso};
+use crate::store::{
+    atomic_write, modified_iso, new_id, now_iso, read_text, rename_retry, safe_file_name,
+};
 use crate::{Error, Result, snapshot, trash};
 
 pub const PROJECT_FILE: &str = "project.json";
@@ -329,18 +332,7 @@ fn canonical(path: &Path) -> Result<PathBuf> {
 /// Renames a folder, retrying briefly while a sync program or virus scanner
 /// holds a file in it.
 fn rename_dir(from: &Path, to: &Path) -> std::io::Result<()> {
-    let mut last = None;
-    for attempt in 0..4 {
-        match fs::rename(from, to) {
-            Ok(()) => return Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
-                last = Some(e);
-                std::thread::sleep(std::time::Duration::from_millis(80 * (attempt + 1)));
-            }
-            Err(e) => return Err(e),
-        }
-    }
-    Err(last.expect("retried at least once"))
+    rename_retry(from, to, 4, Duration::from_millis(80))
 }
 
 fn copy_tree(from: &Path, to: &Path) -> Result<()> {
@@ -471,11 +463,6 @@ impl DocSummary {
     }
 }
 
-fn modified(path: &Path) -> Option<String> {
-    let time = fs::metadata(path).ok()?.modified().ok()?;
-    Some(to_iso(chrono::DateTime::<chrono::Utc>::from(time)))
-}
-
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartView {
@@ -536,7 +523,7 @@ fn listed_docs<'a>(
         .filter_map(|id| {
             let path = root.join(section.dir()).join(doc::file_name(id));
             let file = doc::read_doc(&path).ok()?;
-            Some((file, modified(&path)))
+            Some((file, modified_iso(&path)))
         })
         .collect()
 }

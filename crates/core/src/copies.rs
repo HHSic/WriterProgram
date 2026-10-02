@@ -36,7 +36,7 @@ use crate::doc::{self, DocFile, Section, decode_value};
 use crate::notes::{self, parse_note};
 use crate::project::{self, PROJECT_FILE, Part, Project};
 use crate::snapshot::{self, SNAPSHOT_DIR};
-use crate::store::{atomic_write, new_id, read_text, stable_id, stamp, to_iso};
+use crate::store::{atomic_write, modified_iso, new_id, read_text, stable_id, stamp};
 use crate::trash;
 use crate::{Error, Result};
 
@@ -254,11 +254,6 @@ fn original_of(root: &Path, section: Section, file: &str) -> Result<String> {
         .find(|(f, _)| f == file)
         .map(|(_, of)| of)
         .ok_or_else(|| Error::NotFound("사본을 찾을 수 없음".into()))
-}
-
-fn modified_iso(path: &Path) -> Option<String> {
-    let time = fs::metadata(path).ok()?.modified().ok()?;
-    Some(to_iso(chrono::DateTime::<Utc>::from(time)))
 }
 
 fn describe(root: &Path, section: Section, file: &str, of: &str) -> Result<CopyInfo> {

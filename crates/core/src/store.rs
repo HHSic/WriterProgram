@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use chrono::{DateTime, Datelike, SecondsFormat, Timelike, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use sha2::{Digest, Sha256};
 
 use crate::{Error, Result};
@@ -64,7 +64,7 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
         return Err(Error::io(path, e));
     }
 
-    if let Err(e) = rename_with_retry(&tmp, path) {
+    if let Err(e) = rename_retry(&tmp, path, 6, Duration::from_millis(40)) {
         let _ = fs::remove_file(&tmp);
         return Err(Error::io(path, e));
     }
@@ -79,16 +79,23 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-/// Sync clients and virus scanners briefly lock files on Windows, which makes a
-/// rename fail with "access denied". A few short retries ride that out.
-fn rename_with_retry(from: &Path, to: &Path) -> std::io::Result<()> {
+/// Renames `from` to `to`, trying up to `tries` times. Sync clients and virus
+/// scanners briefly lock files on Windows, which makes a rename fail with
+/// "access denied"; waiting a little longer after each try (`wait`, then twice
+/// that, …) rides that out. Other errors are returned at once.
+pub(crate) fn rename_retry(
+    from: &Path,
+    to: &Path,
+    tries: u32,
+    wait: Duration,
+) -> std::io::Result<()> {
     let mut last = None;
-    for attempt in 0..6 {
+    for attempt in 0..tries {
         match fs::rename(from, to) {
             Ok(()) => return Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
                 last = Some(e);
-                thread::sleep(Duration::from_millis(40 * (attempt + 1)));
+                thread::sleep(wait * (attempt + 1));
             }
             Err(e) => return Err(e),
         }
@@ -147,6 +154,12 @@ pub fn to_iso(t: DateTime<Utc>) -> String {
     t.to_rfc3339_opts(SecondsFormat::Millis, true)
 }
 
+/// When a file was last written, as an RFC 3339 string; none when unknown.
+pub(crate) fn modified_iso(path: &Path) -> Option<String> {
+    let time = fs::metadata(path).ok()?.modified().ok()?;
+    Some(to_iso(DateTime::<Utc>::from(time)))
+}
+
 pub fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
     DateTime::parse_from_rfc3339(s)
         .ok()
@@ -155,16 +168,7 @@ pub fn parse_iso(s: &str) -> Option<DateTime<Utc>> {
 
 /// Compact UTC stamp for file names that sorts by time: `20260927-101500-123`.
 pub fn stamp(t: DateTime<Utc>) -> String {
-    format!(
-        "{:04}{:02}{:02}-{:02}{:02}{:02}-{:03}",
-        t.year(),
-        t.month(),
-        t.day(),
-        t.hour(),
-        t.minute(),
-        t.second(),
-        t.timestamp_subsec_millis()
-    )
+    t.format("%Y%m%d-%H%M%S-%3f").to_string()
 }
 
 pub fn parse_stamp(s: &str) -> Option<DateTime<Utc>> {
