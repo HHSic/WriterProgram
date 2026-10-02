@@ -432,9 +432,7 @@ function seed() {
   touchRecent(root);
 }
 
-seed();
-
-export const mockBackend: Backend = {
+const mockBackend: Backend = {
   isDesktop: false,
   async recentList() {
     await wait();
@@ -1194,7 +1192,6 @@ const otherDevice = {
     watcher.onChange([{ kind: 'doc', id: `${docId}-${device}`, rev: revOf(copyDoc.body) }]);
   },
 };
-if (typeof window !== 'undefined') (window as unknown as { __otherDevice: typeof otherDevice }).__otherDevice = otherDevice;
 
 /** Drives in the browser preview: all "registered", none connected. */
 const drives: DriveInfo[] = [
@@ -1207,4 +1204,14 @@ let connecting = false;
 
 function drive(provider: DriveProvider): DriveInfo {
   return drives.find((d) => d.provider === provider)!;
+}
+
+/**
+ * Seeds the sample project and hands out the stand-in. Nothing runs at import
+ * time, so a production build can drop this whole file when it is not called.
+ */
+export function startMockBackend(): Backend {
+  seed();
+  if (typeof window !== 'undefined') (window as unknown as { __otherDevice: typeof otherDevice }).__otherDevice = otherDevice;
+  return mockBackend;
 }
