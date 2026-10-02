@@ -17,9 +17,9 @@
 | `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |
 | `export.rs`, `docx/`, `hwpx/`, `xml.rs` | 내보내기. docx는 `layout.rs`(머리글·꼬리글), `styles.rs`, `body.rs`. HWPX는 `header.rs`(글자·문단 모양, 스타일), `section.rs`(본문, 머리말·꼬리말 조판 부호). `xml.rs`는 둘이 함께 쓰는 이스케이프·zip 묶기·시각 |
 | `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모), `marked/`(교정본 읽기: 글자 모양·변경 추적·편집자 메모) |
-| `corrections/` | 교정본 주고받기 ([corrections.md](corrections.md)): `sent.rs`(보낸 기록), `compare.rs`(문단·어절·글자 비교, 종류 나누기), `review.rs`(교정본과 보낸 원고 비교), `flat.rs`(회차를 글자 줄로, 자리 옮기기), `apply.rs`(받아들이기·되돌리기) |
+| `corrections/` | 교정본 주고받기 ([corrections.md](corrections.md)): `sent.rs`(보낸 기록), `compare.rs`(문단·어절·글자 비교, 종류 나누기), `review.rs`(교정본과 보낸 원고 비교, 남은 곳을 지금 원고에 다시 놓기 `current_review`), `flat.rs`(회차를 글자 줄로, 자리 옮기기), `apply.rs`(받아들이기·되돌리기). 화면은 `workspace/ExportDialog.tsx`(보내기), `Exchanges.tsx`(목록), `ReviewPane.tsx`(검토 탭), `store/exchange.ts`, `lib/review.ts` |
 | `cards.rs`, `notes.rs`, `search.rs`, `snapshot.rs`, `trash.rs` | 설정집, 메모, 찾기·바꾸기, 기록, 휴지통 |
-| `journal.rs` | 창작 일지: 기기별 `.journal/<기기 id>.jsonl`, 해시 사슬, 저장·기록·가져오기 항목(각 모듈이 `journal::note`로 남김), 확인(`verify`), 요약, 기기 설정(`Settings`). 화면 쪽은 `editor/journal.ts`(쓰기 묶음·붙여넣기), `store/journal.ts`(켜고 끄기·첫 알림), `workspace/settings/JournalField.tsx`, 명령은 `commands/journal.rs` |
+| `journal.rs` | 창작 일지: 기기별 `.journal/<기기 id>.jsonl`, 해시 사슬, 저장·기록·가져오기·교정 주고받기 항목(각 모듈이 `journal::note`로 남김), 확인(`verify`), 요약, 기기 설정(`Settings`). 화면 쪽은 `editor/journal.ts`(쓰기 묶음·붙여넣기), `store/journal.ts`(켜고 끄기·첫 알림), `workspace/settings/JournalField.tsx`, 명령은 `commands/journal.rs` |
 | `copies/`, `changes.rs`, `places.rs`, `recent.rs` | 다른 기기: `scan.rs`(동기화 사본 찾기), `merge.rs`(project.json 사본 합치기), 바뀐 파일 알아보기, 저장 위치 찾기, 최근 작품 |
 
 ### 나머지 crate
@@ -37,10 +37,10 @@
 | `api/tauri.ts` | Rust 명령 호출. 명령 이름 하나에 함수 하나 |
 | `api/types/` | Rust와 주고받는 타입, 영역별 파일. `backend.ts`가 명령 목록(`Backend`) |
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
-| `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web …), 화면은 `store/index.ts`에서 가져다 씀 |
+| `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange …), 화면은 `store/index.ts`에서 가져다 씀 |
 | `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
-| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`) |
-| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`) |
+| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`). 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
+| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`) |
 | `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
 
 ## 자주 하는 작업
