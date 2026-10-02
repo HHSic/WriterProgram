@@ -6,6 +6,8 @@ import { STATUS_LABEL, docNoun, statusesFor } from '../lib/labels';
 import {
   addDoc,
   addNote,
+  aiReady,
+  askAi,
   moveDoc,
   openDialog,
   openTable,
@@ -102,6 +104,19 @@ export function docMenu(ctx: SidebarMenuContext, doc: DocSummary, part: PartView
           },
         }),
     });
+  }
+  if (!planning) {
+    // Reading help only: nothing is sent before the writer sees it, and
+    // nothing in the manuscript changes.
+    const ready = aiReady();
+    const hint = ready ? undefined : 'AI 연결이 꺼져 있음';
+    items.push(
+      { separator: true },
+      { heading: 'AI 점검' },
+      { label: `${noun} 요약…`, disabled: !ready, hint, onSelect: () => void askAi('summary', [doc.id]) },
+      { label: '설정 모순 점검…', disabled: !ready, hint, onSelect: () => void askAi('check', [doc.id]) },
+    );
+    if (!ready) items.push({ label: 'AI 연결 설정…', onSelect: () => openDialog({ kind: 'ai' }) });
   }
   items.push({ separator: true }, ...moveItems(ctx, doc, part));
   if (!planning) {

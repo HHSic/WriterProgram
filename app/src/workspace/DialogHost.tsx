@@ -1,6 +1,7 @@
 // Shows the one open dialog (store `dialog`).
 
 import { NewProjectDialog } from '../screens/NewProjectDialog';
+import { AiDialog } from './AiDialog';
 import { CompareDialog } from './Compare';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CopiesDialog } from './Copies';
@@ -47,5 +48,7 @@ export function DialogHost() {
       return <DrivesDialog />;
     case 'driveImport':
       return <DriveImportDialog />;
+    case 'ai':
+      return <AiDialog />;
   }
 }

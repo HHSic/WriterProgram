@@ -2,6 +2,7 @@
 // crates/core). Field names follow the serde camelCase renames there.
 // One file per area; import from here (`../api/types`).
 
+export type * from './ai';
 export type * from './backend';
 export type * from './browser';
 export type * from './cards';

@@ -2,13 +2,13 @@
 
 import type { Editor } from '@tiptap/core';
 import { create } from 'zustand';
-import type { CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, SnapshotInfo } from '../api/types';
+import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, SnapshotInfo } from '../api/types';
 import type { Pane, SplitDir, Target } from '../lib/tabs';
 import { type ViewSettings, loadView } from '../lib/view';
 
 
 export type SaveState = { state: 'saved' | 'saving' | 'error'; error?: string };
-export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'records';
+export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'records' | 'ai';
 export type FindScope = 'doc' | 'part' | 'all';
 
 /** Asks the find panel to open with a search (from the sidebar or Ctrl+F). */
@@ -16,6 +16,13 @@ export interface FindRequest {
   text?: string;
   scope?: FindScope;
   focus: 'find' | 'replace';
+  nonce: number;
+}
+
+/** Asks the AI tab to get a request ready (from a chapter's menu). */
+export interface AiRequest {
+  task: AiTask;
+  docIds: string[];
   nonce: number;
 }
 
@@ -48,6 +55,8 @@ export type Dialog =
   | { kind: 'driveImport' }
   /** Moving the project folder (저장 위치 옮기기). */
   | { kind: 'move' }
+  /** AI 연결 (내 API 키): this device's AI settings. */
+  | { kind: 'ai' }
   | {
       kind: 'prompt';
       title: string;
@@ -135,6 +144,9 @@ interface AppState {
   /** 소리 내어 읽기 going on in `editor` (or, `noVoice`, asked for there with
    * no Korean voice installed). */
   reading: Reading | null;
+  /** This device's AI settings; null until read. */
+  ai: AiSettings | null;
+  aiRequest: AiRequest | null;
 }
 
 export interface Reading {
@@ -177,6 +189,8 @@ export const useApp = create<AppState>(() => ({
   syncing: false,
   webVersion: 0,
   reading: null,
+  ai: null,
+  aiRequest: null,
 }));
 
 export const set = useApp.setState;

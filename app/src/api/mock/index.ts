@@ -4,6 +4,7 @@
 // Each file next to this one holds the part of the backend for one area.
 
 import type { Backend } from '../types';
+import { aiMethods } from './ai';
 import { browserMethods } from './browser';
 import { cardMethods } from './cards';
 import { deviceMethods, otherDevice } from './devices';
@@ -40,6 +41,7 @@ export function startMockBackend(): Backend {
     ...deviceMethods,
     ...driveMethods,
     ...journalMethods,
+    ...aiMethods,
     ...browserMethods,
   };
 }
