@@ -18,6 +18,7 @@ pub mod format;
 pub mod hwpx;
 pub mod import;
 pub mod indent;
+pub mod journal;
 pub mod layout;
 pub mod markup;
 pub mod notes;
