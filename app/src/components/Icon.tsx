@@ -50,12 +50,6 @@ const PATHS = {
       <path d="M4 4v4h4" />
     </>
   ),
-  copy: (
-    <>
-      <rect x="8" y="8" width="12" height="12" rx="2" />
-      <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
-    </>
-  ),
   split: (
     <>
       <rect x="3.5" y="4.5" width="17" height="15" rx="2" />

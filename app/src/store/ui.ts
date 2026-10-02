@@ -34,12 +34,6 @@ export function allManuscript(ov: Overview): DocSummary[] {
   return ov.parts.flatMap((p) => p.docs);
 }
 
-export function root(): string {
-  const ov = get().overview;
-  if (!ov) throw new Error('no project open');
-  return ov.root;
-}
-
 /** Waits for every pending save. False when something could not be saved. */
 export async function saveEverything(): Promise<boolean> {
   await flushAll();

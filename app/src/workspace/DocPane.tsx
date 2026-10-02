@@ -1,6 +1,6 @@
 // A document in a tab of the middle column: title, synopsis and the editor.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
@@ -8,6 +8,7 @@ import { api } from '../api';
 import type { DocData, MetaPatch } from '../api/types';
 import { setCardNames } from '../editor/cards';
 import { setIndentRules } from '../editor/indent';
+import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { setWhitespaceMarks } from '../editor/marks';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
@@ -346,26 +347,12 @@ function DocHeader({
   );
 }
 
+/** The marks in the floating bar, in its order. */
+const BUBBLE_MARKS: MarkKey[] = ['bold', 'italic', 'underline', 'strike', 'dot'];
+
 /** Small toolbar that appears over selected text. */
 function FormatBubble({ editor }: { editor: Editor }) {
-  const active = useEditorState({
-    editor,
-    selector: ({ editor: e }) => ({
-      bold: e.isActive('bold'),
-      italic: e.isActive('italic'),
-      underline: e.isActive('underline'),
-      strike: e.isActive('strike'),
-      dot: e.isActive('dot'),
-    }),
-  });
-
-  const buttons: { key: keyof typeof active; label: string; glyph: ReactNode; run: () => void }[] = [
-    { key: 'bold', label: '굵게 (Ctrl+B)', glyph: <b>가</b>, run: () => editor.chain().focus().toggleBold().run() },
-    { key: 'italic', label: '기울임 (Ctrl+I)', glyph: <i>가</i>, run: () => editor.chain().focus().toggleItalic().run() },
-    { key: 'underline', label: '밑줄 (Ctrl+U)', glyph: <u>가</u>, run: () => editor.chain().focus().toggleUnderline().run() },
-    { key: 'strike', label: '취소선 (Ctrl+Shift+S)', glyph: <s>가</s>, run: () => editor.chain().focus().toggleStrike().run() },
-    { key: 'dot', label: '방점 (Ctrl+Shift+D)', glyph: <span className="dot">가</span>, run: () => editor.chain().focus().toggleDot().run() },
-  ];
+  const active = useEditorState({ editor, selector: ({ editor: e }) => activeMarks(e) });
 
   return (
     <BubbleMenu
@@ -393,20 +380,24 @@ function FormatBubble({ editor }: { editor: Editor }) {
         메모
       </button>
       <span className="bubble-sep" aria-hidden="true" />
-      {buttons.map((b) => (
-        <button
-          key={b.key}
-          type="button"
-          className={active[b.key] ? 'on' : ''}
-          aria-label={b.label}
-          aria-pressed={active[b.key]}
-          title={b.label}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={b.run}
-        >
-          {b.glyph}
-        </button>
-      ))}
+      {BUBBLE_MARKS.map((key) => {
+        const b = MARK_BUTTONS[key];
+        const label = `${b.name} (${b.keys})`;
+        return (
+          <button
+            key={key}
+            type="button"
+            className={active[key] ? 'on' : ''}
+            aria-label={label}
+            aria-pressed={active[key]}
+            title={label}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => toggleMark(editor, key)}
+          >
+            {b.glyph}
+          </button>
+        );
+      })}
     </BubbleMenu>
   );
 }

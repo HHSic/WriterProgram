@@ -11,8 +11,8 @@ import { openMenu } from '../components/Menu';
 import { markStarts, markedText, selectNote } from '../editor/notes';
 import { useAutoHeight } from '../lib/autoHeight';
 import { errorText, num, timeLabel } from '../lib/format';
-import { registerFlusher } from '../lib/flush';
 import { UNTITLED, docNoun, docNumber } from '../lib/labels';
+import { useDebouncedSave } from '../lib/useDebouncedSave';
 import {
   addNote,
   findDoc,
@@ -84,41 +84,22 @@ export function NoteItem({
   const [reply, setReply] = useState('');
   const [tag, setTag] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const pending = useRef<Note | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const flushRef = useRef<() => Promise<void>>(async () => {});
   const box = useRef<HTMLElement>(null);
+  const { pending, schedule } = useDebouncedSave<Note>(
+    {
+      save: async (next) => {
+        patchNote(await api.noteSave(root, next));
+        setError(null);
+      },
+      onError: (e) => setError(errorText(e)),
+    },
+    [root],
+  );
 
   // Take changes saved elsewhere (the same note open in 메모함 and the tab).
   useEffect(() => {
     if (!pending.current) setDraft(note);
   }, [note]);
-
-  useEffect(() => {
-    let chain: Promise<void> = Promise.resolve();
-    const flush = () => {
-      clearTimeout(timer.current);
-      const next = pending.current;
-      if (!next) return chain;
-      pending.current = null;
-      chain = chain.then(async () => {
-        try {
-          patchNote(await api.noteSave(root, next));
-          setError(null);
-        } catch (e) {
-          pending.current ??= next;
-          setError(errorText(e));
-        }
-      });
-      return chain;
-    };
-    flushRef.current = flush;
-    const unregister = registerFlusher(flush);
-    return () => {
-      unregister();
-      void flush();
-    };
-  }, [root]);
 
   useEffect(() => {
     if (focused) box.current?.scrollIntoView({ block: 'nearest' });
@@ -132,9 +113,7 @@ export function NoteItem({
     // Keep the saved text of the marked stretch up to date.
     if (typeof now === 'string') next.quote = now;
     setDraft(next);
-    pending.current = next;
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flushRef.current(), soon ? 0 : 600);
+    schedule(next, soon ? 0 : 600);
   };
 
   const addReply = () => {

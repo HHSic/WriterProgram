@@ -2,8 +2,8 @@
 
 import { api } from '../api';
 import type { ManuscriptFormat, Overview, ProjectPatch } from '../api/types';
-import { get, set } from './state';
-import { allManuscript, findDoc, openDialog, root, saveEverything, showToast, toastError } from './ui';
+import { get, root, set } from './state';
+import { openDialog, saveEverything, showToast, toastError } from './ui';
 import { commit, initialLayout, resetTabs } from './tabs';
 import { refreshCardCounts } from './cards';
 import { loadNotes } from './notes';
@@ -12,26 +12,6 @@ import { loadLink, stopAutoSync } from './drives';
 
 // ---------------------------------------------------------------------------
 // Projects
-
-const LAST_DOC_KEY = 'wp.lastDoc.';
-
-export function rememberDoc(projectId: string, docId: string) {
-  try {
-    localStorage.setItem(LAST_DOC_KEY + projectId, docId);
-  } catch {
-    // Not critical.
-  }
-}
-
-export function initialDoc(ov: Overview): string | null {
-  try {
-    const last = localStorage.getItem(LAST_DOC_KEY + ov.project.id);
-    if (last && findDoc(ov, last)) return last;
-  } catch {
-    // Fall through to the first chapter.
-  }
-  return allManuscript(ov)[0]?.id ?? ov.planning[0]?.id ?? null;
-}
 
 export function enterProject(ov: Overview) {
   stopAutoSync();

@@ -7,9 +7,13 @@ import type { Editor } from '@tiptap/core';
 import type { ReactNode } from 'react';
 import { Icon } from '../components/Icon';
 import { openMenu, type MenuItem } from '../components/Menu';
+import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { firstLineAt, marginsAt } from '../editor/paragraph';
 import { addTextNote, openFind } from '../store';
 import { openSymbols } from './Symbols';
+
+/** The marks in the 편집 도구줄, in its order (방점 next to 굵게). */
+const TOOLBAR_MARKS: MarkKey[] = ['bold', 'dot', 'italic', 'underline', 'strike'];
 
 /** 문단 여백 for the paragraphs the cursor or selection is in. */
 export function marginMenu(editor: Editor): MenuItem[] {
@@ -49,11 +53,7 @@ export function EditToolbar({ editor }: { editor: Editor }) {
     editor,
     selector: ({ editor: e }) => ({
       editable: e.isEditable,
-      bold: e.isActive('bold'),
-      italic: e.isActive('italic'),
-      underline: e.isActive('underline'),
-      strike: e.isActive('strike'),
-      dot: e.isActive('dot'),
+      ...activeMarks(e),
       undo: e.can().undo(),
       redo: e.can().redo(),
     }),
@@ -89,11 +89,10 @@ export function EditToolbar({ editor }: { editor: Editor }) {
       {tool('undo', '되돌리기 (Ctrl+Z)', <Icon name="undo" size={17} />, () => chain().undo().run(), { disabled: !state.undo })}
       {tool('redo', '다시 하기 (Ctrl+Y)', <Icon name="redo" size={17} />, () => chain().redo().run(), { disabled: !state.redo })}
       <span className="tool-sep" aria-hidden="true" />
-      {tool('bold', '굵게', <b>가</b>, () => chain().toggleBold().run(), { on: state.bold })}
-      {tool('dot', '방점', <span className="dot">가</span>, () => chain().toggleDot().run(), { on: state.dot })}
-      {tool('italic', '기울임', <i>가</i>, () => chain().toggleItalic().run(), { on: state.italic })}
-      {tool('underline', '밑줄', <u>가</u>, () => chain().toggleUnderline().run(), { on: state.underline })}
-      {tool('strike', '취소선', <s>가</s>, () => chain().toggleStrike().run(), { on: state.strike })}
+      {TOOLBAR_MARKS.map((key) => {
+        const b = MARK_BUTTONS[key];
+        return tool(key, b.name, b.glyph, () => toggleMark(editor, key), { on: state[key] });
+      })}
       <span className="tool-sep" aria-hidden="true" />
       {tool('memo', '고른 글에 메모 달기', <Icon name="note" size={17} />, () => void addTextNote())}
       <button

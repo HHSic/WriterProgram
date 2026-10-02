@@ -172,3 +172,10 @@ export const useApp = create<AppState>(() => ({
 
 export const set = useApp.setState;
 export const get = useApp.getState;
+
+/** The open project's folder; throws when none is open. */
+export function root(): string {
+  const ov = get().overview;
+  if (!ov) throw new Error('no project open');
+  return ov.root;
+}
