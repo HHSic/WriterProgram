@@ -1,0 +1,92 @@
+# 코드 지도 (2026-10-02)
+
+어디를 고치면 되는지, 여럿이 동시에 작업할 때 어디서 나뉘는지 정리한 문서. 파일 형식과 설계 이유는 [architecture.md](architecture.md).
+
+원칙: **영역 하나 = 폴더나 파일 하나.** 큰 파일은 `mod.rs`(Rust)나 `index.ts`(TypeScript)가 바깥 이름을 그대로 다시 내보내므로, 파일을 나눠도 부르는 쪽 경로(`writer_core::hwpx::hwpx_bytes`, `../store`, `../api/types`)는 바뀌지 않는다.
+
+## Rust
+
+### `crates/core` (writer-core): 화면과 무관한 모든 것
+
+| 모듈 | 하는 일 |
+|---|---|
+| `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기) |
+| `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기 재시도 |
+| `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
+| `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수, 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝) |
+| `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |
+| `export.rs`, `docx/`, `hwpx/`, `xml.rs` | 내보내기. docx는 `layout.rs`(머리글·꼬리글), `styles.rs`, `body.rs`. HWPX는 `header.rs`(글자·문단 모양, 스타일), `section.rs`(본문, 머리말·꼬리말 조판 부호). `xml.rs`는 둘이 함께 쓰는 이스케이프·zip 묶기·시각 |
+| `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모) |
+| `cards.rs`, `notes.rs`, `search.rs`, `snapshot.rs`, `trash.rs` | 설정집, 메모, 찾기·바꾸기, 기록, 휴지통 |
+| `copies/`, `changes.rs`, `places.rs`, `recent.rs` | 다른 기기: `scan.rs`(동기화 사본 찾기), `merge.rs`(project.json 사본 합치기), 바뀐 파일 알아보기, 저장 위치 찾기, 최근 작품 |
+
+### 나머지 crate
+
+| 위치 | 하는 일 |
+|---|---|
+| `crates/sync` (writer-sync) | 드라이브와 맞추기: `engine.rs`(이 기기·드라이브·지난번 셋을 비교), `base.rs`(지난번 모습), `remote.rs`(드라이브가 해 줘야 할 일), `folder.rs`(흉내 드라이브), `providers/`(`config.rs` 앱 등록·주소, `session.rs` 로그인 세션, 드라이브별 파일), `oauth.rs`(PKCE 로그인), `http.rs`(ureq 감싸기), `secrets.rs`(자격 증명), `accounts.rs`(연결·맞추는 작품 목록) |
+| `crates/revise` (writer-revise) | 퇴고 점검 시제품: `rules/`에 점검 종류별 파일(`repetition.rs` 반복, `rhythm.rs` 문장 리듬, `expression.rs` 표현, `dialogue.rs` 대사, `names.rs` 이름) |
+| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, output, search, cards, notes, sync_folder), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
+
+## TypeScript (`app/src`)
+
+| 위치 | 하는 일 |
+|---|---|
+| `api/tauri.ts` | Rust 명령 호출. 명령 이름 하나에 함수 하나 |
+| `api/types/` | Rust와 주고받는 타입, 영역별 파일. `backend.ts`가 명령 목록(`Backend`) |
+| `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
+| `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web …), 화면은 `store/index.ts`에서 가져다 씀 |
+| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`) |
+| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/` |
+| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`) |
+| `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
+
+## 자주 하는 작업
+
+**Rust 명령 하나 추가**
+1. core에 함수 (`crates/core/src/<영역>`)
+2. `app/src-tauri/src/commands/<영역>.rs`에 `#[tauri::command]`
+3. `app/src-tauri/src/lib.rs` 명령 목록에 전체 경로로 한 줄
+4. `api/types/backend.ts`에 메서드, `api/tauri.ts`에 호출, `api/mock/<영역>.ts`에 흉내
+
+**화면 동작 하나 추가**: `store/<영역>.ts`에 함수, 화면에서 쓰면 `store/index.ts`에 이름 추가.
+
+**원고 서식 항목 하나 추가**: `format/mod.rs`(값·검사·`#[serde(default)]`) → `hwpx/section.rs`·`docx/layout.rs`(쓰기) → `import/page.rs`(한글 파일에서 읽기, 해당되면) → `api/types/format.ts` → `workspace/settings/`(화면) → `api/mock/presets.ts`.
+
+## 여럿이 동시에 작업할 때
+
+- 영역 파일이 겹치지 않게 나눈다. 예: 한 사람은 `import/`·`ImportDialog.tsx`, 다른 사람은 `drives/`·`store/drives.ts`.
+- 함께 고치는 곳은 목록 파일뿐이다: `lib.rs`의 명령 목록, `store/index.ts`, `api/types/index.ts`, `api/types/backend.ts`, `styles/index.css`. 한 줄씩 더하는 곳이라 충돌이 나도 풀기 쉽다.
+- 큰 일은 브랜치나 git worktree를 따로 써서 하고, 합친 뒤 아래 검사를 다 돌린다.
+
+## 검사
+
+```bash
+cargo test --workspace
+cargo clippy --workspace --all-targets
+cargo fmt -p writer-core -p writer-sync -p writer-app --check
+npm --prefix app run typecheck
+npm --prefix app test
+```
+
+`cargo fmt --all`은 쓰지 않는다. `crates/revise`의 기존 파일은 손으로 맞춘 모양이라 통째로 바뀐다.
+
+## 라이브러리를 쓴 곳과 일부러 직접 짠 곳
+
+이미 쓰는 것: quick-xml(XML 읽기·엔티티), zip, chrono(시각 글), encoding_rs(EUC-KR 등), sha2, regex, ureq(HTTP), base64·getrandom(로그인), notify-debouncer-mini(폴더 감시), keyring-core, lindera(형태소), Tiptap, zustand.
+
+직접 짠 채로 둔 것과 이유:
+
+| 코드 | 이유 |
+|---|---|
+| `core/xml.rs` 이스케이프 | quick-xml은 XML이 금지한 글자를 지우지 않고 줄바꿈을 다르게 써서 파일이 달라진다 |
+| `import/xml.rs` 문자 참조 | quick-xml은 `&#X41;`(대문자 X) 같은 참조를 거부해, 한글 파일의 글이 빠질 수 있다 |
+| `store::new_id` | 12자 id가 파일 이름이라 형식을 바꿀 수 없다 |
+| 문서 앞머리 읽기·쓰기 | 모르는 키를 순서 그대로 남겨야 한다(YAML 라이브러리는 파일을 다시 씀) |
+| `count.rs` 빈칸 목록, `editor/counts.ts` | Rust와 화면 글자 수가 같아야 해서 같은 목록을 둔다 |
+| `sync/oauth.rs` | 140줄로 작고 RFC 시험값으로 검사한다. oauth2 crate는 의존성이 늘고 ureq 3을 따로 붙여야 한다 |
+| keyring 나눠 담기 (`drives/keyring.rs`) | Windows 자격 증명 2560바이트 한도를 넘는 토큰을 나누는 crate가 없다 |
+| `lib/diff.ts` | 문단 짝짓기가 앱에 맞춰져 있고, 글자 비교만 jsdiff로 바꿔도 줄어드는 양이 작다 |
+| 끌어서 옮기기 (Sidebar, 탭, 개요 표) | 마우스와 길게 누르기 메뉴가 엮여 있어 dnd-kit로 바꾸면 위험이 크다 |
+
+나중에 할 일: `trash.rs`·`copies/`의 파일 이름 바꾸기에는 재시도가 없다(동기화 프로그램이 파일을 잡고 있으면 실패할 수 있음). `commands/`는 파일 작업을 async 안에서 바로 하고 `drives/`는 `spawn_blocking`을 쓴다. 둘을 한쪽으로 맞출지 정해야 한다.
