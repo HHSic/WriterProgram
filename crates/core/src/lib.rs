@@ -26,6 +26,7 @@ pub mod markup;
 pub mod notes;
 pub mod places;
 pub mod project;
+pub mod proof;
 pub mod recent;
 pub mod search;
 pub mod snapshot;

@@ -346,4 +346,4 @@ pub fn finish(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
