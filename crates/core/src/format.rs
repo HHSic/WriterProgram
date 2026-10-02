@@ -151,14 +151,6 @@ impl RunningHead {
         self.is_on()
             && (self.align == HeadAlign::Outside || self.content == HeadContent::TitleChapter)
     }
-
-    /// Changes with the chapter.
-    pub fn follows_chapter(&self) -> bool {
-        matches!(
-            self.content,
-            HeadContent::Chapter | HeadContent::TitleChapter
-        )
-    }
 }
 
 /// 꼬리말: text the writer typed, shown at the bottom of every page.
@@ -618,7 +610,7 @@ mod tests {
 
         let head: RunningHead =
             serde_json::from_str(r#"{"content":"titleChapter","align":"outside"}"#).unwrap();
-        assert!(head.facing() && head.follows_chapter());
+        assert!(head.facing());
         assert!(head.skip_chapter_first);
     }
 
