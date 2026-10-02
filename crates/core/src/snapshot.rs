@@ -23,7 +23,9 @@ pub const SNAPSHOT_DIR: &str = ".snapshots";
 /// this device's text that could not be saved over another device's,
 /// another device's text replaced by this one's, this device's text before
 /// another device's was loaded, and the text before a copy replaced it.
-pub const KINDS: [&str; 9] = [
+/// `before-corrections` is the text before an editor's corrections were
+/// accepted (corrections/).
+pub const KINDS: [&str; 10] = [
     "auto",
     "manual",
     "before-replace",
@@ -33,6 +35,7 @@ pub const KINDS: [&str; 9] = [
     "other-device",
     "before-reload",
     "before-copy",
+    "before-corrections",
 ];
 
 /// Kinds removed after a while, like automatic records.

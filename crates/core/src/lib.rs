@@ -9,6 +9,7 @@
 pub mod cards;
 pub mod changes;
 pub mod copies;
+pub mod corrections;
 pub mod count;
 pub mod doc;
 pub mod docx;
