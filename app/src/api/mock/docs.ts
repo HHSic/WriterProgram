@@ -1,0 +1,148 @@
+// Chapters and planning documents: adding, moving, loading, saving, records (기록) and the trash.
+
+import type { Backend, Card, Note, TrashItem } from '../types';
+import { mockPages } from './presets';
+import { clone, counts, doc, newDoc, now, project, record, revOf, wait, type MockDoc } from './state';
+
+export const docMethods = {
+  async docAdd(root, spec) {
+    const p = project(root);
+    const section = spec.section ?? 'manuscript';
+    const d = newDoc(p, section, spec.title?.trim() ?? '');
+    if (section === 'planning') {
+      const at = spec.after ? p.planning.indexOf(spec.after) : -1;
+      p.planning.splice(at >= 0 ? at + 1 : p.planning.length, 0, d.meta.id);
+    } else {
+      const withAfter = spec.after ? p.parts.find((x) => x.docs.includes(spec.after!)) : undefined;
+      if (withAfter) withAfter.docs.splice(withAfter.docs.indexOf(spec.after!) + 1, 0, d.meta.id);
+      else (p.parts.find((x) => x.id === spec.partId) ?? p.parts[p.parts.length - 1]).docs.push(d.meta.id);
+    }
+    return d.meta.id;
+  },
+  async docMove(root, docId, partId, index) {
+    const p = project(root);
+    const fromPart = p.parts.find((x) => x.docs.includes(docId));
+    if (fromPart && partId) {
+      const to = p.parts.find((x) => x.id === partId);
+      if (!to) throw '부를 찾을 수 없음';
+      fromPart.docs = fromPart.docs.filter((x) => x !== docId);
+      to.docs.splice(Math.min(index, to.docs.length), 0, docId);
+    } else if (!fromPart && !partId) {
+      p.planning = p.planning.filter((x) => x !== docId);
+      p.planning.splice(Math.min(index, p.planning.length), 0, docId);
+    } else {
+      throw '원고와 기획 문서 사이에서는 옮길 수 없음';
+    }
+  },
+  async docTrash(root, docId) {
+    const p = project(root);
+    const d = doc(p, docId);
+    const part = p.parts.find((x) => x.docs.includes(docId));
+    const index = part ? part.docs.indexOf(docId) : p.planning.indexOf(docId);
+    if (part) part.docs = part.docs.filter((x) => x !== docId);
+    else p.planning = p.planning.filter((x) => x !== docId);
+    p.docs.delete(docId);
+    const item: TrashItem = {
+      id: `${Date.now()}-${docId}`,
+      docId,
+      section: d.section,
+      title: d.meta.title,
+      deletedAt: now(),
+      partId: part?.id ?? null,
+      index,
+      chars: counts(d.body).withSpaces,
+    };
+    p.trash.unshift({ item, doc: d });
+    return clone(item);
+  },
+  async docLoad(root, docId) {
+    await wait();
+    const d = doc(project(root), docId);
+    return { meta: clone(d.meta), body: clone(d.body), counts: counts(d.body), rev: revOf(d.body) };
+  },
+  async docSave(root, docId, b, base, force) {
+    await wait();
+    const p = project(root);
+    const d = doc(p, docId);
+    const c = counts(b);
+    const pages = d.section === 'manuscript' ? mockPages(c.withSpaces, p.info.manuscriptFormat) : null;
+    const disk = revOf(d.body);
+    if (revOf(b) === disk) return { counts: c, pages, snapshot: null, rev: disk, conflict: false };
+    const elsewhere = !!base && base !== disk;
+    if (elsewhere && !force) {
+      const snapshot = record(p, { ...d, body: clone(b) }, 'this-device', '');
+      return { counts: c, pages, snapshot, rev: disk, conflict: true };
+    }
+    const snapshot = elsewhere ? record(p, d, 'other-device', '') : null;
+    d.body = clone(b);
+    d.modified = now();
+    return { counts: c, pages, snapshot, rev: revOf(b), conflict: false };
+  },
+  async docKeep(root, docId, b, kind) {
+    const p = project(root);
+    const d = doc(p, docId);
+    const newest = p.records.get(docId)?.[0];
+    if (newest && revOf(newest.body) === revOf(b)) return null;
+    return record(p, { ...d, body: clone(b) }, kind, '');
+  },
+  async docUpdateMeta(root, docId, patch) {
+    const d = doc(project(root), docId);
+    if (patch.title !== undefined) d.meta.title = patch.title.trim();
+    if (patch.synopsis !== undefined) d.meta.synopsis = patch.synopsis.trim();
+    if (patch.status !== undefined) d.meta.status = patch.status;
+    if (patch.target !== undefined) d.meta.target = patch.target && patch.target > 0 ? patch.target : null;
+    d.modified = now();
+    return clone(d.meta);
+  },
+  async snapshotList(root, docId) {
+    await wait();
+    return (project(root).records.get(docId) ?? []).map((r) => clone(r.info));
+  },
+  async snapshotCreate(root, docId, name) {
+    const p = project(root);
+    return record(p, doc(p, docId), 'manual', name);
+  },
+  async snapshotLoad(root, docId, snapshotId) {
+    const p = project(root);
+    const r = (p.records.get(docId) ?? []).find((x) => x.info.id === snapshotId);
+    if (!r) throw '기록을 찾을 수 없음';
+    return { meta: clone(doc(p, docId).meta), body: clone(r.body), counts: r.info.counts, rev: revOf(r.body) };
+  },
+  async snapshotRestore(root, docId, snapshotId) {
+    const p = project(root);
+    const d = doc(p, docId);
+    const r = (p.records.get(docId) ?? []).find((x) => x.info.id === snapshotId);
+    if (!r) throw '기록을 찾을 수 없음';
+    const before = record(p, d, 'before-restore', '');
+    d.body = clone(r.body);
+    return before;
+  },
+  async trashList(root) {
+    return project(root).trash.map((t) => clone(t.item));
+  },
+  async trashRestore(root, trashId) {
+    const p = project(root);
+    const t = p.trash.find((x) => x.item.id === trashId);
+    if (!t) throw '휴지통 항목을 찾을 수 없음';
+    if (t.item.section === 'cards') {
+      const card = (t.doc as MockDoc & { card?: Card }).card;
+      if (card) p.cards.set(card.id, card);
+      p.trash = p.trash.filter((x) => x !== t);
+      return;
+    }
+    if (t.item.section === 'notes') {
+      const note = (t.doc as MockDoc & { note?: Note }).note;
+      if (note) p.notes.set(note.id, note);
+      p.trash = p.trash.filter((x) => x !== t);
+      return;
+    }
+    p.docs.set(t.item.docId, t.doc);
+    if (t.item.section === 'planning') p.planning.splice(t.item.index, 0, t.item.docId);
+    else (p.parts.find((x) => x.id === t.item.partId) ?? p.parts[p.parts.length - 1]).docs.splice(t.item.index, 0, t.item.docId);
+    p.trash = p.trash.filter((x) => x !== t);
+  },
+  async trashDelete(root, trashId) {
+    const p = project(root);
+    p.trash = p.trash.filter((x) => x.item.id !== trashId);
+  },
+} satisfies Partial<Backend>;
