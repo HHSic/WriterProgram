@@ -42,7 +42,9 @@ fn sample(dir: &Path) -> (PathBuf, String) {
         ("나이".into(), "29".into()),
         ("외모".into(), "검은 눈".into()),
     ];
+    person.description = "강윤석의 오랜 친구.".into();
     cards::save(&root, &person).unwrap();
+    cards::create(&root, "person", "강윤석").unwrap();
     let mut place = cards::create(&root, "place", "달빛 서점").unwrap();
     place.fields = vec![("위치".into(), "골목 끝".into())];
     cards::save(&root, &place).unwrap();
@@ -75,8 +77,12 @@ fn check_goes_out_masked_and_comes_back_named() {
     for name in ["서하", "윤 사장", "달빛 서점"] {
         assert!(!preview.text.contains(name), "{name} was sent");
     }
-    // A card not in the chapter is not sent.
+    // A card not in the chapter is not sent, but its name is masked where
+    // a sent card mentions it.
     assert!(!preview.text.contains("대여"));
+    assert!(preview.text.contains("설명: 인물C의 오랜 친구."));
+    assert!(!preview.text.contains("강윤석"));
+    assert!(!preview.text.contains("### 인물C"));
 
     let client = Client::new(Provider::Anthropic, "sk-ant-test", stand_in.base.clone());
     let answer = client.ask("claude-sonnet-5-5", &out.ask).unwrap();
