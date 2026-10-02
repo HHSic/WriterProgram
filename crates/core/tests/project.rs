@@ -262,8 +262,9 @@ fn tidying_records_removes_only_old_automatic_ones() {
     for stem in [&auto_20, &auto_30, &reload_100] {
         assert!(!kept.contains(stem), "{stem} should go: {kept:?}");
     }
-    assert_eq!(stems(&other), [other_30.clone()]);
-    assert!(!stems(&other).contains(&other_40));
+    // The other chapter keeps its newest automatic record only.
+    assert_eq!(stems(&other), [other_30]);
+    assert!(other_40 < stems(&other)[0]);
 
     // Nothing more to tidy.
     assert_eq!(project::sizes(&root).unwrap().tidy_frees, 0);
