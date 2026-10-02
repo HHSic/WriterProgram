@@ -9,7 +9,7 @@ import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { MoveDialog } from './MoveProject';
 import { PromptDialog } from './PromptDialog';
-import { ProjectSettingsDialog } from './ProjectSettings';
+import { ProjectSettingsDialog } from './settings/ProjectSettingsDialog';
 import { SymbolsDialog } from './Symbols';
 import { TrashDialog } from './TrashDialog';
 import { ViewDialog } from './ViewDialog';
