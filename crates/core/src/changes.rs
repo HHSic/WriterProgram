@@ -141,5 +141,7 @@ mod tests {
             Some(Change::Trash)
         );
         assert_eq!(describe(&p("exports/a.txt"), Some(b"")), None);
+        // The creation journal is not something the screen shows.
+        assert_eq!(describe(&p(".journal/k7q2m9x4t1ab.jsonl"), Some(b"")), None);
     }
 }

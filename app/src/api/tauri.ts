@@ -81,6 +81,11 @@ export const tauriBackend: Backend = {
     };
   },
   driveStatus: () => invoke('drive_status'),
+  journalSettings: () => invoke('journal_settings'),
+  journalSet: (patch) => invoke('journal_set', { enabled: patch.enabled ?? null, noticed: patch.noticed ?? null }),
+  journalEvent: (root, event) => invoke('journal_event', { root, event }),
+  journalSummary: (root) => invoke('journal_summary', { root }),
+  journalVerify: (root) => invoke('journal_verify', { root }),
   driveConnect: (provider) => invoke('drive_connect', { provider }),
   driveCancel: () => invoke('drive_cancel'),
   driveDisconnect: (provider) => invoke('drive_disconnect', { provider }),

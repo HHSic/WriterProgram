@@ -26,7 +26,7 @@ use crate::layout::PageMetrics;
 use crate::markup::{Block, parse_body, write_body};
 use crate::project::{MANUSCRIPT_DIR, PLANNING_DIR};
 use crate::store::{atomic_write, now_iso, read_text, rev_of};
-use crate::{Error, Result, project, snapshot};
+use crate::{Error, Result, journal, project, snapshot};
 
 /// Status values. Common ones first, then web novel, then print.
 pub const STATUSES: [&str; 10] = [
@@ -334,11 +334,22 @@ pub fn save_body(
     } else {
         snapshot::auto_if_due(root, &current, auto_record_every)?
     };
+    let before = count_blocks(&current.body).with_spaces;
     let saved = DocFile {
         meta: current.meta,
         body,
     };
     write_doc_file(&path, &saved)?;
+    journal::note(
+        root,
+        journal::Entry::Save(journal::Save {
+            doc: saved.meta.id.clone(),
+            body: journal::fingerprint(write_body(&saved.body).as_bytes()),
+            chars: counts.with_spaces,
+            added: counts.with_spaces.saturating_sub(before),
+            removed: before.saturating_sub(counts.with_spaces),
+        }),
+    );
     Ok(SaveOutcome {
         counts,
         pages,

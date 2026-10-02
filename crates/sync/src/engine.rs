@@ -62,14 +62,20 @@ struct Here {
     stamp: Option<(u64, i64)>,
 }
 
+/// Hidden folders that travel with the project: records, trash and the
+/// creation journal (one file per device, so both sides never change the same
+/// one).
+const HIDDEN_KEPT: [&str; 3] = [".snapshots", ".trash", ".journal"];
+
 /// Which files belong to the project on a drive: everything but temporary
-/// files, hidden folders other than records and trash, and system files.
+/// files, hidden folders other than records, trash and the journal, and
+/// system files.
 fn wanted(rel: &str) -> bool {
     let parts: Vec<&str> = rel.split('/').collect();
     let (name, dirs) = parts.split_last().expect("at least a name");
     let hidden_dir = dirs
         .iter()
-        .any(|d| d.starts_with('.') && *d != ".snapshots" && *d != ".trash");
+        .any(|d| d.starts_with('.') && !HIDDEN_KEPT.contains(d));
     !hidden_dir
         && !name.starts_with('.')
         && !name.starts_with("~$")
@@ -103,7 +109,7 @@ fn scan(root: &Path, dir: &Path, base: &Base, out: &mut BTreeMap<String, Here>) 
         };
         if meta.is_dir() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if !name.starts_with('.') || name == ".snapshots" || name == ".trash" {
+            if !name.starts_with('.') || HIDDEN_KEPT.contains(&name.as_str()) {
                 scan(root, &path, base, out)?;
             }
             continue;
@@ -434,6 +440,7 @@ mod tests {
         assert!(wanted("manuscript/abc.md"));
         assert!(wanted(".snapshots/abc/20260928-101500-000.auto.md"));
         assert!(wanted(".trash/x/item.json"));
+        assert!(wanted(".journal/k7q2m9x4t1ab.jsonl"));
         assert!(!wanted("manuscript/.abc.md.x1.tmp"));
         assert!(!wanted(".git/config"));
         assert!(!wanted("desktop.ini"));

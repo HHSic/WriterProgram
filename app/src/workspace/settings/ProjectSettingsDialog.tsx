@@ -10,6 +10,7 @@ import { KIND_LABEL, docNoun } from '../../lib/labels';
 import { closeDialog, openDialog, toastError, updateProject, useApp, type SettingsTab } from '../../store';
 import { ProjectDriveField } from '../Drives';
 import { FormatEditor } from './FormatEditor';
+import { JournalField } from './JournalField';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'basic', label: '기본 정보' },
@@ -131,6 +132,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
             )}
           </div>
           <ProjectDriveField />
+          <JournalField root={ov.root} />
         </div>
       )}
 

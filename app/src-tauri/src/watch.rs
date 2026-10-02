@@ -14,6 +14,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 use writer_core::changes::{self, Change};
 use writer_core::copies;
+use writer_core::journal;
 use writer_core::store::rev_of;
 
 use crate::state::AppState;
@@ -78,6 +79,11 @@ pub fn start(app: &AppHandle, root: &str) -> Result<Watching, String> {
             let Ok(rel) = path.strip_prefix(&root_path) else {
                 continue;
             };
+            // The creation journal grows with every save and is nothing the
+            // screen shows: not worth reading.
+            if rel.starts_with(journal::JOURNAL_DIR) {
+                continue;
+            }
             let bytes = if path.is_dir() {
                 None
             } else {

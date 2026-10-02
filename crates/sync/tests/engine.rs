@@ -266,3 +266,34 @@ fn the_base_survives_a_restart() {
     fs::write(a.root.join("manuscript").join(".x.md.123.tmp"), "half").unwrap();
     assert!(a2.sync(&drive).uploaded.is_empty());
 }
+
+#[test]
+fn each_device_journal_travels_without_copies() {
+    use writer_core::journal::{self, Entry, Paste};
+    let (_dir, drive, mut a, mut b) = setup();
+    let paste = |chars| {
+        Entry::Paste(Paste {
+            doc: "d1".into(),
+            chars,
+            outside: true,
+        })
+    };
+    journal::append(&a.root, "devaaaaaaaaa", &paste(100)).unwrap();
+    a.sync(&drive);
+    b.sync(&drive);
+    // Both write at the same time, each to its own file.
+    journal::append(&a.root, "devaaaaaaaaa", &paste(200)).unwrap();
+    journal::append(&b.root, "devbbbbbbbbb", &paste(300)).unwrap();
+    let up = b.sync(&drive);
+    assert!(
+        up.uploaded
+            .contains(&".journal/devbbbbbbbbb.jsonl".to_string())
+    );
+    let report = a.sync(&drive);
+    assert!(report.copies.is_empty(), "{report:?}");
+    b.sync(&drive);
+    assert_eq!(files(&a.root), files(&b.root));
+    let check = journal::verify(&b.root).unwrap();
+    assert!(check.ok);
+    assert_eq!(check.files.len(), 2);
+}

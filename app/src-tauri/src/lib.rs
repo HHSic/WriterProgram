@@ -17,6 +17,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(state)
         .manage(drives::connect::DriveState::default())
+        .setup(|app| {
+            commands::journal::init(app.handle());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::project::recent_list,
             commands::project::recent_remove,
@@ -68,6 +72,11 @@ pub fn run() {
             commands::notes::note_create,
             commands::notes::note_save,
             commands::notes::note_trash,
+            commands::journal::journal_settings,
+            commands::journal::journal_set,
+            commands::journal::journal_event,
+            commands::journal::journal_summary,
+            commands::journal::journal_verify,
             commands::sync_folder::copy_load,
             commands::sync_folder::copy_resolve,
             commands::sync_folder::storage_places,

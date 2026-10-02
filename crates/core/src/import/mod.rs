@@ -35,7 +35,7 @@ use crate::doc::{self, DocFile, DocMeta, STATUSES};
 use crate::markup::{Block, Inline, plain_text};
 use crate::project::{self, MANUSCRIPT_DIR};
 use crate::store::new_id;
-use crate::{Error, Result};
+use crate::{Error, Result, journal};
 
 /// Where to cut a file into chapters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -351,6 +351,45 @@ pub struct Committed {
 }
 
 /// Makes the chapters `spec.picks` name, in the order of the list.
+/// Adds a line to the creation journal for each file chapters came from:
+/// its name, its fingerprint and the documents made from it.
+fn note_imports(
+    root: &Path,
+    paths: &[PathBuf],
+    picks: &[Pick],
+    chapters: &[Chapter],
+    made: &[String],
+) {
+    if journal::device().is_none() {
+        return;
+    }
+    for (index, path) in paths.iter().enumerate() {
+        let docs: Vec<String> = picks
+            .iter()
+            .zip(made)
+            .filter(|(pick, _)| chapters[pick.index].file == index)
+            .map(|(_, id)| id.clone())
+            .collect();
+        if docs.is_empty() {
+            continue;
+        }
+        let Ok(bytes) = fs::read(path) else {
+            continue;
+        };
+        journal::note(
+            root,
+            journal::Entry::Import(journal::Import {
+                file: path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                file_hash: journal::fingerprint(&bytes),
+                docs,
+            }),
+        );
+    }
+}
+
 pub fn commit(
     root: &Path,
     paths: &[PathBuf],
@@ -435,6 +474,7 @@ pub fn commit(
         }
         return Err(e);
     }
+    note_imports(root, paths, &picks, &chapters, &made);
     Ok(Committed {
         docs: made,
         notes: note_ids.len(),

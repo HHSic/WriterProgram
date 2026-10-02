@@ -12,8 +12,9 @@ use serde::Serialize;
 
 use crate::count::{Counts, count_blocks};
 use crate::doc::{self, DocFile};
+use crate::markup::write_body;
 use crate::store::{parse_stamp, stamp, to_iso};
-use crate::{Error, Result};
+use crate::{Error, Result, journal};
 
 pub const SNAPSHOT_DIR: &str = ".snapshots";
 
@@ -85,6 +86,15 @@ pub fn create(root: &Path, doc: &DocFile, kind: &str, name: &str) -> Result<Snap
     copy.meta.set_extra_str("snapshotName", name.trim());
     copy.meta.set_extra_str("snapshotAt", &to_iso(at));
     doc::write_doc_file(&path, &copy)?;
+    journal::note(
+        root,
+        journal::Entry::Snapshot(journal::Snapshot {
+            doc: doc.meta.id.clone(),
+            snapshot: id.clone(),
+            body: journal::fingerprint(write_body(&doc.body).as_bytes()),
+            snapshot_kind: kind.into(),
+        }),
+    );
     Ok(SnapshotInfo {
         id,
         kind: kind.into(),

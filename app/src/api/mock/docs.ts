@@ -1,6 +1,7 @@
 // Chapters and planning documents: adding, moving, loading, saving, records (기록) and the trash.
 
 import type { Backend, Card, Note, TrashItem } from '../types';
+import { noteMockSave } from './journal';
 import { mockPages } from './presets';
 import { clone, counts, doc, newDoc, now, project, record, revOf, wait, type MockDoc } from './state';
 
@@ -76,6 +77,7 @@ export const docMethods = {
     const snapshot = elsewhere ? record(p, d, 'other-device', '') : null;
     d.body = clone(b);
     d.modified = now();
+    noteMockSave(root);
     return { counts: c, pages, snapshot, rev: revOf(b), conflict: false };
   },
   async docKeep(root, docId, b, kind) {
