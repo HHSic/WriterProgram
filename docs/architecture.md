@@ -28,6 +28,7 @@ v0.1 구현의 뼈대. 화면 설계는 [screens.md](screens.md), 영역별 데�
   notes/<id>.md                    메모
   .snapshots/<문서 id>/<시각>.<종류>.md   기록
   .trash/<항목 id>/                휴지통 (문서·카드·메모 파일 + item.json)
+  .exchanges/<기록 id>/            편집자에게 보낸 원고와 받은 교정본 (corrections.md)
 ```
 
 - **부는 `project.json`에만 있다.** 회차를 다른 부로 옮겨도 파일은 움직이지 않는다. 폴더 동기화에서 이동·이름 바꾸기 충돌을 줄이기 위해서다 (layout-data.md의 "폴더 + 순서"를 이렇게 정함).
@@ -110,7 +111,7 @@ created: "2026-09-27T01:00:00.000Z"
 ## 기록 (스냅샷)
 
 - 파일: `.snapshots/<문서 id>/20260927-101500-123.auto.md` (UTC 시각 + 종류). 앞머리에 `snapshotKind`, `snapshotName`, `snapshotAt`.
-- 종류와 화면 이름: `auto` 자동 기록, `manual` 직접 보관, `before-replace` 바꾸기 전, `before-restore` 되돌리기 전, `before-revise` 퇴고 전. 두 기기에서 쓸 때 생기는 것: `this-device` 이 기기에서 쓴 글, `other-device` 다른 기기에서 쓴 글, `before-reload` 다른 기기 것 불러오기 전, `before-copy` 사본으로 바꾸기 전. `auto`와 `before-reload`는 90일 뒤 정리한다.
+- 종류와 화면 이름: `auto` 자동 기록, `manual` 직접 보관, `before-replace` 바꾸기 전, `before-restore` 되돌리기 전, `before-revise` 퇴고 전, `before-corrections` 교정 반영 전. 두 기기에서 쓸 때 생기는 것: `this-device` 이 기기에서 쓴 글, `other-device` 다른 기기에서 쓴 글, `before-reload` 다른 기기 것 불러오기 전, `before-copy` 사본으로 바꾸기 전. `auto`와 `before-reload`는 90일 뒤 정리한다.
 - 자동 기록: 본문을 저장할 때 마지막 기록이 10분보다 오래됐고 내용이 다르면, 바뀌기 직전 원고를 남긴다.
 - 이 때로 되돌리기: 지금 원고를 `before-restore`로 남긴 뒤 본문을 되돌린다. 제목·상태는 그대로.
 
@@ -247,6 +248,8 @@ updated: "2026-09-27T02:00:00.000Z"
 | Word (docx) | 줄 간격은 한글처럼 정확한 줄 높이(exact)로 쓴다. 한국어가 어절 단위로 줄바꿈되도록 Word 기본값(wordWrap 켜짐)을 둔다. 줄바꿈 줄이 양쪽 정렬로 늘어나지 않게 `doNotExpandShiftReturn`. 문단 여백은 글자 단위 들여쓰기(`w:leftChars`) |
 | 텍스트 (txt) | UTF-8(BOM) + CRLF. 메모장과 한글에서 깨지지 않음 |
 | 클립보드 | 연재 플랫폼에 붙여 넣기용 |
+
+"편집자에게 보내기"는 docx·HWPX 내보내기와 같은 파일을 만들고 보낸 원고를 `.exchanges/`에 남긴다. 받은 교정본 비교와 반영은 [corrections.md](corrections.md).
 
 검증: HWPX는 python-hwpx(Apache-2.0)의 구조 검사와 "한글 편집기 열기 안전성" 검사를 통과하고 글·서식이 다시 읽힌다. 실제 한글에서 여는 확인은 아직 필요하다. docx는 Word로 열어 PDF로 바꿔 모양을 확인했다.
 
