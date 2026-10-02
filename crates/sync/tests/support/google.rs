@@ -4,7 +4,16 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
+use super::Room;
 use super::server::{Request, Response, bytes_reply, json_reply};
+
+/// Google's answer when 내 드라이브 is full.
+fn full() -> Response {
+    json_reply(
+        403,
+        json!({ "error": { "code": 403, "message": "The user's Drive storage quota has been exceeded.", "errors": [{ "domain": "usageLimits", "reason": "storageQuotaExceeded", "message": "The user's Drive storage quota has been exceeded." }] } }),
+    )
+}
 
 /// Google Drive v3 with drive.file: files by id, folders are files too.
 #[derive(Default)]
@@ -85,10 +94,29 @@ impl Google {
         id
     }
 
-    pub fn handle(&mut self, req: &Request) -> Response {
+    /// Bytes of all files, also those in the trash (Google counts them).
+    fn stored(&self) -> u64 {
+        self.files.values().map(|f| f.bytes.len() as u64).sum()
+    }
+
+    pub fn handle(&mut self, req: &Request, room: &Room) -> Response {
         let api = "/drive/v3";
         let up = "/upload/drive/v3";
         let path = req.path.as_str();
+        let fields = req.query.get("fields").cloned().unwrap_or_default();
+        if path == format!("{api}/about") && fields.contains("storageQuota") {
+            if !room.readable {
+                return json_reply(
+                    403,
+                    json!({ "error": { "code": 403, "errors": [{ "reason": "insufficientPermissions" }] } }),
+                );
+            }
+            let mut quota = json!({ "usage": (room.elsewhere + self.stored()).to_string() });
+            if let Some(total) = room.total {
+                quota["limit"] = json!(total.to_string());
+            }
+            return json_reply(200, json!({ "storageQuota": quota }));
+        }
         if path == format!("{api}/about") {
             return json_reply(
                 200,
@@ -143,6 +171,9 @@ impl Google {
                 + sep.len()
                 + "\r\nContent-Type: application/octet-stream\r\n\r\n".len();
             let end = find(&body, format!("\r\n{sep}--").as_bytes()).unwrap();
+            if !room.fits(self.stored() + (end - start) as u64) {
+                return full();
+            }
             let id = self.add(
                 meta["name"].as_str().unwrap(),
                 meta["parents"][0].as_str().unwrap(),
@@ -152,6 +183,10 @@ impl Google {
             return json_reply(200, self.meta(&id));
         }
         if let Some(id) = path.strip_prefix(&format!("{up}/files/")) {
+            let after = self.stored() - self.files[id].bytes.len() as u64 + req.body.len() as u64;
+            if !room.fits(after) {
+                return full();
+            }
             let f = self.files.get_mut(id).unwrap();
             f.bytes = req.body.clone();
             f.version += 1;

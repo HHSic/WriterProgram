@@ -54,6 +54,9 @@ pub struct Report {
     pub merged: bool,
     /// Changed again during the pass; taken up by the next one.
     pub later: Vec<String>,
+    /// Room left on the drive in bytes, when it is running low; none when
+    /// there is room or the drive does not say (`accounts::sync_project`).
+    pub space_left: Option<u64>,
 }
 
 /// A file here: its fingerprint, its size and time, and its content when read.

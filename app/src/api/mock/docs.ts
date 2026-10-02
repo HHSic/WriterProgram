@@ -5,7 +5,40 @@ import { noteMockSave } from './journal';
 import { mockPages } from './presets';
 import { clone, counts, doc, newDoc, now, project, record, revOf, wait, type MockDoc } from './state';
 
+/** Bytes of a value as the files would hold it, roughly. */
+export function bytesOf(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+/** Automatic records tidying removes: older than two weeks, each document keeping its newest. */
+export function oldAutoRecords(p: ReturnType<typeof project>) {
+  const out: { docId: string; id: string; size: number }[] = [];
+  for (const [docId, list] of p.records) {
+    let newest = true;
+    for (const r of list) {
+      if (r.info.kind !== 'auto') continue;
+      if (!newest && Date.now() - Date.parse(r.info.at) > 14 * 86_400_000) {
+        out.push({ docId, id: r.info.id, size: bytesOf(r.body) });
+      }
+      newest = false;
+    }
+  }
+  return out;
+}
+
 export const docMethods = {
+  async recordsTidy(root) {
+    const p = project(root);
+    let freed = 0;
+    for (const old of oldAutoRecords(p)) {
+      p.records.set(
+        old.docId,
+        (p.records.get(old.docId) ?? []).filter((r) => r.info.id !== old.id),
+      );
+      freed += old.size;
+    }
+    return freed;
+  },
   async docAdd(root, spec) {
     const p = project(root);
     const section = spec.section ?? 'manuscript';

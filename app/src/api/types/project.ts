@@ -62,6 +62,23 @@ export interface NewProject {
   firstChapter: boolean;
 }
 
+/** 이 작품 크기, in bytes (crates/core/src/project/size.rs). */
+export interface ProjectSizes {
+  /** project.json, chapters, planning, cards and notes. */
+  writing: number;
+  /** Records (.snapshots). */
+  records: number;
+  trash: number;
+  /** The writing journal; 0 when there is none. */
+  journal: number;
+  /** What tidying old automatic records would free. */
+  tidyFrees: number;
+  /** Records have grown much bigger than the writing: suggest tidying. */
+  suggestTidy: boolean;
+  /** Free room on the disk the project is on; null when unknown. */
+  diskFree: number | null;
+}
+
 export interface ProjectPatch {
   title?: string;
   kind?: ProjectKind;

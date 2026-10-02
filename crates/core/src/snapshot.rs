@@ -208,33 +208,89 @@ pub fn keep_unless_same(root: &Path, doc: &DocFile, kind: &str) -> Result<Option
     create(root, doc, kind, "").map(Some)
 }
 
-/// Removes automatic records (and ones kept before loading another device's
-/// text) older than `keep`. Other kinds stay.
-pub fn prune(root: &Path, keep: Duration) -> Result<()> {
-    let base = root.join(SNAPSHOT_DIR);
-    let Ok(docs) = fs::read_dir(&base) else {
-        return Ok(());
+/// Every document with records, and its record stems, newest first.
+fn all_stems(root: &Path) -> Result<Vec<(String, Vec<String>)>> {
+    let Ok(docs) = fs::read_dir(root.join(SNAPSHOT_DIR)) else {
+        return Ok(Vec::new());
     };
-    let cutoff = Utc::now() - keep;
+    let mut out = Vec::new();
     for entry in docs.filter_map(|e| e.ok()) {
         if !entry.path().is_dir() {
             continue;
         }
         let doc_id = entry.file_name().to_string_lossy().into_owned();
-        for stem in stems(root, &doc_id)? {
-            if !PRUNED
-                .iter()
-                .any(|kind| stem.ends_with(&format!(".{kind}")))
-            {
-                continue;
-            }
-            if parse_stamp(&stem).is_some_and(|at| at < cutoff) {
+        let stems = stems(root, &doc_id)?;
+        out.push((doc_id, stems));
+    }
+    Ok(out)
+}
+
+fn kind_of(stem: &str) -> &str {
+    stem.rsplit('.').next().unwrap_or("")
+}
+
+fn older_than(stem: &str, cutoff: chrono::DateTime<Utc>) -> bool {
+    parse_stamp(stem).is_some_and(|at| at < cutoff)
+}
+
+/// Removes automatic records (and ones kept before loading another device's
+/// text) older than `keep`. Other kinds stay.
+pub fn prune(root: &Path, keep: Duration) -> Result<()> {
+    let cutoff = Utc::now() - keep;
+    for (doc_id, stems) in all_stems(root)? {
+        for stem in stems {
+            if PRUNED.contains(&kind_of(&stem)) && older_than(&stem, cutoff) {
                 let path = dir(root, &doc_id).join(format!("{stem}.md"));
                 fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
             }
         }
     }
     Ok(())
+}
+
+/// Automatic records younger than this stay when the writer tidies records
+/// (오래된 자동 기록 정리).
+pub const TIDY_DAYS: i64 = 14;
+
+/// The record files tidying removes, with their sizes: what `prune` removes
+/// after `keep`, and automatic records older than [`TIDY_DAYS`] except each
+/// document's newest automatic one. Records kept by hand (지금 원고 보관)
+/// and the ones taken before replacing, going back, revising or another
+/// device's text are left alone.
+pub fn tidy_plan(root: &Path, keep: Duration) -> Result<Vec<(PathBuf, u64)>> {
+    let now = Utc::now();
+    let (prune_cutoff, tidy_cutoff) = (now - keep, now - Duration::days(TIDY_DAYS));
+    let mut out = Vec::new();
+    for (doc_id, stems) in all_stems(root)? {
+        let mut newest_auto = true;
+        for stem in stems {
+            let kind = kind_of(&stem);
+            let expired = PRUNED.contains(&kind) && older_than(&stem, prune_cutoff);
+            let old_auto = kind == "auto" && !newest_auto && older_than(&stem, tidy_cutoff);
+            if kind == "auto" {
+                newest_auto = false;
+            }
+            if expired || old_auto {
+                let path = dir(root, &doc_id).join(format!("{stem}.md"));
+                let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                out.push((path, size));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Tidies records (see [`tidy_plan`]); returns the bytes freed.
+pub fn tidy(root: &Path, keep: Duration) -> Result<u64> {
+    let mut freed = 0;
+    for (path, size) in tidy_plan(root, keep)? {
+        match fs::remove_file(&path) {
+            Ok(()) => freed += size,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(Error::io(&path, e)),
+        }
+    }
+    Ok(freed)
 }
 
 /// Deletes every record of a document (used when it is deleted for good).

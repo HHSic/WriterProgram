@@ -163,6 +163,14 @@ pub async fn snapshot_restore(
     snapshot::restore(Path::new(&root), &doc_id, &snapshot_id).map_err(fail)
 }
 
+/// "오래된 자동 기록 정리": removes automatic records older than two weeks
+/// (each document keeps its newest). Returns the bytes freed.
+#[tauri::command]
+pub async fn records_tidy(state: State<'_, AppState>, root: String) -> Res<u64> {
+    let _write = state.write();
+    project::tidy_records(Path::new(&root)).map_err(fail)
+}
+
 #[tauri::command]
 pub async fn trash_list(root: String) -> Res<Vec<TrashItem>> {
     trash::list(Path::new(&root)).map_err(fail)

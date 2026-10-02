@@ -1,5 +1,5 @@
-// 작품 설정 (S12): basic information, goals and the manuscript format
-// (원고 서식) with a live page preview and page estimate.
+// 작품 설정 (S12): basic information (with the project's size), goals and
+// the manuscript format (원고 서식) with a live page preview and page estimate.
 
 import { useState } from 'react';
 import { api } from '../../api';
@@ -11,6 +11,7 @@ import { closeDialog, openDialog, toastError, updateProject, useApp, type Settin
 import { ProjectDriveField } from '../Drives';
 import { FormatEditor } from './FormatEditor';
 import { JournalField } from './JournalField';
+import { ProjectSizeField } from './ProjectSizeField';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'basic', label: '기본 정보' },
@@ -131,6 +132,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
               <small className={`hint storage-note${where ? ' synced' : ''}`}>{placeNote(where)}</small>
             )}
           </div>
+          <ProjectSizeField />
           <ProjectDriveField />
           <JournalField root={ov.root} />
         </div>

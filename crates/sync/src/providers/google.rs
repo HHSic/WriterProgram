@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{Account, Session, drive_error, path_in};
+use super::{Account, Session, Space, drive_error, path_in};
 use crate::http::{Body, enc};
 use crate::remote::{Put, Remote, RemoteFile, split};
 use crate::{Error, Result};
@@ -42,6 +42,40 @@ pub fn account(s: &Session) -> Result<Account> {
     Ok(Account {
         name: about.user.display_name,
         email: about.user.email_address,
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AboutQuota {
+    storage_quota: Quota,
+}
+
+/// Numbers come as strings; `limit` is missing when there is none.
+#[derive(Deserialize)]
+struct Quota {
+    #[serde(default)]
+    limit: Option<String>,
+    #[serde(default)]
+    usage: Option<String>,
+}
+
+/// How full 내 드라이브 is (`about.get` allows `drive.file`). The quota is
+/// shared with Gmail and Google Photos, which is why it fills up.
+pub fn space(s: &Session) -> Option<Space> {
+    let url = format!(
+        "{}/about?fields={}",
+        s.ends.api,
+        enc("storageQuota(limit,usage)")
+    );
+    let reply = s.call("GET", &url, &[], &|| Body::Empty).ok()?;
+    if !reply.ok() {
+        return None;
+    }
+    let quota = reply.json::<AboutQuota>().ok()?.storage_quota;
+    Some(Space {
+        used: quota.usage?.parse().ok()?,
+        total: quota.limit?.parse().ok()?,
     })
 }
 

@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
+use super::Room;
 use super::server::{Request, Response, bytes_reply, json_reply};
 
 /// OneDrive through Graph: items with ids, reached by path under approot.
@@ -89,9 +90,26 @@ impl OneDrive {
         id
     }
 
-    pub fn handle(&mut self, req: &Request) -> Response {
+    fn stored(&self) -> u64 {
+        self.items.values().map(|i| i.bytes.len() as u64).sum()
+    }
+
+    pub fn handle(&mut self, req: &Request, room: &Room) -> Response {
         let base = "/v1.0";
         let path = req.path.strip_prefix(base).unwrap_or(&req.path).to_string();
+        if path == "/me/drive" {
+            // Microsoft lists Files.Read as the least permission for this;
+            // with only the app folder it may be refused.
+            if !room.readable {
+                return json_reply(403, json!({ "error": { "code": "accessDenied" } }));
+            }
+            let used = room.elsewhere + self.stored();
+            let total = room.total.unwrap_or(1 << 50);
+            return json_reply(
+                200,
+                json!({ "quota": { "total": total, "used": used, "remaining": total.saturating_sub(used), "deleted": 0, "state": "normal" } }),
+            );
+        }
         if path == "/me" {
             return json_reply(
                 200,
@@ -165,6 +183,15 @@ impl OneDrive {
                                 );
                             }
                         }
+                    }
+                    let before = existing
+                        .as_ref()
+                        .map_or(0, |id| self.items[id].bytes.len() as u64);
+                    if !room.fits(self.stored() - before + req.body.len() as u64) {
+                        return json_reply(
+                            507,
+                            json!({ "error": { "code": "quotaLimitReached", "message": "Insufficient Space Available" } }),
+                        );
                     }
                     let id = match existing {
                         Some(_) if fail_if_exists => {

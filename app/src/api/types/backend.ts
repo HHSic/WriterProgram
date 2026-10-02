@@ -19,7 +19,7 @@ import type { FormatCatalog, ManuscriptFormat, UserPreset } from './format';
 import type { ImportOptions, ImportPreview, ImportSpec, Imported } from './import';
 import type { JournalEvent, JournalReport, JournalSettings, JournalSummary } from './journal';
 import type { NewNote, Note } from './notes';
-import type { NewProject, Overview, ProjectInfo, ProjectPatch, RecentItem } from './project';
+import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem } from './project';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
 
 export interface Backend {
@@ -51,6 +51,10 @@ export interface Backend {
   snapshotCreate(root: string, docId: string, name: string): Promise<SnapshotInfo>;
   snapshotLoad(root: string, docId: string, snapshotId: string): Promise<DocData>;
   snapshotRestore(root: string, docId: string, snapshotId: string): Promise<SnapshotInfo>;
+  /** 오래된 자동 기록 정리: removes automatic records older than two weeks; returns the bytes freed. */
+  recordsTidy(root: string): Promise<number>;
+  /** 이 작품 크기, and the free room on the project's disk. */
+  projectSize(root: string): Promise<ProjectSizes>;
   trashList(root: string): Promise<TrashItem[]>;
   trashRestore(root: string, trashId: string): Promise<void>;
   trashDelete(root: string, trashId: string): Promise<void>;

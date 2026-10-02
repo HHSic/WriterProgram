@@ -14,14 +14,14 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use support::stand_in;
+use support::{Room, set_room, stand_in};
 use writer_core::copies;
 use writer_core::doc::{self, SaveGuard};
 use writer_core::markup::Block;
 use writer_core::project::{self, NewProject, ProjectKind};
 use writer_sync::accounts::{self, Link};
 use writer_sync::base::Base;
-use writer_sync::providers::{self, AppId, Provider, Session};
+use writer_sync::providers::{self, AppId, Endpoints, Provider, Session};
 use writer_sync::secrets::{MemorySecrets, Secrets};
 
 // ---------------------------------------------------------------------------
@@ -207,6 +207,159 @@ fn onedrive() {
 #[test]
 fn dropbox() {
     story(Provider::Dropbox);
+}
+
+// ---------------------------------------------------------------------------
+// A drive filling up
+
+/// A stand-in drive and a session signed in to it.
+fn signed_in(provider: Provider) -> (Endpoints, Session) {
+    let ends = stand_in(provider);
+    let app = AppId {
+        client_id: "writerprogram-test".into(),
+        client_secret: (provider == Provider::Google).then(|| "not-a-secret".into()),
+        redirect_port: Some(0),
+    };
+    let secrets: Arc<dyn Secrets> = Arc::new(MemorySecrets::default());
+    let cancel = AtomicBool::new(false);
+    let browser = |url: &str| {
+        let url = url.to_string();
+        thread::spawn(move || writer_sync::http::fetch(&url).unwrap());
+        Ok(())
+    };
+    let connection = accounts::sign_in(
+        provider,
+        &app,
+        ends.clone(),
+        secrets.clone(),
+        browser,
+        &cancel,
+    )
+    .unwrap();
+    let session = Session::resume(provider, &app, ends.clone(), secrets, connection.key).unwrap();
+    (ends, session)
+}
+
+const MB: u64 = 1024 * 1024;
+
+fn filling_up(provider: Provider) {
+    let dir = tempfile::tempdir().unwrap();
+    let (ends, session) = signed_in(provider);
+    let a = project::create(&NewProject {
+        parent: dir.path().join("a").to_string_lossy().into_owned(),
+        title: "달빛 서점".into(),
+        kind: ProjectKind::Webnovel,
+        per_doc_goal: None,
+        count_spaces: true,
+        first_chapter: true,
+    })
+    .unwrap();
+    let id = project::overview(&a).unwrap().parts[0].docs[0].id.clone();
+    let link = Link {
+        provider,
+        folder: providers::folder_name("달빛 서점"),
+        linked_at: String::new(),
+        synced_at: None,
+        error: None,
+    };
+    let lock = Mutex::new(());
+    let (base_a, base_b) = (
+        dir.path().join("base-a.json"),
+        dir.path().join("base-b.json"),
+    );
+    let b = dir.path().join("b");
+    fs::create_dir_all(&b).unwrap();
+
+    // Plenty of room: no warning.
+    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    assert_eq!(report.space_left, None, "{report:?}");
+    accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+
+    // The drive will not say how full it is: the pass goes on all the same.
+    set_room(
+        &ends,
+        Room {
+            total: Some(40 * MB),
+            elsewhere: 0,
+            readable: false,
+        },
+    );
+    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    assert_eq!(report.space_left, None);
+
+    // Under 50 MB left: the report says how much.
+    set_room(
+        &ends,
+        Room {
+            total: Some(40 * MB),
+            elsewhere: 30 * MB,
+            readable: true,
+        },
+    );
+    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let left = report.space_left.expect("running low");
+    assert!(left < 10 * MB && left > 9 * MB, "{left}");
+
+    // Full: the pass stops with the same words on every drive, and the
+    // chapter stays on this device as written.
+    set_room(
+        &ends,
+        Room {
+            total: Some(40 * MB),
+            elsewhere: 40 * MB,
+            readable: true,
+        },
+    );
+    doc::save_body(
+        &a,
+        &id,
+        body(&["공간이 없을 때 쓴 글."]),
+        chrono::Duration::hours(1),
+        SaveGuard::default(),
+    )
+    .unwrap();
+    let written = files(&a);
+    let err = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap_err();
+    assert!(err.user_message().contains(providers::FULL), "{err}");
+    assert_eq!(files(&a), written);
+    assert_eq!(
+        doc::load(&a, &id).unwrap().body,
+        body(&["공간이 없을 때 쓴 글."])
+    );
+    // Again later, still full: nothing lost, nothing changed here.
+    assert!(accounts::sync_project(&session, &link, &a, &base_a, &lock).is_err());
+    assert_eq!(files(&a), written);
+
+    // Room again: the chapter goes up on the next pass and reaches B.
+    set_room(&ends, Room::default());
+    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    assert!(
+        report
+            .uploaded
+            .iter()
+            .any(|p| p.ends_with(&format!("{id}.md"))),
+        "{report:?}"
+    );
+    accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    assert_eq!(
+        doc::load(&b, &id).unwrap().body,
+        body(&["공간이 없을 때 쓴 글."])
+    );
+}
+
+#[test]
+fn google_drive_filling_up() {
+    filling_up(Provider::Google);
+}
+
+#[test]
+fn onedrive_filling_up() {
+    filling_up(Provider::Onedrive);
+}
+
+#[test]
+fn dropbox_filling_up() {
+    filling_up(Provider::Dropbox);
 }
 
 #[test]

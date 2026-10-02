@@ -1,9 +1,27 @@
 // Recent projects, creating and opening a project, and its parts (부).
 
 import type { Backend } from '../types';
+import { bytesOf, oldAutoRecords } from './docs';
 import { clone, createProject, forgetRecent, id, newDoc, overview, project, recentItems, touchRecent, wait } from './state';
 
+const MB = 1024 * 1024;
+
 export const projectMethods = {
+  async projectSize(root) {
+    const p = project(root);
+    const writing = bytesOf(p.info) + bytesOf([...p.docs.values()]) + bytesOf([...p.cards.values()]) + bytesOf([...p.notes.values()]);
+    const records = bytesOf([...p.records.values()]);
+    const tidyFrees = oldAutoRecords(p).reduce((sum, r) => sum + r.size, 0);
+    return {
+      writing,
+      records,
+      trash: p.trash.length ? bytesOf(p.trash) : 0,
+      journal: 0,
+      tidyFrees,
+      suggestTidy: records > 20 * MB && records > 10 * writing && tidyFrees > 0,
+      diskFree: 64 * 1024 * MB,
+    };
+  },
   async recentList() {
     await wait();
     return clone(recentItems());

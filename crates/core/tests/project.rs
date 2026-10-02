@@ -184,6 +184,92 @@ fn records_by_hand_and_going_back() {
     assert!(snapshot::load(&root, &id, "../project").is_err());
 }
 
+/// A record file of `kind`, `days` old, for the document `id`.
+fn old_record(root: &Path, id: &str, kind: &str, days: i64) -> String {
+    let current = doc::load(root, id).unwrap();
+    let made = snapshot::create(root, &current, kind, "").unwrap();
+    let records = root.join(".snapshots").join(id);
+    let stem = format!(
+        "{}.{kind}",
+        writer_core::store::stamp(chrono::Utc::now() - Duration::days(days))
+    );
+    fs::rename(
+        records.join(format!("{}.md", made.id)),
+        records.join(format!("{stem}.md")),
+    )
+    .unwrap();
+    stem
+}
+
+#[test]
+fn tidying_records_removes_only_old_automatic_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    doc::save_body(
+        &root,
+        &id,
+        body(&["기록할 문장."]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
+
+    let auto_5 = old_record(&root, &id, "auto", 5);
+    let auto_20 = old_record(&root, &id, "auto", 20);
+    let auto_30 = old_record(&root, &id, "auto", 30);
+    let manual_100 = old_record(&root, &id, "manual", 100);
+    let copy_100 = old_record(&root, &id, "before-copy", 100);
+    let reload_20 = old_record(&root, &id, "before-reload", 20);
+    let reload_100 = old_record(&root, &id, "before-reload", 100);
+    let replace_40 = old_record(&root, &id, "before-replace", 40);
+
+    // Another chapter whose automatic records are all old: its newest stays.
+    let other = project::add_doc(&root, &NewDoc::default()).unwrap();
+    doc::save_body(
+        &root,
+        &other,
+        body(&["다른 회차."]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
+    let other_40 = old_record(&root, &other, "auto", 40);
+    let other_30 = old_record(&root, &other, "auto", 30);
+
+    let sizes = project::sizes(&root).unwrap();
+    assert!(sizes.writing > 0 && sizes.records > 0);
+    assert_eq!(sizes.trash, 0);
+    assert_eq!(sizes.journal, 0);
+    // Far from crowded: a few small records.
+    assert!(!sizes.suggest_tidy);
+
+    let freed = project::tidy_records(&root).unwrap();
+    assert_eq!(freed, sizes.tidy_frees);
+    assert!(freed > 0);
+
+    let stems = |doc: &str| -> Vec<String> {
+        snapshot::list(&root, doc)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect()
+    };
+    let kept = stems(&id);
+    for stem in [&auto_5, &manual_100, &copy_100, &reload_20, &replace_40] {
+        assert!(kept.contains(stem), "{stem} should stay: {kept:?}");
+    }
+    for stem in [&auto_20, &auto_30, &reload_100] {
+        assert!(!kept.contains(stem), "{stem} should go: {kept:?}");
+    }
+    // The other chapter keeps its newest automatic record only.
+    assert_eq!(stems(&other), [other_30]);
+    assert!(other_40 < stems(&other)[0]);
+
+    // Nothing more to tidy.
+    assert_eq!(project::sizes(&root).unwrap().tidy_frees, 0);
+}
+
 #[test]
 fn structure_editing() {
     let dir = tempfile::tempdir().unwrap();

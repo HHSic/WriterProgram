@@ -77,7 +77,17 @@ export const driveMethods = {
     link.error = null;
     return {
       link: { ...link },
-      report: { uploaded: [], downloaded: [], removedHere: [], removedThere: [], copies: [], merged: false, later: [] },
+      report: {
+        uploaded: [],
+        downloaded: [],
+        removedHere: [],
+        removedThere: [],
+        copies: [],
+        merged: false,
+        later: [],
+        // The preview's Google Drive is nearly full, to show the warning.
+        spaceLeft: link.provider === 'google' ? 31 * 1024 * 1024 : null,
+      },
     };
   },
 } satisfies Partial<Backend>;

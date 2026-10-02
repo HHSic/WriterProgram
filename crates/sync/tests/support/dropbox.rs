@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
+use super::Room;
 use super::server::{Request, Response, bytes_reply, json_reply};
 
 /// Dropbox v2: files by path (compared without case), revisions.
@@ -19,9 +20,21 @@ impl Dropbox {
         json!({ ".tag": "file", "name": display.rsplit('/').next(), "path_lower": lower, "path_display": display, "rev": format!("r{rev}") })
     }
 
-    pub fn handle(&mut self, req: &Request) -> Response {
+    fn stored(&self) -> u64 {
+        self.files.values().map(|(_, b, _)| b.len() as u64).sum()
+    }
+
+    pub fn handle(&mut self, req: &Request, room: &Room) -> Response {
         let conflict = |summary: &str| json_reply(409, json!({ "error_summary": summary }));
         match req.path.as_str() {
+            "/2/users/get_space_usage" if !room.readable => json_reply(
+                401,
+                json!({ "error_summary": "missing_scope/..", "error": { ".tag": "missing_scope", "required_scope": "account_info.read" } }),
+            ),
+            "/2/users/get_space_usage" => json_reply(
+                200,
+                json!({ "used": room.elsewhere + self.stored(), "allocation": { ".tag": "individual", "allocated": room.total.unwrap_or(0) } }),
+            ),
             "/2/users/get_current_account" => json_reply(
                 200,
                 json!({ "name": { "display_name": "윤서하" }, "email": "writer@example.com" }),
@@ -83,6 +96,13 @@ impl Dropbox {
                         return conflict("path/conflict/file/..");
                     }
                     _ => {}
+                }
+                let before = self.files.get(&lower).map_or(0, |(_, b, _)| b.len() as u64);
+                if !room.fits(self.stored() - before + req.body.len() as u64) {
+                    return json_reply(
+                        409,
+                        json!({ "error_summary": "path/insufficient_space/..", "error": { ".tag": "path", "reason": { ".tag": "insufficient_space" }, "upload_session_id": "s1" } }),
+                    );
                 }
                 let rev = self.files.get(&lower).map_or(1, |(_, _, r)| r + 1);
                 self.files
