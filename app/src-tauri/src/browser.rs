@@ -18,7 +18,7 @@ use tauri::{
     WebviewUrl,
 };
 
-type Res<T> = Result<T, String>;
+use crate::error::Res;
 
 const HOME: &str = "https://www.google.com/";
 

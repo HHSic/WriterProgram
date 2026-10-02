@@ -16,7 +16,7 @@ use writer_core::changes::{self, Change};
 use writer_core::copies;
 use writer_core::store::rev_of;
 
-use crate::commands::AppState;
+use crate::state::AppState;
 
 /// Changes settle this long before they are passed on: a sync program often
 /// writes a file in several steps.

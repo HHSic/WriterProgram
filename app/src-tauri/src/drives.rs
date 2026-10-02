@@ -24,13 +24,9 @@ use writer_sync::providers::{self, Account, AppIds, Endpoints, Provider, Session
 use writer_sync::remote::Remote;
 use writer_sync::secrets::Secrets;
 
-use crate::commands::{AppState, recent_file};
-
-type Res<T> = Result<T, String>;
-
-fn fail(e: writer_sync::Error) -> String {
-    e.user_message()
-}
+use crate::error::{Res, fail};
+use crate::paths::{apps_file, base_dir, recent_file, registry_file};
+use crate::state::AppState;
 
 /// Sign-ins in the system's credential store. A value longer than one
 /// credential can hold (Windows: 2,560 bytes) is split over several.
@@ -123,22 +119,6 @@ pub fn init_secrets() {
 pub struct DriveState {
     /// Set to stop a sign-in waiting for the browser.
     cancel: Arc<AtomicBool>,
-}
-
-fn dir(app: &AppHandle) -> Res<PathBuf> {
-    app.path().app_config_dir().map_err(|e| e.to_string())
-}
-
-fn registry_file(app: &AppHandle) -> Res<PathBuf> {
-    Ok(dir(app)?.join("drives.json"))
-}
-
-fn apps_file(app: &AppHandle) -> Res<PathBuf> {
-    Ok(dir(app)?.join("drive-apps.json"))
-}
-
-fn base_dir(app: &AppHandle) -> Res<PathBuf> {
-    Ok(dir(app)?.join("sync"))
 }
 
 fn secrets() -> Arc<dyn Secrets> {
@@ -482,7 +462,7 @@ pub async fn drive_fetch(
         let base = accounts::base_file(&base_dir(&app)?, &project_id);
         let _ = std::fs::remove_file(&base);
         accounts::sync_project(&session, &link, &root, &base, state.lock()).map_err(fail)?;
-        let overview = project::open(&root).map_err(|e| e.user_message())?;
+        let overview = project::open(&root).map_err(fail)?;
         let _ = writer_core::recent::touch(&recent_file(&app)?, &overview);
         let mut registry = Registry::load(&file);
         registry.links.insert(
