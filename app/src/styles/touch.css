@@ -1,0 +1,247 @@
+/* Touch: ⋯ buttons, sheets, long press and finger drag (lib/press.ts) ----- */
+
+.more-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-2);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.more-btn:hover {
+  color: var(--text);
+}
+
+.more-btn:focus-visible,
+.doc-row:hover > .more-btn,
+.plan-row:hover > .more-btn,
+.card-row:hover > .more-btn,
+.part-row:hover > .more-btn,
+.kind-row:hover > .more-btn,
+.otable tr:hover .more-btn,
+.otable tr:focus-within .more-btn {
+  opacity: 1;
+}
+
+.doc-row,
+.plan-row,
+.card-row {
+  position: relative;
+}
+
+.doc-row > .more-btn {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+}
+
+/* Make room for ⋯ on the first line, so it never lands on the status chip. */
+.doc-row:hover > .doc-item > .doc-line:first-child,
+.doc-row:focus-within > .doc-item > .doc-line:first-child {
+  padding-right: 26px;
+}
+
+.plan-row > .more-btn,
+.card-row > .more-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.part-row > .more-btn,
+.kind-row > .more-btn {
+  border-color: transparent;
+  background: transparent;
+}
+
+.c-no-inner {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* A long press shouldn't select text or open the system's own menu. */
+.doc-row,
+.plan-row,
+.card-row,
+.part-row,
+.kind-row,
+.ctab,
+.otable td.c-no {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pressing {
+  background: var(--hover) !important;
+  transform: scale(0.985);
+  transition: transform 0.12s;
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 80;
+  max-width: 60vw;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--surface);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -130%);
+  pointer-events: none;
+}
+
+/* The menu as a sheet from the bottom, after a finger. */
+.menu-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--overlay);
+  animation: sheet-fade 0.15s ease-out;
+}
+
+.menu-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 480px);
+  max-height: 78vh;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: sheet-up 0.18s ease-out;
+}
+
+.menu-sheet-head {
+  padding: 10px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.menu-sheet-head strong {
+  display: block;
+  font-size: 15px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.menu-sheet-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.menu-sheet-items {
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.menu-sheet .menu-item {
+  height: 46px;
+  padding: 0 14px 0 8px;
+  font-size: 15px;
+}
+
+.menu-sheet .menu-heading {
+  padding: 10px 14px 4px 32px;
+  font-size: 12px;
+}
+
+.menu-sheet-close {
+  flex-shrink: 0;
+  height: 46px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 편집 도구줄 under the page */
+.edit-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: var(--kb, 0px);
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tool {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: var(--body-font);
+  font-size: 16px;
+  color: var(--text);
+}
+
+.tool:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.tool.on {
+  background: var(--text);
+  color: var(--surface);
+}
+
+.tool-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--border);
+}
+
+/* Screens that take touch: bigger targets, and nothing hidden behind hover. */

@@ -1,0 +1,192 @@
+/* 머리말 on the format preview page */
+.pv-head {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--pv-font);
+  color: #4a443b;
+}
+
+/* 문단 여백: a paragraph set in as a whole, in characters (editor/paragraph.ts). */
+.manuscript p {
+  margin-left: calc(var(--pl, 0) * (1em + var(--tracking)));
+  margin-right: calc(var(--pr, 0) * (1em + var(--tracking)));
+}
+
+
+/* 첫 줄: a paragraph's own (data-indent; negative is 내어쓰기) or the rules' (editor/indent.ts). */
+.manuscript p[data-indent] {
+  text-indent: calc(var(--pi) * (1em + var(--tracking)));
+}
+
+.manuscript p[data-indent^='-'] {
+  padding-left: calc(var(--pi) * -1 * (1em + var(--tracking)));
+}
+
+.manuscript p.indent-flush {
+  text-indent: 0;
+}
+
+.manuscript p.indent-hang {
+  padding-left: var(--indent);
+  text-indent: 0;
+}
+
+/* 빈칸·문단 부호 보이기 (editor/marks.ts) */
+.show-marks .manuscript .ws-space,
+.show-marks .manuscript .ws-nbsp,
+.show-marks .manuscript .ws-fixed {
+  background: radial-gradient(circle, var(--mark-color) 0.09em, transparent 0.11em) center / 100% 100% no-repeat;
+}
+
+.show-marks .manuscript .ws-space {
+  --mark-color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+/* 묶음 빈칸: a dot with a small tie underneath. */
+.show-marks .manuscript .ws-nbsp {
+  --mark-color: var(--blue);
+  box-shadow: inset 0 -0.08em 0 color-mix(in srgb, var(--blue) 45%, transparent);
+}
+
+/* 고정폭 빈칸: a dot in brackets' colour, framed at the foot. */
+.show-marks .manuscript .ws-fixed {
+  --mark-color: var(--amber-text);
+  box-shadow: inset 0 -0.08em 0 color-mix(in srgb, var(--amber) 60%, transparent);
+}
+
+.show-marks .manuscript .ws-full {
+  outline: 1px dotted color-mix(in srgb, var(--muted) 60%, transparent);
+  outline-offset: -0.18em;
+}
+
+.show-marks .manuscript .ws-tab {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+/* Paragraph ends: ↵ after the text, or at the start of an empty paragraph. */
+.show-marks .manuscript p::after {
+  content: '↵';
+  padding-left: 0.15em;
+  font-family: var(--ui-font);
+  font-size: 0.8em;
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+.show-marks .manuscript p:has(> br.ProseMirror-trailingBreak:last-child)::after {
+  content: none;
+}
+
+.show-marks .manuscript p:not(.is-editor-empty):has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: '↵';
+  position: absolute;
+  font-family: var(--ui-font);
+  font-size: 0.8em;
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 문자표 */
+.symbols {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  min-height: 300px;
+}
+
+.symbol-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.symbol-groups button {
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.symbol-groups button:hover {
+  background: var(--hover);
+}
+
+.symbol-groups button.on {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.symbol-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 4px;
+  align-content: start;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.symbol {
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-family: var(--body-font);
+  font-size: 18px;
+  color: var(--text);
+}
+
+.symbol:hover {
+  border-color: var(--border-strong);
+  background: var(--hover);
+}
+
+.space-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.space-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.space-list .btn {
+  min-width: 112px;
+}
+
+.symbol-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.symbol.space {
+  font-family: var(--ui-font);
+  font-size: 11px;
+  color: var(--text-2);
+}

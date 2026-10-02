@@ -1,0 +1,350 @@
+/* Middle: document */
+
+.center {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+
+.center-head {
+  gap: 4px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.crumbs strong {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.dot-mark {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.save-state.saving .dot-mark {
+  background: var(--muted);
+}
+
+.save-state.error {
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--chip-red-bg);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.save-state.error .dot-mark {
+  background: var(--danger);
+}
+
+.doc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px clamp(12px, 3vw, 40px) 0;
+  scroll-padding: 96px 0;
+}
+
+.page {
+  width: min(100%, calc(var(--measure) + 144px));
+  min-height: calc(100% - 28px);
+  margin: 0 auto;
+  padding: 48px clamp(20px, 6vw, 72px) 40vh;
+  background: var(--surface);
+  border: 1px solid var(--page-border);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+
+.doc-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.doc-title-input {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: var(--body-font);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: calc(var(--tracking) - 0.01em);
+  color: var(--text);
+}
+
+.doc-title-input:focus {
+  box-shadow: none;
+}
+
+.doc-title-input::placeholder {
+  color: var(--track);
+}
+
+.synopsis {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.synopsis-label {
+  flex-shrink: 0;
+  /* One line box as tall as the textarea's, so the label sits on its first line. */
+  line-height: 20.8px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.synopsis textarea {
+  flex: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.synopsis textarea:focus {
+  box-shadow: none;
+}
+
+.synopsis textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+/* ProseMirror base rules. Tiptap would inject these as a <style> tag, which
+   the app's content security policy does not allow, so they live here. */
+
+.ProseMirror {
+  position: relative;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  white-space: break-spaces;
+  -webkit-font-variant-ligatures: none;
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0;
+}
+
+.ProseMirror [contenteditable="false"] {
+  white-space: normal;
+}
+
+img.ProseMirror-separator {
+  display: inline !important;
+  border: none !important;
+  margin: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.ProseMirror-gapcursor {
+  display: none;
+  pointer-events: none;
+  position: absolute;
+  margin: 0;
+}
+
+.ProseMirror-gapcursor::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--text);
+  animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ProseMirror-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.ProseMirror-hideselection *::selection {
+  background: transparent;
+}
+
+.ProseMirror-hideselection * {
+  caret-color: transparent;
+}
+
+.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+/* The writing surface */
+
+.manuscript {
+  min-height: 40vh;
+  outline: none;
+  font-family: var(--body-font);
+  font-size: var(--body-size);
+  line-height: var(--body-leading);
+  color: var(--body-text);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  letter-spacing: var(--tracking);
+  caret-color: var(--accent);
+}
+
+.manuscript p {
+  margin: 0 0 var(--para-gap);
+  text-indent: var(--indent);
+}
+
+.manuscript p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted);
+  opacity: 0.6;
+  pointer-events: none;
+  text-indent: 0;
+}
+
+.manuscript ::selection {
+  background: var(--blue-soft);
+}
+
+.scene-break {
+  margin: 0 0 var(--para-gap);
+  padding: 0.4em 0 0.4em 1em;
+  text-align: center;
+  letter-spacing: 1em;
+  color: var(--accent);
+  font-size: 0.8em;
+  user-select: none;
+}
+
+.scene-break.ProseMirror-selectednode {
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--blue-soft);
+}
+
+.dot {
+  text-emphasis: filled dot;
+  -webkit-text-emphasis: filled dot;
+  text-emphasis-position: over right;
+  -webkit-text-emphasis-position: over right;
+}
+
+.bubble {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.bubble button {
+  width: 32px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--surface);
+  font-family: var(--body-font);
+  font-size: 15px;
+}
+
+.bubble button:hover,
+.bubble button.on {
+  background: rgba(255, 253, 247, 0.18);
+}
+
+.pane-message {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.status-bar {
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.status-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A narrow window cuts the counts short, never the sync and 오늘 on the right. */
+.status-bar > .grow {
+  flex: 1 0 0;
+}
+
+.status-bar > .grow ~ .status-item {
+  flex-shrink: 0;
+}
+
+/* The in-between counts give way before 공백 포함 and 목표. */
+.status-bar > .status-item:first-child {
+  flex-shrink: 0;
+}
+
+.status-bar > .status-item + .status-item:not(:has(+ .grow)) {
+  flex-shrink: 20;
+}
+
+.status-item.strong {
+  color: var(--blue-strong);
+  font-weight: 600;
+}

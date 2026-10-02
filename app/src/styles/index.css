@@ -1,0 +1,25 @@
+/* Styles of the app, one file per area. The order matters: later files
+   override earlier ones, as in the single file they came from. */
+@import './tokens.css'; /* Color, type and spacing tokens, light and dark. */
+@import './base.css'; /* Page base, scrollbars. */
+@import './buttons.css'; /* Buttons, icon buttons, status chips. */
+@import './start.css'; /* Start screen (작품 목록). */
+@import './forms.css'; /* Modal dialogs and form fields. */
+@import './menu.css'; /* Menus and toasts. */
+@import './workspace.css'; /* Workspace columns; left navigation. */
+@import './document.css'; /* Middle column: document header, ProseMirror base, writing surface, status bar. */
+@import './right.css'; /* Right column, trash. */
+@import './settings.css'; /* Settings dialog and manuscript format form. */
+@import './find.css'; /* Find and replace. */
+@import './cards.css'; /* 설정집: cards, names in the manuscript, card preview. */
+@import './panes.css'; /* Panes and tabs in the middle. */
+@import './notes.css'; /* 메모, 메모함 and 개요 표, tab strip. */
+@import './view.css'; /* 보기 설정: color samples and picker. */
+@import './paragraphs.css'; /* Format preview head, paragraph margins and first lines, shown marks, 문자표. */
+@import './narrow.css'; /* Narrow middle column, parts in the tree. */
+@import './touch.css'; /* Touch: ⋯ buttons, sheets, long press, editing toolbar. */
+@import './devices.css'; /* Other devices: copies, comparing, where projects are kept, drives. */
+@import './browser.css'; /* In-app browser (prototype). */
+@import './ruler.css'; /* Editor ruler (workspace/Ruler.tsx). */
+@import './page-editor.css'; /* Page editor of the manuscript format (workspace/PageEditor.tsx). */
+@import './import.css'; /* 가져오기 wizard (workspace/ImportDialog.tsx). */

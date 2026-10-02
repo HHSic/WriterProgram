@@ -1,0 +1,185 @@
+/* Buttons ------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  background: var(--accent);
+}
+
+.btn.dark {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+
+.btn.dark:hover:not(:disabled) {
+  background: var(--text);
+  filter: brightness(1.2);
+}
+
+.btn.danger,
+.btn.primary.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fffdf7;
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn.dashed {
+  border-style: dashed;
+  background: transparent;
+  color: var(--text-2);
+  height: 38px;
+}
+
+.btn.square {
+  width: 44px;
+  height: 38px;
+  padding: 0;
+  gap: 2px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.btn.small {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.icon-btn.on {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.icon-btn.tiny {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.logo {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Serif KR', serif;
+  font-weight: 700;
+  font-size: 21px;
+}
+
+.logo.small {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.kind-chip {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+}
+
+/* Status chips (상태 라벨) */
+.chip {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.6;
+  padding: 0 6px;
+  border-radius: 8px;
+}
+
+.status-draft {
+  background: var(--chip-red-bg);
+  color: var(--chip-red-fg);
+}
+
+.status-revise,
+.status-proof1,
+.status-proof2,
+.status-proof3 {
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+}
+
+.status-done,
+.status-published,
+.status-final {
+  background: var(--chip-green-bg);
+  color: var(--chip-green-fg);
+}
+
+.status-stock {
+  background: var(--chip-blue-bg);
+  color: var(--chip-blue-fg);
+}
+
+.status-scheduled {
+  background: var(--chip-violet-bg);
+  color: var(--chip-violet-fg);
+}

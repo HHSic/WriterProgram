@@ -1,5 +1,5 @@
 // 빈칸·문단 부호 보이기: small marks on spaces and special spaces while writing,
-// like 한글's 조판 부호. Paragraph ends are drawn by CSS (styles.css
+// like 한글's 조판 부호. Paragraph ends are drawn by CSS (styles/paragraphs.css
 // ".show-marks"), which keeps the text itself untouched for the IME.
 
 import { Extension, type Editor } from '@tiptap/core';

@@ -1,0 +1,142 @@
+/* Start screen -------------------------------------------------------------- */
+
+.start {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 64px 32px;
+}
+
+.start-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.start-head h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.start-head p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-family: 'Noto Serif KR', serif;
+}
+
+.start-empty {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 720px;
+}
+
+.start-big {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px;
+  text-align: left;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.start-big:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+
+.start-big span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.start-big strong {
+  font-size: 16px;
+}
+
+.start-big small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.start-big.primary svg {
+  color: var(--accent);
+}
+
+.start-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.start-list-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.project-card {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.project-card:hover {
+  border-color: var(--border-strong);
+}
+
+.project-open {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 18px 18px 16px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  border-radius: 12px;
+}
+
+.project-title {
+  font-family: 'Noto Serif KR', serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  padding-right: 28px;
+}
+
+.project-card .path {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.project-card.missing {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.card-menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}

@@ -1,5 +1,5 @@
 // ⋯ on a list row: the same menu as a right click or a long press. Shown on
-// hover with a mouse, always on touch screens (styles.css .more-btn).
+// hover with a mouse, always on touch screens (styles/touch.css .more-btn).
 
 import { Icon } from './Icon';
 import { openMenu, type MenuItem, type MenuOptions } from './Menu';

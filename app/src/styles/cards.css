@@ -1,0 +1,268 @@
+/* 설정집 (setting cards) ------------------------------------------------------ */
+
+.kind-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kind-row .part-head {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px 0 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+.card-item:hover {
+  background: var(--hover);
+}
+
+.card-item.active {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+/* Names of setting cards in the manuscript. */
+.card-name {
+  text-decoration: underline dotted var(--blue);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.28em;
+}
+
+.card-page {
+  padding-bottom: 96px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.card-kind {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.card-appears {
+  min-height: 1.4em;
+  margin: 8px 0 28px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.card-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.card-section h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.chip-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: 14px;
+  background: var(--blue-soft);
+  color: var(--blue-strong);
+  font-size: 13px;
+}
+
+.chip-tag button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+}
+
+.chip-tag button:hover {
+  background: var(--hover);
+}
+
+.chip-input {
+  flex: 1;
+  min-width: 160px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.card-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.card-field {
+  display: grid;
+  grid-template-columns: minmax(80px, 140px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-field input {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.card-field input:first-child {
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.card-description {
+  width: 100%;
+  min-height: 120px;
+  padding: 10px 12px;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--body-font);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+/* Right column: card preview, 등장 위치, 등장 설정 */
+
+.card-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-preview-name {
+  margin: 4px 0 0;
+  font-family: var(--body-font);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.card-preview .meta {
+  margin: 0;
+}
+
+.card-preview-fields {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 6px 0;
+  font-size: 13px;
+}
+
+.card-preview-fields div {
+  display: contents;
+}
+
+.card-preview-fields dt {
+  color: var(--muted);
+}
+
+.card-preview-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-preview-text {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--sidebar);
+  font-family: var(--body-font);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.appearances {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appearances > .section-label {
+  margin: 0;
+}
+
+.cast-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cast-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.cast-item:hover {
+  border-color: var(--border-strong);
+}
+
+.cast-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cast-summary {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}

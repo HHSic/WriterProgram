@@ -1,0 +1,65 @@
+/* A narrow middle column: the path gives way to the buttons, not over them. */
+.crumbs {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.crumbs > span,
+.crumbs > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumbs > span {
+  /* The part name gives way first, so the open chapter's name stays readable. */
+  flex: 0 100 auto;
+}
+
+.crumbs > strong {
+  flex: 0 1 auto;
+}
+
+.crumbs > svg {
+  flex-shrink: 0;
+}
+
+.center-head > .grow {
+  flex: 0 0 0;
+}
+
+/* A part in the tree: the arrow folds it, the title picks it for 새 회차. */
+.part-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.part-toggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.part-toggle:hover {
+  background: var(--hover);
+}
+
+.part-row .part-head {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.part-head.selected {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border), inset 3px 0 0 var(--accent);
+  color: var(--text);
+}

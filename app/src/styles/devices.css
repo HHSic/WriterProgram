@@ -1,0 +1,405 @@
+/* Other devices: copies, changes on two devices, where projects are kept ---- */
+
+.copy-badge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.doc-banners {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px clamp(12px, 3vw, 40px) 0;
+}
+
+.doc-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  width: min(100%, calc(var(--measure) + 144px));
+  margin: 0 auto;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--amber);
+  border-radius: 8px;
+  background: var(--amber-soft);
+}
+
+.doc-banner.warn {
+  border-left-color: var(--danger);
+  background: var(--chip-red-bg);
+}
+
+.doc-banner-text {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.doc-banner-text strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.doc-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.save-state.conflict {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.save-state.conflict .dot-mark {
+  background: var(--danger);
+}
+
+.status-link {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status-link:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.status-link.synced::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+  vertical-align: 1px;
+}
+
+.status-link.warn {
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+  font-weight: 600;
+}
+
+.storage-note.synced {
+  color: var(--blue-strong);
+}
+
+/* 다른 기기 사본 */
+
+.copy-list {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.copy-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.copy-item .grow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.copy-item .link-btn {
+  padding: 0;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.copy-item .link-btn:hover {
+  text-decoration: underline;
+}
+
+/* 둘 다 보기 */
+
+.compare-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.compare {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--body-font, inherit);
+}
+
+.compare-head,
+.compare-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.compare-head span {
+  position: sticky;
+  top: 0;
+  padding: 8px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.compare-row p {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 14px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.compare-row p + p,
+.compare-head span + span {
+  border-left: 1px solid var(--border);
+}
+
+.compare-row.same p {
+  color: var(--muted);
+}
+
+.compare-row.changed,
+.compare-row.removed,
+.compare-row.added {
+  background: var(--amber-soft);
+}
+
+.compare-empty {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--hover) 6px 12px);
+}
+
+.compare mark {
+  border-radius: 3px;
+  color: inherit;
+}
+
+.diff-left {
+  background: var(--chip-red-bg);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
+.diff-right {
+  background: var(--chip-green-bg);
+}
+
+.compare-fold {
+  display: block;
+  width: 100%;
+  padding: 4px;
+  border: 0;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.compare-fold:hover {
+  color: var(--text);
+}
+
+.modal-foot .grow {
+  flex: 1;
+}
+
+/* 저장 위치 */
+
+.places {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.place {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.place.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.place input {
+  margin: 3px 0 0;
+}
+
+.place-mark {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.place-mark.service-local {
+  background: var(--muted);
+}
+
+.place-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.place-text strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.place-text small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.place-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.place-here {
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--chip-blue-bg);
+  color: var(--chip-blue-fg);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.place-pick {
+  align-self: flex-start;
+}
+
+.busy-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay);
+}
+
+.busy-box {
+  padding: 16px 24px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+}
+
+
+/* 기기 간 맞추기 */
+
+.drive-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.drive-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.drive-item .place-mark {
+  margin-top: 0;
+}
+
+.drive-item .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drive-item strong {
+  font-size: 13.5px;
+}
+
+.drive-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.drive-import + .drive-import {
+  margin-top: 12px;
+}
+
+.drive-import h3 {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.place-mark.service-google,
+.place-mark.service-googledrive {
+  background: #34a853;
+}
+
+.place-mark.service-dropbox {
+  background: #0061fe;
+}
+
+.start-head .grow {
+  flex: 1;
+}

@@ -1,5 +1,5 @@
 // 화면 색 (screen colors) and 강조 색 (accent), per device like the other view
-// settings. The default beige lives in styles.css; the others are made from a
+// settings. The default beige lives in styles/tokens.css; the others are made from a
 // hue and a little chroma in OKLCH, so each has a matching light and dark
 // version and text keeps the same contrast whatever the tint.
 
@@ -29,7 +29,7 @@ export const ACCENTS: { id: Exclude<AccentId, 'auto'>; name: string; light: [str
   { id: 'ink', name: '먹색', light: ['#2b2a28', '#ffffff'], dark: ['#e8e6e1', '#1a1a19'] },
 ];
 
-/** The tokens a palette sets (the rest of styles.css stays as it is). */
+/** The tokens a palette sets (the rest of the styles stay as they are). */
 const KEYS = [
   'bg',
   'sidebar',
@@ -56,7 +56,7 @@ function oklch(l: number, c: number, h: number, alpha?: number): string {
   return `oklch(${l} ${Math.max(0, c).toFixed(4)} ${h.toFixed(1)}${a})`;
 }
 
-/** Background, lines and text for a tint. Lightness steps follow the beige in styles.css. */
+/** Background, lines and text for a tint. Lightness steps follow the beige in styles/tokens.css. */
 export function neutrals(tint: Tint, dark: boolean): Tokens {
   const o = (l: number, k: number, alpha?: number) => oklch(l, tint.chroma * k, tint.hue, alpha);
   if (dark) {
@@ -124,7 +124,7 @@ export interface ColorChoice {
   customColor: string;
 }
 
-/** Tokens to set for a choice; empty means styles.css as it is (beige, its own accent). */
+/** Tokens to set for a choice; empty means styles/tokens.css as it is (beige, its own accent). */
 export function colorTokens(choice: ColorChoice, dark: boolean): Tokens {
   const preset = PALETTES.find((p) => p.id === choice.palette);
   const tint = choice.palette === 'custom' ? hexToTint(choice.customColor) : (preset?.tint ?? null);
@@ -140,7 +140,7 @@ export function colorTokens(choice: ColorChoice, dark: boolean): Tokens {
   return tokens;
 }
 
-/** The beige of styles.css, for previews. */
+/** The beige of styles/tokens.css, for previews. */
 const BEIGE = {
   light: { bg: '#f4f1e8', surface: '#fffdf7', border: '#d6cfbe', accent: '#b8432f' },
   dark: { bg: '#1c1a17', surface: '#262320', border: '#48423a', accent: '#d0634e' },

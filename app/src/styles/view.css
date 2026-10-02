@@ -1,0 +1,75 @@
+/* 화면 색 · 강조 색 samples in 보기 설정 */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 4px;
+}
+
+.swatch {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 58px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.swatch:hover {
+  background: var(--hover);
+}
+
+.swatch-chip {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+}
+
+.swatch.on .swatch-chip {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+}
+
+.swatch.on .swatch-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.swatch-dot {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+
+.swatch-chip.accent {
+  border-color: transparent;
+}
+
+.swatch-chip.auto {
+  outline: 1.5px dashed var(--border-strong);
+  outline-offset: 2px;
+}
+
+/* The color picker opens from the sample; the input itself stays out of sight. */
+.swatch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch-name {
+  white-space: nowrap;
+}

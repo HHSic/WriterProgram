@@ -1,0 +1,272 @@
+/* Workspace ------------------------------------------------------------------ */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr) 320px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.workspace.no-right {
+  grid-template-columns: 272px minmax(0, 1fr);
+}
+
+.col-head {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Left: navigation */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-head {
+  gap: 12px;
+  padding: 0 8px 0 16px;
+}
+
+.sidebar-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebar-title strong {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-title span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tree.planning {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 4px 6px;
+}
+
+.section-label {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.stock-chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue-strong);
+  background: var(--blue-soft);
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+.part {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.part-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-align: left;
+}
+
+.part-head:hover {
+  background: var(--hover);
+}
+
+.part-head.drop-into {
+  box-shadow: inset 0 0 0 2px var(--blue);
+}
+
+.part-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  padding: 7px 10px 7px 24px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+}
+
+.doc-item:hover {
+  background: var(--hover);
+}
+
+.doc-item.active {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.doc-item.active .doc-title {
+  font-weight: 600;
+}
+
+.doc-item.drop-before::before,
+.doc-item.drop-after::after,
+.plan-item.drop-before::before,
+.plan-item.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--blue);
+}
+
+.doc-item.drop-before::before,
+.plan-item.drop-before::before {
+  top: -1px;
+}
+
+.doc-item.drop-after::after,
+.plan-item.drop-after::after {
+  bottom: -1px;
+}
+
+.doc-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.doc-no {
+  /* 100화, 1000화 grow the column instead of running into the title. */
+  min-width: 34px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.bar-fill.full {
+  background: var(--green);
+}
+
+.doc-count {
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+.plan-item svg {
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.plan-item:hover {
+  background: var(--hover);
+}
+
+.plan-item.active {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.sidebar-foot {
+  display: flex;
+  gap: 6px;
+  padding: 12px;
+}

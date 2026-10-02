@@ -1,0 +1,422 @@
+/* 메모 ----------------------------------------------------------------------- */
+
+/* Text a note hangs on: a pale wash and an underline, like a pencil mark. */
+.memo-mark {
+  background: var(--memo);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: inset 0 -1px 0 var(--memo-line);
+  cursor: pointer;
+}
+
+.bubble .bubble-memo {
+  width: auto;
+  padding: 0 10px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bubble-sep {
+  width: 1px;
+  margin: 5px 2px;
+  background: rgba(255, 253, 247, 0.25);
+}
+
+.notes-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.notes-tab > .btn {
+  align-self: flex-start;
+}
+
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.note.focused {
+  border-color: var(--memo-line);
+  box-shadow: 0 0 0 1px var(--memo-line);
+}
+
+.note.done {
+  opacity: 0.7;
+}
+
+.note-on {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.note-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 0;
+  border-left: 3px solid var(--memo-line);
+  border-radius: 0 6px 6px 0;
+  background: var(--memo);
+  text-align: left;
+  font-family: var(--body-font);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+.note-quote-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.note-gone {
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.note-text,
+.note-reply-input {
+  width: 100%;
+  padding: 6px 8px;
+  resize: none;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.note-text {
+  min-height: 34px;
+}
+
+.note-reply-input {
+  background: var(--bg);
+  font-size: 12px;
+}
+
+.note-replies {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.note-replies p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.note-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-tag.small {
+  height: 22px;
+  padding: 0 2px 0 8px;
+  font-size: 11px;
+}
+
+.chip-tag.small button {
+  width: 16px;
+  height: 16px;
+}
+
+.tag-input {
+  width: 80px;
+  height: 22px;
+  padding: 0 6px;
+  border-style: dashed;
+  font-size: 11px;
+}
+
+.note-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.small-check {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.memo-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--amber-text);
+}
+
+/* 메모함 and 개요 표 in the middle */
+
+.board {
+  width: min(100%, 880px);
+  margin: 0 auto;
+  padding: 8px 0 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-head h1 {
+  margin: 0;
+  font-family: var(--body-font);
+  font-size: 24px;
+}
+
+.board-head .meta {
+  margin: 4px 0 0;
+}
+
+.board-head select {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.tag-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-toggle {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.chip-toggle.on {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+}
+
+.board-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.board-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.link-btn {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.otable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.otable th {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.otable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+/* Headers over input cells line up with the text inside the input (border + padding). */
+.otable th.c-title,
+.otable th.c-synopsis {
+  padding-left: 15px;
+}
+
+.otable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.otable tbody tr:hover td {
+  background: var(--hover);
+}
+
+.otable tr.drop-before td {
+  box-shadow: inset 0 2px 0 var(--blue);
+}
+
+.otable tr.drop-after td {
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
+.otable .c-no {
+  width: 56px;
+  white-space: nowrap;
+}
+
+.otable .c-title {
+  width: 26%;
+}
+
+.otable .c-status {
+  width: 84px;
+}
+
+.otable .c-length {
+  width: 130px;
+}
+
+.otable .c-notes {
+  width: 64px;
+  text-align: center;
+}
+
+.otable .c-modified {
+  width: 96px;
+  white-space: nowrap;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 4px 6px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+
+.cell-input:hover {
+  border-color: var(--border);
+}
+
+.cell-input:focus {
+  border-color: var(--blue);
+  background: var(--surface);
+}
+
+.cell-select {
+  height: 26px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.c-length .num-text {
+  display: block;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.c-length .bar {
+  display: block;
+}
+
+/* Margins follow the pane, not the window, so a split pane keeps a usable line. */
+.tab-body {
+  container-type: inline-size;
+}
+
+.tab-body .doc-scroll {
+  padding: 28px clamp(8px, 3cqi, 40px) 0;
+}
+
+.tab-body .page {
+  padding: 48px clamp(18px, 6cqi, 72px) 40vh;
+}
+
+.tab-body .doc-title-input {
+  font-size: clamp(22px, 5cqi, 30px);
+}
+
+.tab-body .card-page {
+  padding-bottom: 96px;
+}
+
+/* Tabs shrink before they overflow; the strip scrolls with the wheel. */
+.ctab {
+  flex: 0 1 auto;
+  min-width: 64px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+}
+
+.table-wrap .otable {
+  min-width: 640px;
+}
+
+.otable .c-title {
+  min-width: 140px;
+}
+
+.otable .c-synopsis {
+  min-width: 180px;
+}
