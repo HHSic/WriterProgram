@@ -130,7 +130,7 @@ created: "2026-09-27T01:00:00.000Z"
   - `project.json`의 사본(`project-DESKTOP-….json` 등)은 곧바로 합친다: 사본에만 있는 부와 회차를 사본에서 있던 자리에 넣고, 나머지(제목, 순서, 설정)는 지금 것을 따른다. 합친 사본은 `.snapshots/project/`에 둔다.
 - **둘 다 보기**: 두 글을 문단 단위로 맞춰 놓고(LCS), 바뀐 문단 안에서는 글자 단위로 표시한다(`app/src/lib/diff.ts`). 같은 문단이 길게 이어지면 접는다.
 
-## 드라이브 직접 연결 (`crates/sync`, 앱 `drives.rs`)
+## 드라이브 직접 연결 (`crates/sync`, 앱 `drives/`)
 
 휴대폰처럼 드라이브 프로그램이 폴더를 맞춰 주지 않는 곳을 위해, 앱이 작가의 Google Drive·OneDrive·Dropbox에 직접 연결해 작품을 맞춘다. 우리 서버는 거치지 않는다. 연결하려면 각 드라이브에 앱을 등록해야 한다([drive-apps.md](drive-apps.md)).
 

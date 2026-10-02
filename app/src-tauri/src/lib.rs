@@ -11,12 +11,12 @@ pub fn run() {
     let state = state::AppState::default();
     let own = state.own.clone();
     writer_core::store::on_write(move |path, bytes| own.record(path, bytes));
-    drives::init_secrets();
+    drives::keyring::init_secrets();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(state)
-        .manage(drives::DriveState::default())
+        .manage(drives::connect::DriveState::default())
         .invoke_handler(tauri::generate_handler![
             commands::project::recent_list,
             commands::project::recent_remove,
@@ -80,16 +80,16 @@ pub fn run() {
             browser::browser_step,
             browser::browser_close,
             browser::browser_clip,
-            drives::drive_status,
-            drives::drive_connect,
-            drives::drive_cancel,
-            drives::drive_disconnect,
-            drives::drive_projects,
-            drives::drive_fetch,
-            drives::project_link_get,
-            drives::project_link,
-            drives::project_unlink,
-            drives::project_sync,
+            drives::connect::drive_status,
+            drives::connect::drive_connect,
+            drives::connect::drive_cancel,
+            drives::connect::drive_disconnect,
+            drives::projects::drive_projects,
+            drives::projects::drive_fetch,
+            drives::projects::project_link_get,
+            drives::projects::project_link,
+            drives::projects::project_unlink,
+            drives::projects::project_sync,
         ])
         .run(tauri::generate_context!())
         .expect("error while running WriterProgram");
