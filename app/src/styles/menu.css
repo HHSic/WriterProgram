@@ -90,4 +90,7 @@
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
+  /* A long toast wraps its text, not its button. */
+  flex: none;
+  white-space: nowrap;
 }

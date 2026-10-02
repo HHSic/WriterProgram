@@ -444,7 +444,7 @@ function PieceView({
     <>
       {marks}
       <Tag
-        className={`rv-${piece.kind} ${view}${on ? ' on' : ''}${piece.para ? ' para' : ''}${cls ? ` ${cls}` : ''}`}
+        className={`rv-${piece.kind} ${view}${on ? ' on' : ''}${piece.para ? ' para' : ''}${piece.text.trim() ? '' : ' blank'}${cls ? ` ${cls}` : ''}`}
         data-rv={piece.kind === 'del' || !piece.para ? piece.change : undefined}
         title={piece.kind === 'del' ? (piece.para ? '문단 나눔을 지움' : '지운 글') : '넣은 글'}
         onClick={() => piece.change && onPick(piece.change)}

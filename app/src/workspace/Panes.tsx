@@ -36,7 +36,7 @@ export function tabLabel(ov: Overview, target: Target): { label: string; icon: I
   if (target.kind === 'notes') return { label: '메모함', icon: 'note' };
   if (target.kind === 'review') {
     const file = useApp.getState().reviewFiles[target.id];
-    return { label: file ? `교정본 · ${file}` : '교정본 검토', icon: 'correction' };
+    return { label: file || '교정본 검토', icon: 'correction' };
   }
   if (target.kind === 'web') {
     const page = webPages(ov.project.id)[target.id];
