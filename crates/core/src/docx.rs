@@ -9,20 +9,14 @@
 //! style, which Word fills in page by page. Leaving 머리말 off each chapter's
 //! first page needs a section per chapter with a different first page.
 
-use std::io::{Cursor, Write};
-
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipWriter};
-
 use crate::export::{DocInfo, DocOptions, ExportDoc, Piece, RunStyle, pieces};
 use crate::format::{HeadAlign, HeadContent, ManuscriptFormat, font};
 use crate::markup::{Block, ParaAttrs};
-use crate::store::now_iso;
-use crate::{Error, Result, xml};
+use crate::{Result, xml};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+/// The relationships namespace, which is also where relationship types live.
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const CT_HEADER: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml";
 const CT_FOOTER: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml";
 /// Name of the chapter title style, which STYLEREF looks for.
@@ -79,7 +73,7 @@ impl Layout {
     ) -> Self {
         let head = &format.header;
         let even_odd = head.facing() || format.footer_facing();
-        let sections = head.is_on() && head.skip_chapter_first && format.chapter_new_page;
+        let sections = format.head_skips_chapter_first();
         let mut parts = Vec::new();
         let mut add = |header: bool, page: PageType, xml: String| {
             let n = parts.len() + 3;
@@ -114,11 +108,7 @@ impl Layout {
             } else {
                 HeadText::Plain(info.title.clone())
             };
-            let fixed = match head.content {
-                HeadContent::Author => info.author.clone(),
-                HeadContent::Custom => head.text.clone(),
-                _ => info.title.clone(),
-            };
+            let fixed = head.fixed_text(&info.title, &info.author);
             let (odd_text, even_text) = match head.content {
                 HeadContent::Chapter => (chapter.clone(), chapter),
                 HeadContent::TitleChapter => (chapter, HeadText::Plain(info.title.clone())),
@@ -214,18 +204,12 @@ pub fn docx_bytes(
     for part in &layout.parts {
         parts.push((format!("word/{}", part.file), part.xml.clone()));
     }
-
-    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
-    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
-    for (name, body) in parts {
-        zip.start_file(name, options)
-            .and_then(|_| zip.write_all(body.as_bytes()).map_err(Into::into))
-            .map_err(|e| Error::Invalid(format!("docx 파일을 만들지 못함 ({e})")))?;
-    }
-    let cursor = zip
-        .finish()
-        .map_err(|e| Error::Invalid(format!("docx 파일을 만들지 못함 ({e})")))?;
-    Ok(cursor.into_inner())
+    xml::zip_package(
+        parts
+            .iter()
+            .map(|(name, body)| (name.as_str(), body.as_bytes(), true)),
+        "docx",
+    )
 }
 
 fn content_types(layout: &Layout) -> String {
@@ -253,11 +237,10 @@ fn root_rels() -> String {
 }
 
 fn core_props(info: &DocInfo) -> String {
-    let now = now_iso();
-    let now = now.split('.').next().unwrap_or(&now);
+    let now = xml::now_w3cdtf();
     format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>{}</dc:title><dc:creator>{}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">{now}Z</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{now}Z</dcterms:modified></cp:coreProperties>"#,
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>{}</dc:title><dc:creator>{}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified></cp:coreProperties>"#,
         xml::text(&info.title),
         xml::text(&info.author),
     )
@@ -275,7 +258,7 @@ fn document_rels(layout: &Layout) -> String {
         .iter()
         .map(|p| {
             format!(
-                r#"<Relationship Id="{}" Type="{REL}/{}" Target="{}"/>"#,
+                r#"<Relationship Id="{}" Type="{R}/{}" Target="{}"/>"#,
                 p.rel,
                 if p.header { "header" } else { "footer" },
                 p.file
@@ -597,7 +580,7 @@ fn document(
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
+    use std::io::{Cursor, Read};
 
     use super::*;
     use crate::format::{RunningHead, builtin};

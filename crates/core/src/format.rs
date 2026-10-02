@@ -151,6 +151,16 @@ impl RunningHead {
         self.is_on()
             && (self.align == HeadAlign::Outside || self.content == HeadContent::TitleChapter)
     }
+
+    /// The text of a 머리말 that is the same on every page: the pen name, the
+    /// writer's own text, or else the work's title.
+    pub fn fixed_text(&self, title: &str, author: &str) -> String {
+        match self.content {
+            HeadContent::Author => author.to_string(),
+            HeadContent::Custom => self.text.clone(),
+            _ => title.to_string(),
+        }
+    }
 }
 
 /// 꼬리말: text the writer typed, shown at the bottom of every page.
@@ -372,6 +382,12 @@ pub fn default_for(kind: ProjectKind) -> ManuscriptFormat {
 impl ManuscriptFormat {
     pub fn has_paper(&self) -> bool {
         self.paper.kind != "none"
+    }
+
+    /// 머리말 is left off the first page of each chapter. That needs chapters
+    /// to start on a new page.
+    pub fn head_skips_chapter_first(&self) -> bool {
+        self.header.is_on() && self.header.skip_chapter_first && self.chapter_new_page
     }
 
     /// The 꼬리말 and the page number would sit on top of each other.

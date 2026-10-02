@@ -13,16 +13,11 @@
 //! without it.
 
 use std::fmt::Write as _;
-use std::io::{Cursor, Write};
-
-use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipWriter};
 
 use crate::export::{DocInfo, DocOptions, ExportDoc, Piece, RunStyle, pieces};
 use crate::format::{HeadAlign, HeadContent, ManuscriptFormat, font};
 use crate::markup::{Block, ParaAttrs};
-use crate::store::now_iso;
-use crate::{Error, Result, xml};
+use crate::{Result, xml};
 
 const NAMESPACES: &str = r#"xmlns:ha="http://www.hancom.co.kr/hwpml/2011/app" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hp10="http://www.hancom.co.kr/hwpml/2016/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core" xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" xmlns:hhs="http://www.hancom.co.kr/hwpml/2011/history" xmlns:hm="http://www.hancom.co.kr/hwpml/2011/master-page" xmlns:hpf="http://www.hancom.co.kr/schema/2011/hpf" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf/" xmlns:ooxmlchart="http://www.hancom.co.kr/hwpml/2016/ooxmlchart" xmlns:hwpunitchar="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar" xmlns:epub="http://www.idpf.org/2007/ops" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0""#;
 
@@ -123,24 +118,13 @@ pub fn hwpx_bytes(
         ("META-INF/container.xml", container().into_bytes(), true),
         ("META-INF/manifest.xml", manifest().into_bytes(), true),
     ];
-
-    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
-    for (name, body, deflate) in parts {
-        // The mimetype entry must come first and stay uncompressed.
-        let method = if deflate {
-            CompressionMethod::Deflated
-        } else {
-            CompressionMethod::Stored
-        };
-        let options = SimpleFileOptions::default().compression_method(method);
-        zip.start_file(name, options)
-            .and_then(|_| zip.write_all(&body).map_err(Into::into))
-            .map_err(|e| Error::Invalid(format!("한글 파일을 만들지 못함 ({e})")))?;
-    }
-    let cursor = zip
-        .finish()
-        .map_err(|e| Error::Invalid(format!("한글 파일을 만들지 못함 ({e})")))?;
-    Ok(cursor.into_inner())
+    // The mimetype entry must come first and stay uncompressed.
+    xml::zip_package(
+        parts
+            .iter()
+            .map(|(name, body, deflate)| (*name, body.as_slice(), *deflate)),
+        "한글",
+    )
 }
 
 fn version() -> String {
@@ -174,8 +158,7 @@ fn container_rdf() -> String {
 }
 
 fn content_hpf(info: &DocInfo) -> String {
-    let now = now_iso();
-    let now = format!("{}Z", now.split('.').next().unwrap_or(&now));
+    let now = xml::now_w3cdtf();
     format!(
         r#"{XML_DECL}<opf:package {NAMESPACES} version="" unique-identifier="" id=""><opf:metadata><opf:title>{title}</opf:title><opf:language>ko</opf:language><opf:meta name="creator" content="text">{author}</opf:meta><opf:meta name="subject" content="text"/><opf:meta name="description" content="text"/><opf:meta name="lastsaveby" content="text">{author}</opf:meta><opf:meta name="CreatedDate" content="text">{now}</opf:meta><opf:meta name="ModifiedDate" content="text">{now}</opf:meta><opf:meta name="keyword" content="text"/></opf:metadata><opf:manifest><opf:item id="header" href="Contents/header.xml" media-type="application/xml"/><opf:item id="section0" href="Contents/section0.xml" media-type="application/xml"/><opf:item id="settings" href="settings.xml" media-type="application/xml"/></opf:manifest><opf:spine><opf:itemref idref="header" linear="yes"/><opf:itemref idref="section0" linear="yes"/></opf:spine></opf:package>"#,
         title = xml::text(&info.title),
@@ -795,7 +778,7 @@ fn section(
     };
     let head = &format.header;
     let mut heads = Heads::new(format);
-    let skip_first = head.is_on() && head.skip_chapter_first && format.chapter_new_page;
+    let skip_first = format.head_skips_chapter_first();
     let mut preview = String::new();
     let mut add_preview = |text: &str| {
         if preview.chars().count() < 1000 {
@@ -827,11 +810,7 @@ fn section(
                     ctrls.push_str(&heads.ctrl(&mut w, "ODD", para, chapter));
                 }
                 HeadContent::Title | HeadContent::Author | HeadContent::Custom if first => {
-                    let text = match head.content {
-                        HeadContent::Author => info.author.clone(),
-                        HeadContent::Custom => head.text.clone(),
-                        _ => info.title.clone(),
-                    };
+                    let text = head.fixed_text(&info.title, &info.author);
                     ctrls.push_str(&heads.both(&mut w, &text));
                 }
                 _ => {}
@@ -911,7 +890,9 @@ fn section(
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
+    use std::io::{Cursor, Read};
+
+    use zip::CompressionMethod;
 
     use super::*;
     use crate::format::builtin;
