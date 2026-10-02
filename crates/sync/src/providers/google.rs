@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{Account, Session, drive_error};
+use super::{Account, Session, drive_error, path_in};
 use crate::http::{Body, enc};
 use crate::remote::{Put, Remote, RemoteFile, split};
 use crate::{Error, Result};
@@ -232,26 +232,17 @@ impl Remote for GoogleRemote<'_> {
         let all = query(self.s, "trashed = false")?;
         let by_id: HashMap<&str, &File> = all.iter().map(|f| (f.id.as_str(), f)).collect();
         let root = self.root.clone();
-        // Path of an item inside the project folder, if it is in there.
-        let path_of = |file: &File| -> Option<String> {
-            let mut parts = vec![file.name.clone()];
-            let mut parent = file.parents.first()?;
-            for _ in 0..64 {
-                if *parent == root {
-                    parts.reverse();
-                    return Some(parts.join("/"));
-                }
-                let up = by_id.get(parent.as_str())?;
-                parts.push(up.name.clone());
-                parent = up.parents.first()?;
-            }
-            None
-        };
         self.files.clear();
         self.folders.clear();
         let mut out = Vec::new();
         for file in &all {
-            let Some(path) = path_of(file) else {
+            let Some(path) = path_in(
+                file,
+                &root,
+                &by_id,
+                |f| &f.name,
+                |f| f.parents.first().map(String::as_str),
+            ) else {
                 continue;
             };
             if file.mime_type == FOLDER {

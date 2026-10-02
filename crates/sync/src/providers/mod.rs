@@ -11,6 +11,7 @@
 //! installed app). Those come from [`AppIds`], read from `drive-apps.json` in
 //! the app's settings folder, or built in at compile time.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
@@ -391,6 +392,30 @@ pub(crate) fn drive_error(what: &str, reply: &Reply) -> Error {
         507 => Error::Drive(format!("{what} · 드라이브 공간이 가득 참")),
         _ => Error::Drive(format!("{what} · {} {}", reply.status, reply.text())),
     }
+}
+
+/// Path of an item inside the folder `root`, for drives that keep files by id
+/// and tell only each item's parent: worked out up the chain of parents in
+/// `by_id`. None when the item is not in there.
+pub(crate) fn path_in<'a, T>(
+    item: &'a T,
+    root: &str,
+    by_id: &HashMap<&str, &'a T>,
+    name: impl Fn(&'a T) -> &'a str,
+    parent: impl Fn(&'a T) -> Option<&'a str>,
+) -> Option<String> {
+    let mut parts = vec![name(item).to_string()];
+    let mut up = parent(item)?;
+    for _ in 0..64 {
+        if up == root {
+            parts.reverse();
+            return Some(parts.join("/"));
+        }
+        let folder = *by_id.get(up)?;
+        parts.push(name(folder).to_string());
+        up = parent(folder)?;
+    }
+    None
 }
 
 /// A project folder's name on a drive: its title, made safe for file names.

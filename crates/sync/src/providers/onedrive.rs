@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{Account, Session, drive_error};
+use super::{Account, Session, drive_error, path_in};
 use crate::http::{Body, enc};
 use crate::remote::{Put, Remote, RemoteFile};
 use crate::{Error, Result};
@@ -168,27 +168,18 @@ impl Remote for OneDriveRemote<'_> {
         }
         let items: Vec<Item> = items.into_iter().filter(|i| i.deleted.is_none()).collect();
         let by_id: HashMap<&str, &Item> = items.iter().map(|i| (i.id.as_str(), i)).collect();
-        let root = self.root_id.clone();
-        let path_of = |item: &Item| -> Option<String> {
-            let mut parts = vec![item.name.clone()];
-            let mut parent = item.parent_reference.as_ref()?.id.clone()?;
-            for _ in 0..64 {
-                if parent == root {
-                    parts.reverse();
-                    return Some(parts.join("/"));
-                }
-                let up = by_id.get(parent.as_str())?;
-                parts.push(up.name.clone());
-                parent = up.parent_reference.as_ref()?.id.clone()?;
-            }
-            None
-        };
         let mut out: Vec<RemoteFile> = items
             .iter()
             .filter(|i| i.folder.is_none() && i.id != self.root_id)
             .filter_map(|i| {
                 Some(RemoteFile {
-                    path: path_of(i)?,
+                    path: path_in(
+                        i,
+                        &self.root_id,
+                        &by_id,
+                        |i| &i.name,
+                        |i| i.parent_reference.as_ref()?.id.as_deref(),
+                    )?,
                     rev: i.e_tag.clone()?,
                 })
             })

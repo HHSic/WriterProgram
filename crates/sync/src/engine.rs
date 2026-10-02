@@ -56,15 +56,6 @@ pub struct Report {
     pub later: Vec<String>,
 }
 
-impl Report {
-    pub fn changed_here(&self) -> bool {
-        !self.downloaded.is_empty()
-            || !self.removed_here.is_empty()
-            || !self.copies.is_empty()
-            || self.merged
-    }
-}
-
 /// A file here: its fingerprint, its size and time, and its content when read.
 struct Here {
     rev: String,

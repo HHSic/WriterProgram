@@ -11,6 +11,8 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde_json::{Value, json};
 use writer_core::store::sha256;
 use writer_sync::providers::{Endpoints, Provider};
@@ -168,7 +170,7 @@ fn token_endpoint(req: &Request, state: &mut SignIn) -> Response {
     match form.get("grant_type").map(String::as_str) {
         Some("authorization_code") => {
             let verifier = form.get("code_verifier").cloned().unwrap_or_default();
-            let challenge = base64_url(&sha256(verifier.as_bytes()));
+            let challenge = URL_SAFE_NO_PAD.encode(sha256(verifier.as_bytes()));
             if form.get("code").map(String::as_str) != Some(CODE)
                 || challenge != state.challenge
                 || form.get("redirect_uri") != Some(&state.redirect)
@@ -188,20 +190,6 @@ fn token_endpoint(req: &Request, state: &mut SignIn) -> Response {
         }
         _ => json_reply(400, json!({ "error": "invalid_grant" })),
     }
-}
-
-fn base64_url(bytes: &[u8]) -> String {
-    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let mut out = String::new();
-    for chunk in bytes.chunks(3) {
-        let n = (chunk[0] as u32) << 16
-            | (*chunk.get(1).unwrap_or(&0) as u32) << 8
-            | *chunk.get(2).unwrap_or(&0) as u32;
-        for i in 0..(chunk.len() + 1) {
-            out.push(T[(n >> (18 - 6 * i) & 63) as usize] as char);
-        }
-    }
-    out
 }
 
 /// The drive's sign-in page, answered as if the writer signed in at once.
