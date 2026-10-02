@@ -733,6 +733,18 @@ impl InlineParser {
     }
 }
 
+/// Plain text of a paragraph's content, line breaks as `\n`.
+pub fn inline_text(content: &[Inline]) -> String {
+    let mut text = String::new();
+    for inline in content {
+        match inline {
+            Inline::Text { text: t, .. } => text.push_str(t),
+            Inline::HardBreak {} => text.push('\n'),
+        }
+    }
+    text
+}
+
 /// Plain text of a body: paragraphs joined by newlines, scene breaks as empty
 /// lines. Used for search and previews.
 pub fn plain_text(blocks: &[Block]) -> String {

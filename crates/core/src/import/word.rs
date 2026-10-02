@@ -11,7 +11,7 @@ use zip::ZipArchive;
 
 use super::text::is_scene;
 use super::{Item, Raw, SkipKind};
-use crate::markup::{Inline, Mark};
+use crate::markup::{Inline, Mark, inline_text};
 
 /// Largest XML part read, against files made to swell.
 pub(super) const PART_LIMIT: u64 = 256 * 1024 * 1024;
@@ -288,7 +288,7 @@ fn body(xml: &str, styles: &Styles) -> Result<Vec<Item>, String> {
     let close = |para: Option<Para>, items: &mut Vec<Item>| {
         let Some(mut p) = para else { return };
         trim_ends(&mut p.inlines);
-        let text = super::plain(&p.inlines);
+        let text = inline_text(&p.inlines);
         let toc = p.style.as_deref().is_some_and(|s| styles.is_toc(s));
         if !text.trim().is_empty() && !toc {
             let level = p

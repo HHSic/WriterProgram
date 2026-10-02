@@ -16,7 +16,7 @@ use super::text::is_scene;
 use super::word::{Para, Run, Tok, read_part, trim_ends, val, walk};
 use super::{Item, Raw, SkipKind};
 use crate::format::{HeadAlign, Margins};
-use crate::markup::Inline;
+use crate::markup::{Inline, inline_text};
 
 const BROKEN: &str = "한글 문서(HWPX)가 아니거나 손상됨";
 
@@ -306,7 +306,7 @@ fn section(
             toc,
         } = open;
         trim_ends(&mut para.inlines);
-        let text = super::plain(&para.inlines);
+        let text = inline_text(&para.inlines);
         if !text.trim().is_empty() && !toc {
             let single = !text.contains('\n');
             if is_scene(&text) && single && heading.is_none() {
@@ -500,7 +500,7 @@ mod tests {
         let kinds: Vec<String> = items
             .iter()
             .map(|i| match i {
-                Item::Para(inl) => format!("p:{}", super::super::plain(inl)),
+                Item::Para(inl) => format!("p:{}", inline_text(inl)),
                 Item::Heading { level, text } => format!("h{level}:{text}"),
                 Item::Scene => "scene".into(),
                 Item::Skip(k, n) => format!("skip:{}:{n}", k.label()),

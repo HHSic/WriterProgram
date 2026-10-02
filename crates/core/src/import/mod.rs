@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::count::count_blocks;
 use crate::doc::{self, DocFile, DocMeta, STATUSES};
-use crate::markup::{Block, Inline, Mark, MemoAttrs, plain_text};
+use crate::markup::{Block, Inline, Mark, MemoAttrs, inline_text, plain_text};
 use crate::notes::{self, Anchor, NewNote};
 use crate::project::{self, MANUSCRIPT_DIR};
 use crate::store::new_id;
@@ -196,17 +196,6 @@ impl Split {
     }
 }
 
-fn plain(inlines: &[Inline]) -> String {
-    let mut s = String::new();
-    for i in inlines {
-        match i {
-            Inline::Text { text, .. } => s.push_str(text),
-            Inline::HardBreak {} => s.push('\n'),
-        }
-    }
-    s
-}
-
 /// The first line of a paragraph and what follows it.
 fn split_first_line(inlines: &[Inline]) -> (String, Vec<Inline>) {
     let cut = inlines
@@ -217,7 +206,7 @@ fn split_first_line(inlines: &[Inline]) -> (String, Vec<Inline>) {
         .get(cut + 1..)
         .map(<[Inline]>::to_vec)
         .unwrap_or_default();
-    (plain(&inlines[..cut]), rest)
+    (inline_text(&inlines[..cut]), rest)
 }
 
 fn is_title_line(re: &Regex, line: &str) -> bool {
@@ -339,7 +328,7 @@ fn split(items: Vec<Item>, how: &Split, stem: &str, file: usize) -> Vec<Chapter>
                                 level: 1,
                                 text: line.trim().to_string(),
                             });
-                            if !plain(&rest).trim().is_empty() {
+                            if !inline_text(&rest).trim().is_empty() {
                                 out.push(Item::Para(rest));
                             }
                         } else {

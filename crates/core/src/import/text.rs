@@ -261,7 +261,7 @@ mod tests {
         raw.items
             .iter()
             .map(|i| match i {
-                Item::Para(inl) => super::super::plain(inl),
+                Item::Para(inl) => crate::markup::inline_text(inl),
                 Item::Scene => "<scene>".into(),
                 Item::Heading { level, text } => format!("<h{level}>{text}"),
                 Item::Skip(kind, n) => format!("<skip {kind:?} {n}>"),
