@@ -19,6 +19,12 @@ impl Reason for writer_sync::Error {
     }
 }
 
+impl Reason for writer_ai::Error {
+    fn reason(&self) -> String {
+        self.user_message()
+    }
+}
+
 /// The error's reason for the screen (`.map_err(fail)`).
 pub fn fail(e: impl Reason) -> String {
     e.reason()

@@ -3,6 +3,7 @@
 //! The drives' commands are in `crate::drives`, the in-app browser's in
 //! `crate::browser`.
 
+pub mod ai;
 pub mod cards;
 pub mod doc;
 pub mod exchange;

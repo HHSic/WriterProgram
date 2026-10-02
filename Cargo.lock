@@ -5505,7 +5505,9 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
+ "tempfile",
  "windows-native-keyring-store",
+ "writer-ai",
  "writer-core",
  "writer-sync",
 ]
