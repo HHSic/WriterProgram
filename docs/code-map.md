@@ -36,7 +36,7 @@
 | `api/types/` | Rust와 주고받는 타입, 영역별 파일. `backend.ts`가 명령 목록(`Backend`) |
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
 | `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web …), 화면은 `store/index.ts`에서 가져다 씀 |
-| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`) |
+| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
 | `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/` |
 | `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`) |
 | `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
