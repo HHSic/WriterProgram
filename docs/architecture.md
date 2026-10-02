@@ -13,7 +13,7 @@ v0.1 구현의 뼈대. 화면 설계는 [screens.md](screens.md), 영역별 데�
 | `app/src/editor` | 편집기 스키마, 자동 저장, 글자 수, 장면 개요, 찾기 강조, 설정집 이름 강조, 메모 구간, 두 창에 연 같은 문서 맞추기 |
 | `app/src/screens`, `app/src/workspace` | 시작 화면, 새 작품, 작업 화면(왼쪽 탐색 · 가운데 탭과 분할 · 오른쪽 맥락), 설정 카드, 메모함, 개요 표 |
 | `app/src/lib/tabs.ts` | 가운데 탭과 분할 창 (순수 함수, 상태는 store) |
-| `app/src/store.ts` | 화면 상태와 동작 (zustand) |
+| `app/src/store/` | 화면 상태와 동작 (zustand). 영역별 파일, 화면은 `store/index.ts`에서 가져다 씀 |
 
 ## 작품 폴더
 
