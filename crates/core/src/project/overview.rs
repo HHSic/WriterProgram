@@ -98,11 +98,11 @@ pub struct Overview {
     pub total_pages: Option<u32>,
     pub card_types: Vec<CardType>,
     pub cards: Vec<CardSummary>,
-    /// Copies left by sync programs, waiting for the writer to pick (copies.rs).
+    /// Copies left by sync programs, waiting for the writer to pick (copies/).
     pub copies: Vec<CopyInfo>,
 }
 
-/// Opens a project: sorts out what sync programs left (copies.rs), brings the
+/// Opens a project: sorts out what sync programs left (copies/), brings the
 /// structure in line with the files on disk, clears expired trash and old
 /// automatic records, and returns the overview.
 pub fn open(root: &Path) -> Result<Overview> {

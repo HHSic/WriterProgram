@@ -11,7 +11,7 @@
 //! created: "2026-09-27T01:00:00.000Z"
 //! ---
 //!
-//! 본문 (markup.rs)
+//! 본문 (markup/)
 //! ```
 //!
 //! Front matter values are JSON scalars, which YAML also reads. Keys this

@@ -23,7 +23,7 @@ cargo test --release
 |---|---|
 | `src/text.rs` | 문단·문장 나누기, 지문/대사/속말 구분, 상태창·장면 나눔 표시 제외 |
 | `src/morph.rs` | lindera + ko-dic 형태소 분석, 활용형을 형태소 목록으로 풀기 |
-| `src/rules.rs` | 점검 규칙, 장르 프로필, 설정집 이름 |
+| `src/rules/` | 점검 규칙(묶음마다 파일 하나), 장르 프로필, 설정집 이름 |
 | `src/hangul.rs` | 받침 붙이기, 조사 고르기, 자모 단위 편집 거리 |
 | `src/main.rs` | 명령줄 도구 `revise-check` |
 

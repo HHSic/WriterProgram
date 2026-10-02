@@ -240,7 +240,7 @@ pub fn load(root: &Path, id: &str) -> Result<Card> {
 }
 
 /// Every card, sorted by name. Copies left by sync programs are not cards of
-/// their own (copies.rs).
+/// their own (copies/).
 pub fn load_all(root: &Path) -> Result<Vec<Card>> {
     let dir = root.join(CARDS_DIR);
     let mut cards = Vec::new();

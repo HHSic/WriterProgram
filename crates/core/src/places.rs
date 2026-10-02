@@ -3,7 +3,7 @@
 //! Drive), and a folder on this computer only.
 //!
 //! A project inside one of those folders goes to the other devices by itself;
-//! the app only needs to cope with changes arriving (copies.rs). Detection
+//! the app only needs to cope with changes arriving (copies/). Detection
 //! looks where each program keeps its folder:
 //!
 //! | program | Windows | macOS |
