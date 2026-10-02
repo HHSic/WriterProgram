@@ -30,7 +30,13 @@ export function ProjectSizeField() {
   if (!sizes) return null;
 
   const parts = [`원고 ${sizeText(sizes.writing)}`];
-  if (sizes.records) parts.push(`기록 ${sizeText(sizes.records)}`);
+  if (sizes.records) {
+    parts.push(
+      sizes.daily
+        ? `기록 ${sizeText(sizes.records)}(그중 창작 과정 보관 ${sizeText(sizes.daily)})`
+        : `기록 ${sizeText(sizes.records)}`,
+    );
+  }
   if (sizes.trash) parts.push(`휴지통 ${sizeText(sizes.trash)}`);
   if (sizes.exchanges) parts.push(`교정 주고받기 ${sizeText(sizes.exchanges)}`);
   if (sizes.journal) parts.push(`창작 일지 ${sizeText(sizes.journal)}`);

@@ -20,6 +20,8 @@ pub struct JournalSettings {
     device: String,
     enabled: bool,
     noticed: bool,
+    /// Daily time stamps allowed; null until the writer has been asked.
+    anchor: Option<bool>,
 }
 
 impl From<&Settings> for JournalSettings {
@@ -28,6 +30,7 @@ impl From<&Settings> for JournalSettings {
             device: s.device.clone(),
             enabled: s.enabled,
             noticed: s.noticed,
+            anchor: s.anchor,
         }
     }
 }
@@ -49,14 +52,15 @@ pub async fn journal_settings(app: AppHandle) -> Res<JournalSettings> {
     Ok(JournalSettings::from(&settings))
 }
 
-/// Turns the journal on or off for this device, or notes that the writer has
-/// seen the first-use notice.
+/// Turns the journal on or off for this device, notes that the writer has
+/// seen the first-use notice, or allows (or not) the daily time stamps.
 #[tauri::command]
 pub async fn journal_set(
     app: AppHandle,
     state: State<'_, AppState>,
     enabled: Option<bool>,
     noticed: Option<bool>,
+    anchor: Option<bool>,
 ) -> Res<JournalSettings> {
     let _write = state.write();
     let path = journal_file(&app)?;
@@ -66,6 +70,9 @@ pub async fn journal_set(
     }
     if let Some(noticed) = noticed {
         settings.noticed = noticed;
+    }
+    if anchor.is_some() {
+        settings.anchor = anchor;
     }
     journal::save_settings(&path, &settings).map_err(fail)?;
     journal::set_device(settings.active_device());

@@ -5909,6 +5909,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
+ "ureq",
  "windows-native-keyring-store",
  "writer-core",
  "writer-sync",

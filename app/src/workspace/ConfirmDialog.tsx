@@ -13,8 +13,15 @@ export function ConfirmDialog({ dialog }: { dialog: Extract<Dialog, { kind: 'con
       width={440}
       footer={
         <>
-          <button type="button" className="btn" onClick={closeDialog}>
-            취소
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              dialog.onCancel?.();
+              closeDialog();
+            }}
+          >
+            {dialog.cancel ?? '취소'}
           </button>
           <button
             type="button"

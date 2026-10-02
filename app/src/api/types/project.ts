@@ -22,6 +22,8 @@ export interface ProjectInfo {
   goal: Goal;
   sceneBreak: string;
   manuscriptFormat: ManuscriptFormat;
+  /** 창작 과정 보관: each chapter's last record of a day is never cleared. */
+  keepDaily: boolean;
 }
 
 export interface PartView {
@@ -68,6 +70,8 @@ export interface ProjectSizes {
   writing: number;
   /** Records (.snapshots). */
   records: number;
+  /** Of the records, the ones kept only as each chapter's last state of a day (창작 과정 보관). */
+  daily: number;
   trash: number;
   /** The writing journal; 0 when there is none. */
   journal: number;
@@ -88,4 +92,5 @@ export interface ProjectPatch {
   goal?: Goal;
   sceneBreak?: string;
   manuscriptFormat?: ManuscriptFormat;
+  keepDaily?: boolean;
 }

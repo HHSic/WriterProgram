@@ -15,6 +15,7 @@ export const projectMethods = {
     return {
       writing,
       records,
+      daily: 0,
       trash: p.trash.length ? bytesOf(p.trash) : 0,
       journal: 0,
       exchanges: 0,
