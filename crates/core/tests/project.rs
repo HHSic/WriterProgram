@@ -186,13 +186,15 @@ fn records_by_hand_and_going_back() {
 
 /// A record file of `kind`, `days` old, for the document `id`.
 fn old_record(root: &Path, id: &str, kind: &str, days: i64) -> String {
+    record_at(root, id, kind, chrono::Utc::now() - Duration::days(days))
+}
+
+/// A record file of `kind` made `at`, for the document `id`.
+fn record_at(root: &Path, id: &str, kind: &str, at: chrono::DateTime<chrono::Utc>) -> String {
     let current = doc::load(root, id).unwrap();
     let made = snapshot::create(root, &current, kind, "").unwrap();
     let records = root.join(".snapshots").join(id);
-    let stem = format!(
-        "{}.{kind}",
-        writer_core::store::stamp(chrono::Utc::now() - Duration::days(days))
-    );
+    let stem = format!("{}.{kind}", writer_core::store::stamp(at));
     fs::rename(
         records.join(format!("{}.md", made.id)),
         records.join(format!("{stem}.md")),
@@ -268,6 +270,86 @@ fn tidying_records_removes_only_old_automatic_ones() {
 
     // Nothing more to tidy.
     assert_eq!(project::sizes(&root).unwrap().tidy_frees, 0);
+}
+
+#[test]
+fn keeping_daily_states_spares_each_days_last_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    doc::save_body(
+        &root,
+        &id,
+        body(&["하루의 마지막 상태."]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
+    // Noon (local time) `days` ago, give or take some hours: same day.
+    let noon = |days: i64, hours: i64| {
+        let day = chrono::Local::now().date_naive() - Duration::days(days);
+        day.and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_local_timezone(chrono::Local)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+            + Duration::hours(hours)
+    };
+    let early_100 = record_at(&root, &id, "auto", noon(100, -3));
+    let late_100 = record_at(&root, &id, "auto", noon(100, 2));
+    let early_30 = record_at(&root, &id, "auto", noon(30, -3));
+    let late_30 = record_at(&root, &id, "auto", noon(30, 2));
+    // The newest automatic record stays anyway; the ones above are older.
+    record_at(&root, &id, "auto", noon(20, 0));
+    let stems = || -> Vec<String> {
+        snapshot::list(&root, &id)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect()
+    };
+
+    let off = project::sizes(&root).unwrap();
+    assert_eq!(off.daily, 0);
+    let info = project::update(
+        &root,
+        &project::ProjectPatch {
+            keep_daily: Some(true),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(info.keep_daily);
+    let on = project::sizes(&root).unwrap();
+    assert!(on.daily > 0);
+    assert_eq!(on.tidy_frees + on.daily, off.tidy_frees);
+
+    // Opening clears records past 90 days, but not the day's last one.
+    project::open(&root).unwrap();
+    let kept = stems();
+    assert!(
+        kept.contains(&late_100) && !kept.contains(&early_100),
+        "{kept:?}"
+    );
+    project::tidy_records(&root).unwrap();
+    let kept = stems();
+    assert!(
+        kept.contains(&late_30) && !kept.contains(&early_30),
+        "{kept:?}"
+    );
+    assert!(kept.contains(&late_100));
+
+    // Turned off, the next opening clears it like any old automatic record.
+    project::update(
+        &root,
+        &project::ProjectPatch {
+            keep_daily: Some(false),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    project::open(&root).unwrap();
+    assert!(!stems().contains(&late_100));
 }
 
 #[test]

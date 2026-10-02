@@ -11,7 +11,7 @@ use std::path::Path;
 use chrono::Duration;
 use serde::Serialize;
 
-use super::{AUTO_RECORD_DAYS, MANUSCRIPT_DIR, PLANNING_DIR, PROJECT_FILE};
+use super::{AUTO_RECORD_DAYS, MANUSCRIPT_DIR, PLANNING_DIR, PROJECT_FILE, load};
 use crate::Result;
 use crate::cards::CARDS_DIR;
 use crate::notes::NOTES_DIR;
@@ -31,6 +31,9 @@ pub struct Sizes {
     pub writing: u64,
     /// Records (.snapshots).
     pub records: u64,
+    /// Of the records, the ones kept only as each chapter's last state of a
+    /// day (창작 과정 보관); 0 while that is off.
+    pub daily: u64,
     pub trash: u64,
     /// The writing journal (.journal); 0 when there is none.
     pub journal: u64,
@@ -88,13 +91,21 @@ pub fn sizes(root: &Path) -> Result<Sizes> {
     .map(|p| size_of(&root.join(p)))
     .sum();
     let records = size_of(&root.join(SNAPSHOT_DIR));
-    let tidy_frees = snapshot::tidy_plan(root, Duration::days(AUTO_RECORD_DAYS))?
+    let keep = Duration::days(AUTO_RECORD_DAYS);
+    let keep_daily = load(root).is_ok_and(|p| p.keep_daily);
+    let tidy_frees = snapshot::tidy_plan(root, keep, keep_daily)?
         .iter()
         .map(|(_, size)| size)
         .sum();
+    let daily = if keep_daily {
+        snapshot::daily_size(root, keep)?
+    } else {
+        0
+    };
     Ok(Sizes {
         writing,
         records,
+        daily,
         trash: size_of(&root.join(TRASH_DIR)),
         journal: size_of(&root.join(JOURNAL_DIR)),
         exchanges: size_of(&root.join(crate::corrections::EXCHANGE_DIR)),
@@ -106,7 +117,8 @@ pub fn sizes(root: &Path) -> Result<Sizes> {
 
 /// Tidies old automatic records (snapshot::tidy_plan); returns the bytes freed.
 pub fn tidy_records(root: &Path) -> Result<u64> {
-    snapshot::tidy(root, Duration::days(AUTO_RECORD_DAYS))
+    let keep_daily = load(root)?.keep_daily;
+    snapshot::tidy(root, Duration::days(AUTO_RECORD_DAYS), keep_daily)
 }
 
 /// Free room for this user on the disk holding `path`.

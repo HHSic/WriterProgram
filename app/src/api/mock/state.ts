@@ -195,6 +195,7 @@ export function createProject(parent: string, title: string, kind: ProjectInfo['
       goal: { perDoc, countSpaces, daily: null },
       sceneBreak: kind === 'webnovel' ? '◆' : '*',
       manuscriptFormat: defaultFormat(kind),
+      keepDaily: false,
     },
     parts: [{ id: id(), title: '1부', docs: [] }],
     planning: [],

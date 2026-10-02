@@ -1,8 +1,36 @@
 import { describe, expect, it } from 'vitest';
 import type { JournalSummary } from '../api/types';
-import { journalCheckText, journalSummaryText } from './journalText';
+import { anchorResultText, anchorText, journalCheckText, journalSummaryText } from './journalText';
 
-const empty: JournalSummary = { since: null, saves: 0, sessions: 0, pastes: 0, imports: 0, exchanges: 0, devices: 0, thisDevice: 0 };
+const empty: JournalSummary = {
+  since: null,
+  saves: 0,
+  sessions: 0,
+  pastes: 0,
+  imports: 0,
+  exchanges: 0,
+  anchors: 0,
+  lastAnchor: null,
+  devices: 0,
+  thisDevice: 0,
+};
+
+describe('time stamp sentences', () => {
+  it('says when the last one was signed', () => {
+    expect(anchorText(empty)).toBe('아직 날짜 증명을 받지 않았습니다.');
+    expect(anchorText({ ...empty, anchors: 6, lastAnchor: '2026-10-02T03:00:00.000Z' })).toBe(
+      '마지막 날짜 증명: 2026년 10월 2일',
+    );
+  });
+
+  it('says what asking came to', () => {
+    expect(anchorResultText({ state: 'signed', signed: ['DigiCert', 'FreeTSA'] })).toBe(
+      'DigiCert, FreeTSA에서 날짜 증명을 받았습니다.',
+    );
+    expect(anchorResultText({ state: 'unchanged', signed: [] })).toContain('바뀐 것이 없');
+    expect(anchorResultText({ state: 'offline', signed: [] })).toContain('나중에');
+  });
+});
 
 describe('journal sentences', () => {
   it('says how long and how often', () => {

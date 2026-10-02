@@ -11,6 +11,7 @@ import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { MoveDialog } from './MoveProject';
 import { PromptDialog } from './PromptDialog';
+import { ProofDialog } from './ProofDialog';
 import { ProjectSettingsDialog } from './settings/ProjectSettingsDialog';
 import { SymbolsDialog } from './Symbols';
 import { TrashDialog } from './TrashDialog';
@@ -53,5 +54,7 @@ export function DialogHost() {
       return <DriveImportDialog />;
     case 'ai':
       return <AiDialog />;
+    case 'proof':
+      return <ProofDialog />;
   }
 }

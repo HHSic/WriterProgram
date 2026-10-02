@@ -76,7 +76,12 @@ export type Dialog =
       confirm: string;
       danger?: boolean;
       onConfirm: () => Promise<void> | void;
-    };
+      /** The other button's label (취소) and what it does besides closing. */
+      cancel?: string;
+      onCancel?: () => void;
+    }
+  /** 창작 과정 증명서 만들기. */
+  | { kind: 'proof' };
 
 /** A document whose text another device changed while it was being edited here. */
 export interface DocConflict {

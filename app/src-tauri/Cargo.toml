@@ -24,6 +24,9 @@ tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 writer-ai = { path = "../../crates/ai" }
+# Time stamps for the creation proof (commands/anchor.rs); already in the
+# tree through writer-sync.
+ureq = "3"
 writer-core = { path = "../../crates/core" }
 writer-sync = { path = "../../crates/sync" }
 

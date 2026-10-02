@@ -7,6 +7,8 @@ export interface JournalSettings {
   enabled: boolean;
   /** The writer has seen the first-use notice. */
   noticed: boolean;
+  /** Daily time stamps (시각 고정) allowed on this device; null until asked. */
+  anchor: boolean | null;
 }
 
 /** What the editor reports. Counts only, never text. */
@@ -23,6 +25,10 @@ export interface JournalSummary {
   imports: number;
   /** 교정 주고받기 lines: chapters sent, corrected files taken back, corrections applied. */
   exchanges: number;
+  /** Time stamps (one per authority) on all devices. */
+  anchors: number;
+  /** When the newest time stamp was signed. */
+  lastAnchor: string | null;
   /** Devices with a journal in this project. */
   devices: number;
   /** Lines written by this device. */
@@ -40,5 +46,35 @@ export interface JournalFileCheck {
 
 export interface JournalReport {
   files: JournalFileCheck[];
+  ok: boolean;
+}
+
+/** What a time stamp request came to (시각 고정, commands/anchor.rs). */
+export interface AnchorResult {
+  state: 'signed' | 'notAllowed' | 'journalOff' | 'noJournal' | 'unchanged' | 'doneToday' | 'offline';
+  /** Authorities that signed. */
+  signed: string[];
+}
+
+/** What the writer picks for a creation proof certificate (writer_core::proof::Options). */
+export interface ProofOptions {
+  /** Chapters covered; null for the whole work. */
+  docs: string[] | null;
+  /** First and last day covered, `YYYY-MM-DD`, both included; null for no limit. */
+  from: string | null;
+  to: string | null;
+  /** Chapters whose draft and final text are compared on the page. */
+  excerpts: string[];
+  /** Times on the page as dates only. */
+  datesOnly: boolean;
+}
+
+/** Where a certificate was written. */
+export interface ProofWritten {
+  folder: string;
+  html: string;
+  bundle: string;
+  summary: string;
+  /** Its own check found nothing wrong. */
   ok: boolean;
 }

@@ -73,6 +73,10 @@ pub struct Settings {
     /// The writer has been told the journal is kept (spec §7).
     #[serde(default)]
     pub noticed: bool,
+    /// Whether a fingerprint may go to the time-stamping authorities once a
+    /// day (시각 고정, `anchor` module); none until the writer is asked.
+    #[serde(default)]
+    pub anchor: Option<bool>,
 }
 
 fn on() -> bool {
@@ -101,6 +105,7 @@ pub fn load_settings(path: &Path) -> Result<Settings> {
         device: new_id(),
         enabled: true,
         noticed: false,
+        anchor: None,
     };
     save_settings(path, &settings)?;
     Ok(settings)
@@ -127,7 +132,9 @@ pub enum Entry {
     /// 교정 주고받기: chapters sent to an editor, a corrected file taken
     /// back, or corrections applied.
     Exchange(Exchange),
-    // Later: `anchor` (time-stamping, §4.2).
+    /// A time-stamping authority signed the fingerprint of the journals and
+    /// chapters (시각 고정, `anchor` module): one line per authority.
+    Anchor(Anchor),
     // `verify` and `summary` read kinds they do not know, so older versions
     // keep checking newer journals.
 }
@@ -220,6 +227,21 @@ pub struct Exchange {
     pub docs: Vec<ExchangeDoc>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Anchor {
+    /// The Merkle root sent (hex); the record beside the token has its leaves.
+    pub root: String,
+    /// Short name of the authority (`anchor::TSAS`).
+    pub tsa: String,
+    /// The token's file name in `.journal/anchors/`.
+    pub file: String,
+    /// SHA-256 (hex) of the token file.
+    pub token: String,
+    /// When the authority signed, as it says (UTC).
+    pub gen_time: String,
+}
+
 impl Entry {
     pub fn kind(&self) -> &'static str {
         match self {
@@ -229,6 +251,7 @@ impl Entry {
             Entry::Import(_) => "import",
             Entry::Snapshot(_) => "snapshot",
             Entry::Exchange(_) => "exchange",
+            Entry::Anchor(_) => "anchor",
         }
     }
 
@@ -240,6 +263,7 @@ impl Entry {
             Entry::Import(e) => serde_json::to_string(e),
             Entry::Snapshot(e) => serde_json::to_string(e),
             Entry::Exchange(e) => serde_json::to_string(e),
+            Entry::Anchor(e) => serde_json::to_string(e),
         }
         .expect("entries serialize");
         // `{"a":1,"b":2}` → `"a":1,"b":2`
@@ -276,7 +300,7 @@ pub fn append(root: &Path, device: &str, entry: &Entry) -> Result<()> {
     append_at(root, device, entry, &now_iso())
 }
 
-fn append_at(root: &Path, device: &str, entry: &Entry, time: &str) -> Result<()> {
+pub(crate) fn append_at(root: &Path, device: &str, entry: &Entry, time: &str) -> Result<()> {
     if !is_id(device) {
         return Err(Error::Invalid("올바르지 않은 기기 이름".into()));
     }
@@ -452,6 +476,21 @@ fn files(root: &Path) -> Result<Vec<(String, PathBuf)>> {
     Ok(out)
 }
 
+/// Every device's journal in `root`: (device id, its lines without line
+/// breaks), sorted by device.
+pub fn read_all(root: &Path) -> Result<Vec<(String, Vec<Vec<u8>>)>> {
+    let mut out = Vec::new();
+    for (device, path) in files(root)? {
+        let bytes = fs::read(&path).map_err(|e| Error::io(&path, e))?;
+        let lines = lines(&bytes).into_iter().map(<[u8]>::to_vec).collect();
+        out.push((device, lines));
+    }
+    Ok(out)
+}
+
+/// The `prev` of a file's first line.
+pub const FIRST_PREV: &str = NO_PREV;
+
 /// Lines of a journal file, without line breaks. A last line without a line
 /// break (cut short) is included.
 fn lines(bytes: &[u8]) -> Vec<&[u8]> {
@@ -545,6 +584,10 @@ pub struct Summary {
     pub imports: usize,
     /// 교정 주고받기 lines: chapters sent, files taken back, corrections applied.
     pub exchanges: usize,
+    /// Time stamps (one line per authority) on all devices.
+    pub anchors: usize,
+    /// When the newest time stamp was signed, on any device.
+    pub last_anchor: Option<String>,
     /// Devices with a journal in this project.
     pub devices: usize,
     /// Lines written by this device.
@@ -554,6 +597,7 @@ pub struct Summary {
 pub fn summary(root: &Path, device: Option<&str>) -> Result<Summary> {
     let mut out = Summary::default();
     let mut since: Option<chrono::DateTime<chrono::Utc>> = None;
+    let mut last_anchor: Option<chrono::DateTime<chrono::Utc>> = None;
     for (name, path) in files(root)? {
         let bytes = fs::read(&path).map_err(|e| Error::io(&path, e))?;
         out.devices += 1;
@@ -571,6 +615,15 @@ pub fn summary(root: &Path, device: Option<&str>) -> Result<Summary> {
                 Some("paste") => out.pastes += 1,
                 Some("import") => out.imports += 1,
                 Some("exchange") => out.exchanges += 1,
+                Some("anchor") => {
+                    out.anchors += 1;
+                    let signed = v.get("genTime").and_then(Value::as_str);
+                    if let Some(t) = signed.and_then(parse_iso)
+                        && last_anchor.is_none_or(|l| t > l)
+                    {
+                        last_anchor = Some(t);
+                    }
+                }
                 _ => {}
             }
             if let Some(t) = v.get("time").and_then(Value::as_str).and_then(parse_iso)
@@ -581,6 +634,7 @@ pub fn summary(root: &Path, device: Option<&str>) -> Result<Summary> {
         }
     }
     out.since = since.map(to_iso);
+    out.last_anchor = last_anchor.map(to_iso);
     Ok(out)
 }
 

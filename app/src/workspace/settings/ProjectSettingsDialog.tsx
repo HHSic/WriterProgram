@@ -32,6 +32,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
   const [sceneBreak, setSceneBreak] = useState(project.sceneBreak);
   const [goal, setGoal] = useState<Goal>(project.goal);
   const [format, setFormat] = useState<ManuscriptFormat>(project.manuscriptFormat);
+  const [keepDaily, setKeepDaily] = useState(project.keepDaily);
   const [busy, setBusy] = useState(false);
   const where = usePlaceOf(ov.root);
 
@@ -45,6 +46,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
       sceneBreak,
       goal,
       manuscriptFormat: format,
+      keepDaily,
     });
     setBusy(false);
     if (ok) closeDialog();
@@ -134,7 +136,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
           </div>
           <ProjectSizeField />
           <ProjectDriveField />
-          <JournalField root={ov.root} />
+          <JournalField root={ov.root} keepDaily={keepDaily} onKeepDaily={setKeepDaily} />
         </div>
       )}
 

@@ -140,3 +140,25 @@ input.num {
 .format-chip:hover {
   background: var(--hover);
 }
+
+/* 창작 과정 증명서 만들기 (workspace/ProofDialog.tsx) */
+
+.proof-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.proof-summary {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--sidebar);
+  font-size: 13px;
+  line-height: 1.6;
+}

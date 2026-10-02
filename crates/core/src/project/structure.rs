@@ -20,6 +20,7 @@ pub struct ProjectPatch {
     pub goal: Option<Goal>,
     pub scene_break: Option<String>,
     pub manuscript_format: Option<ManuscriptFormat>,
+    pub keep_daily: Option<bool>,
 }
 
 pub fn update(root: &Path, patch: &ProjectPatch) -> Result<ProjectInfo> {
@@ -50,6 +51,9 @@ pub fn update(root: &Path, patch: &ProjectPatch) -> Result<ProjectInfo> {
         format.validate()?;
         project.preset = format.preset.clone();
         project.manuscript_format = Some(format.clone());
+    }
+    if let Some(keep) = patch.keep_daily {
+        project.keep_daily = keep;
     }
     save(root, &project)?;
     Ok(ProjectInfo::from(&project))

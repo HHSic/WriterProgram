@@ -29,6 +29,8 @@ pub struct ProjectInfo {
     pub goal: Goal,
     pub scene_break: String,
     pub manuscript_format: ManuscriptFormat,
+    /// 창작 과정 보관 (`Project::keep_daily`).
+    pub keep_daily: bool,
 }
 
 impl From<&Project> for ProjectInfo {
@@ -42,6 +44,7 @@ impl From<&Project> for ProjectInfo {
             goal: p.goal.clone(),
             scene_break: p.scene_break.clone(),
             manuscript_format: p.manuscript_format(),
+            keep_daily: p.keep_daily,
         }
     }
 }
@@ -118,7 +121,11 @@ pub fn open(root: &Path) -> Result<Overview> {
         save(root, &project)?;
     }
     trash::purge(root, chrono::Duration::days(TRASH_DAYS))?;
-    snapshot::prune(root, chrono::Duration::days(AUTO_RECORD_DAYS))?;
+    snapshot::prune(
+        root,
+        chrono::Duration::days(AUTO_RECORD_DAYS),
+        project.keep_daily,
+    )?;
     overview(root)
 }
 
