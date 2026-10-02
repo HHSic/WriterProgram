@@ -2,8 +2,8 @@
 
 import { api } from '../api';
 import type { DocStatus, NewDoc } from '../api/types';
-import { get } from './state';
-import { allManuscript, findDoc, patchSummary, root, saveEverything, showToast, toastError } from './ui';
+import { get, root } from './state';
+import { allManuscript, findDoc, patchSummary, saveEverything, showToast, toastError } from './ui';
 import { dropEverywhere, openTarget } from './tabs';
 import { refreshOverview } from './project';
 

@@ -5,11 +5,31 @@ import type { Overview } from '../api/types';
 import { blocksFromNode, countBlocks } from '../editor/counts';
 import { type Pane, type SplitDir, type Target, activeTab, dropTargets, fromSaved, makePane, moveTab, navigate, openTab, removeTab, sameTarget, step, toSaved } from '../lib/tabs';
 import { get, set } from './state';
-import { findDoc, saveEverything } from './ui';
-import { initialDoc, rememberDoc } from './project';
+import { allManuscript, findDoc, saveEverything } from './ui';
 
 // ---------------------------------------------------------------------------
 // Tabs and panes (lib/tabs.ts)
+
+// The document last open in each project, to open it again next time.
+const LAST_DOC_KEY = 'wp.lastDoc.';
+
+export function rememberDoc(projectId: string, docId: string) {
+  try {
+    localStorage.setItem(LAST_DOC_KEY + projectId, docId);
+  } catch {
+    // Not critical.
+  }
+}
+
+export function initialDoc(ov: Overview): string | null {
+  try {
+    const last = localStorage.getItem(LAST_DOC_KEY + ov.project.id);
+    if (last && findDoc(ov, last)) return last;
+  } catch {
+    // Fall through to the first chapter.
+  }
+  return allManuscript(ov)[0]?.id ?? ov.planning[0]?.id ?? null;
+}
 
 /** Editors of open document tabs, by tab key. */
 const tabEditors = new Map<string, Editor>();

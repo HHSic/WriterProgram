@@ -2,8 +2,8 @@
 
 import { api } from '../api';
 import type { CardSummary } from '../api/types';
-import { get, set } from './state';
-import { root, saveEverything, showToast, toastError } from './ui';
+import { get, root, set } from './state';
+import { saveEverything, showToast, toastError } from './ui';
 import { dropEverywhere, openTarget } from './tabs';
 import { refreshOverview } from './project';
 
