@@ -66,3 +66,16 @@ cargo run -p writer-sync --example stand_in -- dropbox 8765
 ```
 
 앱을 `WRITER_DROPBOX_ENDPOINT=http://127.0.0.1:8765`, `WRITER_SIGN_IN=fetch` 환경 변수로 띄우고, `drive-apps.json`에 `{"dropbox": {"clientId": "stand-in"}}`를 넣으면 "연결"이 바로 통과한다. 로그인 창 대신 앱이 흉내 서버의 로그인 주소를 직접 방문한다. 흉내 서버가 꺼지면 올린 파일도 사라진다.
+
+## 드라이브 공간 (2026-10-02 결정, 아직 구현 전)
+
+원고는 텍스트라 작지만, 작가의 드라이브가 다른 파일로 가득 차는 일은 흔하다(Google 무료 15GB는 Gmail·사진과 같이 쓴다). 차면 동기화가 조용히 멈추고 작가는 백업되는 줄 안다. 이것을 막는다.
+
+| 방식 | 할 일 |
+|---|---|
+| 폴더 동기화 (PC의 드라이브 폴더) | 클라우드 공간은 드라이브 앱이 알린다. 우리는 PC 디스크 여유만 확인한다 |
+| 직접 연결 (모바일, 앱 안 연결) | ① 공간 부족 오류를 정확한 말로 알린다 ② 여유가 적으면 미리 알린다 ③ 실패해도 원고는 기기에 남기고 나중에 다시 올린다 |
+
+- **오류 말 고치기** (`writer-sync`의 `drive_error`): OneDrive의 507은 이미 "드라이브 공간이 가득 참"으로 알린다. Google은 공간 부족을 403(`storageQuotaExceeded`)으로, Dropbox는 409(`insufficient_space`)로 돌려주는데 지금은 "허락하지 않음"이나 일반 오류로 보인다. 사유를 읽어 같은 말로 알린다.
+- **미리 알리기**: 남은 공간 API(Google `about.get`의 `storageQuota`, Dropbox `users/get_space_usage`, OneDrive `drive`의 `quota`)를 맞추기 전에 가볍게 읽고, 남은 공간이 작품 크기의 몇 배보다 적으면 알린다. 우리가 받은 좁은 권한(Google `drive.file`, Dropbox·OneDrive 앱 폴더)으로 이 값을 읽을 수 있는지 먼저 확인한다. 읽을 수 없으면 오류 처리만으로 간다.
+- **우리 쪽 크기 관리**: 기록(스냅샷)이 원고보다 훨씬 커질 수 있다(200회차 × 기록 50개면 100MB 넘게). 자동 기록은 이미 기간이 지나면 지워진다(`snapshot::prune`). 더해서 작품 정보에 "이 작품 크기(원고 3MB · 기록 40MB)"를 보이고, 기록이 커지면 오래된 기록 정리를 제안한다.
