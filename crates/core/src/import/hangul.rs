@@ -12,8 +12,8 @@ use std::io::Cursor;
 use zip::ZipArchive;
 
 use super::page::{Found, Line};
-use super::text::is_scene;
-use super::word::{Para, Run, Tok, read_part, trim_ends, val, walk};
+use super::para::{Para, Run};
+use super::xml::{Tok, read_part, val, walk};
 use super::{Item, Raw, SkipKind};
 use crate::format::{HeadAlign, Margins};
 use crate::markup::Inline;
@@ -241,30 +241,8 @@ fn pages(xml: &str, aligns: &HashMap<String, HeadAlign>, first: bool, found: &mu
                 l.text.push_str(&s);
             }
         }
-        Tok::Ref(r) if in_t => {
-            if let (Some((l, _)), Some(c)) = (line.as_mut(), entity(&r)) {
-                l.text.push(c);
-            }
-        }
         _ => {}
     });
-}
-
-fn entity(name: &str) -> Option<char> {
-    match name {
-        "amp" => Some('&'),
-        "lt" => Some('<'),
-        "gt" => Some('>'),
-        "quot" => Some('"'),
-        "apos" => Some('\''),
-        n => n.strip_prefix('#').and_then(|n| {
-            match n.strip_prefix(['x', 'X']) {
-                Some(hex) => u32::from_str_radix(hex, 16).ok(),
-                None => n.parse().ok(),
-            }
-            .and_then(char::from_u32)
-        }),
-    }
 }
 
 /// What a subtree left out is, by the element that opens it.
@@ -299,31 +277,7 @@ fn section(
     let mut in_t = false;
     let mut ignoring = 0usize;
 
-    let close = |open: Open, items: &mut Vec<Item>| {
-        let Open {
-            mut para,
-            heading,
-            toc,
-        } = open;
-        trim_ends(&mut para.inlines);
-        let text = super::plain(&para.inlines);
-        if !text.trim().is_empty() && !toc {
-            let single = !text.contains('\n');
-            if is_scene(&text) && single && heading.is_none() {
-                items.push(Item::Scene);
-            } else if let (Some(level), true) = (heading, single) {
-                items.push(Item::Heading {
-                    level,
-                    text: text.trim().to_string(),
-                });
-            } else {
-                items.push(Item::Para(para.inlines));
-            }
-        }
-        for (kind, n) in para.skips {
-            items.push(Item::Skip(kind, n));
-        }
-    };
+    let close = |open: Open, items: &mut Vec<Item>| open.para.close(open.heading, open.toc, items);
 
     walk(xml, |tok| {
         if ignoring > 0 {
@@ -407,11 +361,6 @@ fn section(
                     open.para.add_text(&s, run);
                 }
             }
-            Tok::Ref(name) => {
-                if in_t && let (Some(c), Some(open)) = (entity(&name), stack.last_mut()) {
-                    open.para.add_text(&c.to_string(), run);
-                }
-            }
         }
     })
     .map_err(|_| BROKEN.to_string())
@@ -464,7 +413,7 @@ pub(super) fn read(bytes: &[u8]) -> Result<Raw, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::markup::Mark;
+    use crate::markup::{Mark, inline_text};
 
     #[test]
     fn reads_text_marks_and_leaves_out_tables() {
@@ -500,7 +449,7 @@ mod tests {
         let kinds: Vec<String> = items
             .iter()
             .map(|i| match i {
-                Item::Para(inl) => format!("p:{}", super::super::plain(inl)),
+                Item::Para(inl) => format!("p:{}", inline_text(inl)),
                 Item::Heading { level, text } => format!("h{level}:{text}"),
                 Item::Scene => "scene".into(),
                 Item::Skip(k, n) => format!("skip:{}:{n}", k.label()),

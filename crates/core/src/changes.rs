@@ -19,7 +19,7 @@ use crate::trash::TRASH_DIR;
 pub enum Change {
     /// `project.json`: structure and settings.
     Project,
-    /// A copy of `project.json` left by a sync program (copies.rs).
+    /// A copy of `project.json` left by a sync program (copies/).
     ProjectCopy,
     /// A manuscript or planning file (or a copy of one, whose `id` is then
     /// its file name). `rev` is the fingerprint of the text now in it; none

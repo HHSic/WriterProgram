@@ -10,7 +10,7 @@ use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 
 use crate::doc::{self, DocFile};
-use crate::markup::{Block, Inline, Mark};
+use crate::markup::{Block, Inline, Mark, inline_text};
 use crate::snapshot::{self, SnapshotInfo};
 use crate::{Error, Result, project};
 
@@ -83,18 +83,6 @@ pub fn matcher(q: &SearchQuery) -> Result<Regex> {
         .map_err(|_| Error::Invalid("찾는 식이 올바르지 않음".into()))
 }
 
-/// The plain text of a paragraph, line breaks as `\n`.
-fn paragraph_text(content: &[Inline]) -> String {
-    let mut text = String::new();
-    for inline in content {
-        match inline {
-            Inline::Text { text: t, .. } => text.push_str(t),
-            Inline::HardBreak {} => text.push('\n'),
-        }
-    }
-    text
-}
-
 fn utf16_len(s: &str) -> usize {
     s.encode_utf16().count()
 }
@@ -129,7 +117,7 @@ pub fn find_in_blocks(blocks: &[Block], re: &Regex, limit: usize) -> Vec<Match> 
         let Block::Paragraph { content, .. } = b else {
             continue;
         };
-        let text = paragraph_text(content);
+        let text = inline_text(content);
         for m in re.find_iter(&text) {
             if m.is_empty() || m.as_str().contains('\n') {
                 continue;
@@ -253,7 +241,7 @@ fn replace_in_paragraph(
     replacement: &str,
     expand: bool,
 ) -> (Vec<Inline>, usize) {
-    let text = paragraph_text(content);
+    let text = inline_text(content);
     let old = atoms(content);
     let mut new: Vec<Atom> = Vec::with_capacity(old.len());
     let mut count = 0;

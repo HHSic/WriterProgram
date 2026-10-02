@@ -19,7 +19,7 @@ pub const SNAPSHOT_DIR: &str = ".snapshots";
 
 /// Kinds of records: automatic, kept by hand ("지금 원고 보관"), and the ones
 /// taken before replace-all, before going back to a record, and when revising
-/// starts. The last four come from edits on two devices (see copies.rs):
+/// starts. The last four come from edits on two devices (see copies/):
 /// this device's text that could not be saved over another device's,
 /// another device's text replaced by this one's, this device's text before
 /// another device's was loaded, and the text before a copy replaced it.

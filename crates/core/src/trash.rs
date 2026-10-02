@@ -30,7 +30,7 @@ pub struct TrashItem {
     pub index: usize,
     #[serde(default)]
     pub chars: u32,
-    /// For a copy left by a sync program (copies.rs): the file name it comes
+    /// For a copy left by a sync program (copies/): the file name it comes
     /// back under, next to the original.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,

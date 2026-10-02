@@ -230,7 +230,7 @@ pub fn load(root: &Path, id: &str) -> Result<Note> {
 }
 
 /// Every note, oldest first. Copies left by sync programs are not notes of
-/// their own (copies.rs).
+/// their own (copies/).
 pub fn list(root: &Path) -> Result<Vec<Note>> {
     let dir = root.join(NOTES_DIR);
     let mut notes = Vec::new();
