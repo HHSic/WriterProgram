@@ -27,8 +27,9 @@
 | 위치 | 하는 일 |
 |---|---|
 | `crates/sync` (writer-sync) | 드라이브와 맞추기: `engine.rs`(이 기기·드라이브·지난번 셋을 비교), `base.rs`(지난번 모습), `remote.rs`(드라이브가 해 줘야 할 일), `folder.rs`(흉내 드라이브), `providers/`(`config.rs` 앱 등록·주소, `session.rs` 로그인 세션과 오류 말(공간 부족 포함), 드라이브별 파일과 남은 공간 읽기), `oauth.rs`(PKCE 로그인), `http.rs`(ureq 감싸기), `secrets.rs`(자격 증명), `accounts.rs`(연결·맞추는 작품 목록) |
+| `crates/ai` (writer-ai) | 자기 API 키로 쓰는 AI ([architecture.md](architecture.md) "AI 점검"): `provider.rs`(세 회사, 기본 모델, 주소·`WRITER_AI_<회사>_ENDPOINT`), `client.rs`(회사별 요청·답·오류), `mask.rs`(이름 가리기와 조사 맞추기), `tasks.rs`(회차 요약·설정 모순 점검에 보낼 글, 답 읽기, 인용 찾기), `settings.rs`(`ai.json`). 시험 `tests/flow.rs`, 흉내 서버 `tests/support/` |
 | `crates/revise` (writer-revise) | 퇴고 점검 시제품: `rules/`에 점검 종류별 파일(`repetition.rs` 반복, `rhythm.rs` 문장 리듬, `expression.rs` 표현, `dialogue.rs` 대사, `names.rs` 이름) |
-| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, output, search, cards, notes, journal, exchange, sync_folder), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
+| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, output, search, cards, notes, journal, exchange, sync_folder, ai: 키는 `drives/keyring.rs`로 자격 증명 저장소에), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
 
 ## TypeScript (`app/src`)
 
@@ -37,7 +38,8 @@
 | `api/tauri.ts` | Rust 명령 호출. 명령 이름 하나에 함수 하나 |
 | `api/types/` | Rust와 주고받는 타입, 영역별 파일. `backend.ts`가 명령 목록(`Backend`) |
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
-| `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange …), 화면은 `store/index.ts`에서 가져다 씀 |
+| `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange, ai …), 화면은 `store/index.ts`에서 가져다 씀 |
+| AI 점검 | `workspace/AiTab.tsx`(오른쪽 탭: 보낼 내용 보기 → 보내기 → 결과), `workspace/AiDialog.tsx`(AI 연결 설정), `store/ai.ts`(설정, `askAi`, 시놉시스에 넣기), `lib/aiText.ts`(보낼 양·쓴 양 문장), `api/mock/ai.ts`(흉내 답) |
 | `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
 | `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`). 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
 | `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`) |
@@ -66,7 +68,7 @@
 ```bash
 cargo test --workspace
 cargo clippy --workspace --all-targets
-cargo fmt -p writer-core -p writer-sync -p writer-app --check
+cargo fmt -p writer-core -p writer-sync -p writer-ai -p writer-app --check
 npm --prefix app run typecheck
 npm --prefix app test
 ```
@@ -88,6 +90,7 @@ npm --prefix app test
 | `count.rs` 빈칸 목록, `editor/counts.ts` | Rust와 화면 글자 수가 같아야 해서 같은 목록을 둔다 |
 | `sync/oauth.rs` | 140줄로 작고 RFC 시험값으로 검사한다. oauth2 crate는 의존성이 늘고 ureq 3을 따로 붙여야 한다 |
 | keyring 나눠 담기 (`drives/keyring.rs`) | Windows 자격 증명 2560바이트 한도를 넘는 토큰을 나누는 crate가 없다 |
+| `crates/ai/src/client.rs` (AI 회사 SDK 없이) | Rust 공식 SDK가 없는 회사가 있고, 세 회사 요청·답이 필드 몇 개라 ureq로 직접 짜고 흉내 서버로 시험한다 |
 | `lib/diff.ts` | 문단 짝짓기가 앱에 맞춰져 있고, 글자 비교만 jsdiff로 바꿔도 줄어드는 양이 작다 |
 | 끌어서 옮기기 (Sidebar, 탭, 개요 표) | 마우스와 길게 누르기 메뉴가 엮여 있어 dnd-kit로 바꾸면 위험이 크다 |
 

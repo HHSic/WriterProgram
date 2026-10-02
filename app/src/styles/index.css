@@ -11,6 +11,7 @@
 @import './right.css'; /* Right column, trash. */
 @import './settings.css'; /* Settings dialog and manuscript format form. */
 @import './find.css'; /* Find and replace. */
+@import './ai.css'; /* AI 점검 tab and AI 연결 settings. */
 @import './read.css'; /* 소리 내어 읽기: the sentence being read, the floating bar. */
 @import './cards.css'; /* 설정집: cards, names in the manuscript, card preview. */
 @import './panes.css'; /* Panes and tabs in the middle. */

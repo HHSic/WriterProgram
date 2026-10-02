@@ -23,6 +23,7 @@ import {
   type RightTab,
 } from '../store';
 import type { MenuItem } from '../components/Menu';
+import { AiTab } from './AiTab';
 import { Appearances, CardPreview, CastTab } from './CardPanels';
 import { NotesTab } from './Notes';
 import { SearchTab } from './SearchTab';
@@ -35,6 +36,7 @@ const CHAPTER_TABS: TabList = [
   { id: 'cast', label: '등장 설정' },
   { id: 'records', label: '기록' },
   { id: 'find', label: '찾기' },
+  { id: 'ai', label: 'AI 점검' },
 ];
 const PLANNING_TABS: TabList = [
   { id: 'outline', label: '개요' },
@@ -87,6 +89,7 @@ export function RightPanel() {
               { label: '교정본 주고받기', onSelect: () => openDialog({ kind: 'exchanges' }) },
               { separator: true },
               { label: '보기 설정', onSelect: () => openDialog({ kind: 'view' }) },
+              { label: 'AI 연결 (내 API 키)', onSelect: () => openDialog({ kind: 'ai' }) },
               { label: '휴지통', onSelect: () => openDialog({ kind: 'trash' }) },
               { separator: true },
               { label: '작품 목록으로', onSelect: () => void leaveProject() },
@@ -129,6 +132,8 @@ export function RightPanel() {
           <NotesTab key={activeDocId} on="doc" targetId={activeDocId} editor={editor} />
         ) : tab === 'cast' ? (
           editor ? <CastTab editor={editor} /> : null
+        ) : tab === 'ai' ? (
+          <AiTab docId={activeDocId} />
         ) : (
           <RecordsTab docId={activeDocId} />
         )}

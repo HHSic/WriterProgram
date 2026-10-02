@@ -3,7 +3,7 @@
 
 export type { Pane, SplitDir, Target } from '../lib/tabs';
 export { useApp } from './state';
-export type { Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast } from './state';
+export type { Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast, AiRequest } from './state';
 export { findDoc, allManuscript, saveEverything, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
@@ -19,3 +19,4 @@ export { loadJournal, setJournalEnabled } from './journal';
 export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';
 export type { WebPage } from './web';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
+export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';

@@ -1,9 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/revise", "crates/sync", "app/src-tauri"]
+members = ["crates/ai", "crates/core", "crates/revise", "crates/sync", "app/src-tauri"]
 # The revise engine embeds a large dictionary and is slow to build, so plain
 # `cargo build` / `cargo test` skip it. Use `-p writer-revise` to include it.
-default-members = ["crates/core", "crates/sync", "app/src-tauri"]
+default-members = ["crates/ai", "crates/core", "crates/sync", "app/src-tauri"]
 
 [workspace.package]
 edition = "2024"

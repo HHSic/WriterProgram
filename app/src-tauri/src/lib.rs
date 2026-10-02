@@ -22,6 +22,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::ai::ai_settings,
+            commands::ai::ai_settings_set,
+            commands::ai::ai_key_set,
+            commands::ai::ai_key_remove,
+            commands::ai::ai_connection_check,
+            commands::ai::ai_preview,
+            commands::ai::ai_summarize,
+            commands::ai::ai_check,
             commands::project::recent_list,
             commands::project::recent_remove,
             commands::project::default_location,

@@ -1,0 +1,21 @@
+[package]
+name = "writer-ai"
+version = "0.1.0"
+edition.workspace = true
+description = "Reading and checking help from an AI service with the writer's own API key (no server of ours)"
+publish = false
+
+[lib]
+name = "writer_ai"
+path = "src/lib.rs"
+
+[dependencies]
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+ureq = "3"
+writer-core = { path = "../core" }
+
+[dev-dependencies]
+tempfile = "3"

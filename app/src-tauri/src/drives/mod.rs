@@ -26,12 +26,14 @@ pub mod connect;
 pub mod keyring;
 pub mod projects;
 
-fn secrets() -> Arc<dyn Secrets> {
+pub(crate) fn secrets() -> Arc<dyn Secrets> {
     Arc::new(keyring::KeyringSecrets)
 }
 
 /// Runs blocking work (network, files) away from the screen's thread.
-async fn blocking<T: Send + 'static>(f: impl FnOnce() -> Res<T> + Send + 'static) -> Res<T> {
+pub(crate) async fn blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Res<T> + Send + 'static,
+) -> Res<T> {
     tauri::async_runtime::spawn_blocking(f)
         .await
         .map_err(|e| e.to_string())?

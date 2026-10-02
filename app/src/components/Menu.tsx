@@ -7,7 +7,15 @@ import { create } from 'zustand';
 import { fingerScreen, touchLike } from '../lib/pointer';
 
 export type MenuItem =
-  | { label: string; onSelect: () => void; danger?: boolean; checked?: boolean; disabled?: boolean }
+  | {
+      label: string;
+      onSelect: () => void;
+      danger?: boolean;
+      checked?: boolean;
+      disabled?: boolean;
+      /** A short note after the label (why it is turned off, say). */
+      hint?: string;
+    }
   | { separator: true }
   | { heading: string };
 
@@ -125,6 +133,7 @@ export function MenuHost() {
       >
         <span className="menu-check">{item.checked ? '✓' : ''}</span>
         {item.label}
+        {item.hint && <span className="menu-hint">{item.hint}</span>}
       </button>
     );
   });

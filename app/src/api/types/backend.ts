@@ -2,6 +2,7 @@
 
 import type { JSONContent } from '@tiptap/core';
 import type { Bounds, PageClip, PageEvent } from './browser';
+import type { AiCheck, AiPreview, AiProvider, AiSettings, AiSettingsPatch, AiSummary, AiTask } from './ai';
 import type { Appearance, Card, CardSummary, CardType } from './cards';
 import type {
   Change,
@@ -146,6 +147,21 @@ export interface Backend {
   projectLink(projectId: string, title: string, provider: DriveProvider): Promise<DriveLink>;
   projectUnlink(projectId: string): Promise<void>;
   projectSync(root: string, projectId: string): Promise<SyncOutcome>;
+  /** This device's AI settings (자기 API 키 연결). */
+  aiSettings(): Promise<AiSettings>;
+  /** Turns AI on or off (on notes the agreement), picks the company or its models. */
+  aiSettingsSet(patch: AiSettingsPatch): Promise<AiSettings>;
+  /** Keeps a company's key in the system's credential store. */
+  aiKeySet(provider: AiProvider, key: string): Promise<AiSettings>;
+  aiKeyRemove(provider: AiProvider): Promise<AiSettings>;
+  /** 연결 확인: checks the key and the two models; sends no manuscript. Answers a sentence. */
+  aiConnectionCheck(): Promise<string>;
+  /** What would be sent for each chapter; nothing is sent. */
+  aiPreview(root: string, task: AiTask, docIds: string[]): Promise<AiPreview[]>;
+  /** 회차 요약 of one chapter; changes nothing by itself. */
+  aiSummarize(root: string, docId: string): Promise<AiSummary>;
+  /** 설정 모순 점검 of one chapter against its setting cards. */
+  aiCheck(root: string, docId: string): Promise<AiCheck>;
   /** In-app browser (prototype): desktop only. */
   browserOpen(label: string, url: string, at: Bounds): Promise<void>;
   browserBounds(label: string, at: Bounds, visible: boolean): Promise<void>;

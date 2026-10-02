@@ -42,6 +42,13 @@
   font-size: 12px;
 }
 
+.menu-hint {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .menu-sep {
   height: 1px;
   margin: 5px 4px;

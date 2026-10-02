@@ -9,6 +9,7 @@ v0.1 구현의 뼈대. 화면 설계는 [screens.md](screens.md), 영역별 데�
 | 위치 | 내용 |
 |---|---|
 | `crates/core` (writer-core) | 작품 폴더 형식, 원고 파일 읽기·쓰기, 원자적 저장, 글자 수·원고지 매수, 기록(스냅샷), 휴지통, 설정집, 메모, 찾기/바꾸기, 원고 서식과 예상 쪽수, 내보내기(txt, docx, HWPX). 화면·Tauri에 의존하지 않아 모바일에서도 그대로 쓴다. |
+| `crates/ai` (writer-ai) | 자기 API 키로 쓰는 AI: 회사별 HTTPS 호출, 이름 가리기, 회차 요약·설정 모순 점검에 보낼 글과 답 읽기, 이 기기의 AI 설정. 원고를 쓰거나 고치지 않는다. |
 | `crates/revise` (writer-revise) | 퇴고 점검 엔진 시제품 ([revise-engine.md](revise-engine.md)). v0.2에 앱과 연결. |
 | `app/src-tauri` (writer-app) | Tauri 명령. core 함수를 얇게 감싸고, 오류는 화면에 쓸 짧은 이유로 바꾼다. |
 | `app/src/api` | Rust 명령 호출(`tauri.ts`), 브라우저 미리보기용 메모리 저장소(`mock/`, 영역별 파일 · 개발 서버에서만 씀) |
@@ -158,9 +159,24 @@ created: "2026-09-27T01:00:00.000Z"
 - **Base**: 기기마다 앱 설정 폴더의 `sync/<작품 id>.json`. 드라이브로 올라가지 않는다. 크기·수정 시각이 같으면 파일을 다시 읽지 않는다.
 - **로그인** (`oauth.rs`): 드라이브의 로그인 창을 브라우저로 열고(PKCE, 무작위 `state`), 돌아오는 주소 `http://127.0.0.1:<포트>/`(OneDrive·Dropbox는 `localhost`)에서 대답 한 번만 받는다. 코드를 토큰으로 바꾼 뒤 새로 고침 토큰만 운영체제의 자격 증명 저장소(Windows 자격 증명 관리자)에 두고, 짧은 접근 토큰은 메모리에만 둔다. 거절되면(401) 한 번 새로 받는다. Windows 자격 증명 한 칸(2,560바이트)보다 긴 토큰은 나눠 담는다.
 - **드라이브 공간**: 공간 부족 오류는 세 드라이브 모두 "드라이브 공간이 가득 참"으로 알리고, 맞추기 전에 남은 공간을 읽어 50MB 또는 작품 크기의 5배보다 적으면 하루 한 번 알린다. 실패해도 이 기기 파일은 그대로이고 다음 맞추기에서 다시 올린다([drive-apps.md](drive-apps.md) "드라이브 공간").
-- **앱 설정 폴더의 파일**: `journal.json`(이 기기의 창작 일지 id와 켜고 끄기), `drives.json`(연결된 드라이브와 계정 이름, 작품별 연결 폴더·마지막 맞춘 때·실패 이유), `drive-apps.json`(앱 등록 정보), `sync/`(Base).
+- **앱 설정 폴더의 파일**: `journal.json`(이 기기의 창작 일지 id와 켜고 끄기), `ai.json`(AI 점검 설정, 키는 없음), `drives.json`(연결된 드라이브와 계정 이름, 작품별 연결 폴더·마지막 맞춘 때·실패 이유), `drive-apps.json`(앱 등록 정보), `sync/`(Base).
 - **화면**: 기기 간 맞추기(드라이브 연결·끊기), 작품 설정의 "드라이브와 맞추기"(맞추기 시작·지금 맞추기·그만 맞추기), 시작 화면의 "드라이브에서 가져오기". 연결된 작품은 열 때, 1분마다, 창으로 돌아올 때 맞춘다. 상태줄 "드라이브와 맞춤 · 14:20".
 - **시험**: `crates/sync/tests/engine.rs`는 두 기기가 흉내 드라이브(폴더)로 맞추는 이야기, `tests/providers.rs`는 세 드라이브의 API를 흉내 내는 로컬 서버로 로그인부터 사본까지. `cargo run -p writer-sync --example stand_in -- dropbox 8765`로 같은 흉내 서버를 띄워 앱을 계정 없이 돌려 볼 수 있다([drive-apps.md](drive-apps.md) 끝).
+
+## AI 점검: 자기 API 키 연결 (`crates/ai`, 앱 `commands/ai.rs`)
+
+작가가 가입한 AI 회사(Anthropic, OpenAI, Google Gemini)의 API 키로 이 기기에서 바로 부른다. 우리 서버는 거치지 않는다. 원칙은 [revenue-ai-report.md](revenue-ai-report.md) §4.1과 [business-model.md](business-model.md) "AI 점검에서 원고 보호": **본문을 쓰거나 이어 쓰지 않고 읽고 요약하고 점검만 한다.** 결과는 화면에 보일 뿐 원고를 바꾸지 않는다(요약은 작가가 누를 때만 시놉시스에 들어간다).
+
+- **켜기**: 기본은 꺼짐. 설정 "AI 연결 (내 API 키)"에서 켤 때 동의 문구(원고 일부가 고른 AI 회사로 감, 학습 안 함 계약이 있는 유료 키, 본문을 써 주는 기능 없음, 보낸 글을 저장하지 않음)를 보이고 동의한 시각을 남긴다.
+- **키가 있는 곳**: 운영체제의 자격 증명 저장소(Windows 자격 증명 관리자), 이름 `ai/<anthropic|openai|gemini>`. 드라이브 로그인과 같은 `KeyringSecrets`를 쓴다. 파일·로그·화면으로 돌아오는 값에는 키가 없다(화면은 "키 저장됨"만 안다). 부를 때만 꺼내 HTTP 머리글에 넣는다.
+- **설정 파일**: 앱 설정 폴더의 `ai.json`(켜짐, 고른 회사, 회사별 모델 이름, 동의 시각). 모델 기본값은 요약에 값싼 모델, 점검에 중간 모델: Anthropic `claude-haiku-4-5`·`claude-sonnet-5`, OpenAI `gpt-5-nano`·`gpt-5-mini`, Gemini `gemini-2.5-flash-lite`·`gemini-2.5-flash`. 이름은 자주 바뀌므로 작가가 글자로 고쳐 쓸 수 있다(영문·숫자·`-._:`만).
+- **부르는 법** (`client.rs`): ureq로 JSON 한 번. Anthropic `POST /v1/messages`(`x-api-key`, `anthropic-version: 2023-06-01`), OpenAI `POST /v1/chat/completions`(`Authorization: Bearer`, 점검은 `response_format: json_object`), Gemini `POST /v1beta/models/{모델}:generateContent`(`x-goog-api-key`, 점검은 `responseMimeType: application/json`). 온도 같은 값은 보내지 않는다(새 모델이 거부함). 연결 15초, 전체 180초. 오류는 "API 키가 맞지 않음", "잔액이나 사용 한도가 부족함", "요청이 너무 잦음", "서버가 바쁨", "모델 이름을 모름", "안전 기준 때문에 답하지 않음", "AI 회사에 닿지 않음"으로 나눈다. "연결 확인"은 두 모델 정보를 읽는 `GET …/models/{모델}`이라 원고를 보내지 않고 요금도 없다.
+- **보내는 것** (`tasks.rs`): 회차 요약은 회차 본문만(문단마다 한 줄, 장면 나눔은 `* * *`). 설정 모순 점검은 본문과 그 회차에 이름이 나오는 설정 카드(이름, 다른 이름, 채운 항목, 설명)만. 제목·메모·다른 회차는 보내지 않는다. 한 번에 10만 자까지. 점검의 답은 `{"problems":[{"quote","card","problem"}]}`이고, 인용은 회차에서 다시 찾아(그대로, 안 되면 띄어쓰기 무시) 찾기 결과처럼 그 자리로 간다.
+- **이름 가리기** (`mask.rs`): 보내는 글에 나오는 카드만 처음 나온 차례로 `인물A`, `장소B`, `용어C`(그 밖의 분류는 `설정D`). 다른 이름은 `인물A2`, `인물A3`이라 되돌릴 때 원래 낱말이 그대로 돌아온다. 보낸 카드의 설명에만 나오는 다른 카드 이름도 가린다. AI가 쓴 문장은 되돌린 이름 뒤 조사를 받침에 맞춰 고친다(인물B가 → 윤석이, ㄹ 받침은 로). 인용은 고치지 않고 그대로 되돌린다. 원고에 `인물A` 같은 글자가 원래 있으면 이름으로 바뀌어 보일 수 있다(드묾).
+- **먼저 보여 주기**: 보내기 전에 `ai_preview`가 보낼 글 그대로(가린 뒤), 바꾼 이름 목록, 함께 보낼 카드, 글자 수, AI에게 주는 지시를 돌려준다. 작가가 "보내기"를 눌러야 같은 내용을 다시 만들어 보낸다.
+- **남기지 않음**: 보낸 글과 답은 화면 메모리에만 있다. 파일·로그·창작 일지에 쓰지 않는다. 쓴 양은 회사가 알려 주면 "읽은 양·답한 양 N토큰" 문장으로만 보인다(요금은 작가가 회사에 직접 냄, 값은 보이지 않음).
+- **화면**: 오른쪽 "AI 점검" 탭(회차 요약: 이 회차 또는 이 부 전체, 설정 모순 점검), 회차 ⋯ 메뉴의 "AI 점검"(꺼져 있으면 흐리게 + "AI 연결이 꺼져 있음"), 오른쪽 ⋯ 메뉴의 "AI 연결 (내 API 키)".
+- **시험**: `crates/ai/tests/flow.rs`가 세 회사를 흉내 내는 로컬 서버로 머리글, 가린 본문(실제 이름이 나가지 않음), 답 읽기, 오류를 확인한다. 실제 API는 부르지 않는다. 주소는 `WRITER_AI_<회사>_ENDPOINT`(예: `WRITER_AI_ANTHROPIC_ENDPOINT=http://127.0.0.1:8765`)로 옮길 수 있다. 키 보관 시험은 메모리 저장소(`MemorySecrets`)만 쓴다.
 
 ## 분량 계산 (`crates/core/src/count.rs`, `app/src/editor/counts.ts`)
 
@@ -282,7 +298,7 @@ txt, md, docx, HWPX 파일을 읽어 회차로 나눈다. 옛 HWP(바이너리)�
 ## 개발
 
 ```bash
-cargo test                              # core·sync·앱 테스트
+cargo test                              # core·sync·ai·앱 테스트
 cd app
 npm install
 npm test                                # 글자 수, 탭 (TypeScript 쪽)

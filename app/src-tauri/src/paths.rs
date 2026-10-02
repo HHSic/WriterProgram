@@ -39,6 +39,12 @@ pub fn journal_file(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "journal.json")
 }
 
+/// This device's AI choices (`writer_ai::settings`); the API key is in the
+/// system's credential store, not here.
+pub fn ai_file(app: &AppHandle) -> Res<PathBuf> {
+    config_file(app, "ai.json")
+}
+
 /// What each project looked like after its last pass (`sync/<id>.json`).
 pub fn base_dir(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "sync")
