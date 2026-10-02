@@ -127,12 +127,3 @@ export function countChars(text: string): { withSpaces: number; withoutSpaces: n
   }
   return { withSpaces, withoutSpaces };
 }
-
-export function addCounts(a: Counts, b: Counts): Counts {
-  return {
-    withSpaces: a.withSpaces + b.withSpaces,
-    withoutSpaces: a.withoutSpaces + b.withoutSpaces,
-    manuscriptLines: a.manuscriptLines + b.manuscriptLines,
-    manuscriptPages: a.manuscriptPages + b.manuscriptPages,
-  };
-}
