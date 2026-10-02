@@ -5,7 +5,7 @@
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{Account, Session, drive_error};
+use super::{Account, Session, Space, drive_error, space_full};
 use crate::http::{Body, header_json};
 use crate::remote::{Put, Remote, RemoteFile};
 use crate::{Error, Result};
@@ -34,6 +34,56 @@ pub fn account(s: &Session) -> Result<Account> {
         name: me.name.display_name,
         email: me.email,
     })
+}
+
+#[derive(Deserialize)]
+struct Usage {
+    /// This account's use.
+    used: u64,
+    allocation: Allocation,
+}
+
+/// `individual`: the account's own space. `team`: shared with the team, maybe
+/// with a limit for each member (0: none).
+#[derive(Deserialize)]
+struct Allocation {
+    #[serde(rename = ".tag", default)]
+    tag: String,
+    #[serde(default)]
+    allocated: u64,
+    /// The whole team's use.
+    #[serde(default)]
+    used: u64,
+    #[serde(default)]
+    user_within_team_space_allocated: u64,
+    #[serde(default)]
+    user_within_team_space_used_cached: u64,
+}
+
+/// How full the Dropbox is (`users/get_space_usage`, `account_info.read`).
+pub fn space(s: &Session) -> Option<Space> {
+    let url = format!("{}/users/get_space_usage", s.ends.api);
+    let reply = s.call("POST", &url, &[], &|| Body::Empty).ok()?;
+    if !reply.ok() {
+        return None;
+    }
+    let usage: Usage = reply.json().ok()?;
+    let a = usage.allocation;
+    let space = match a.tag.as_str() {
+        "team" if a.user_within_team_space_allocated > 0 => Space {
+            used: a.user_within_team_space_used_cached,
+            total: a.user_within_team_space_allocated,
+        },
+        "team" => Space {
+            used: a.used,
+            total: a.allocated,
+        },
+        _ => Space {
+            used: usage.used,
+            total: a.allocated,
+        },
+    };
+    (space.total > 0).then_some(space)
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,7 +248,8 @@ impl Remote for DropboxRemote<'_> {
             .call("POST", &url, &[("Dropbox-API-Arg", arg)], &|| {
                 Body::Bytes(bytes, "application/octet-stream")
             })?;
-        if reply.status == 409 {
+        // A 409 is a version conflict, unless the drive is full.
+        if reply.status == 409 && !space_full(&reply) {
             return Ok(Put::Changed);
         }
         if !reply.ok() {

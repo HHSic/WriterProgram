@@ -9,6 +9,13 @@
 //! any app id for that drive, e.g. `{"dropbox": {"clientId": "stand-in"}}`.
 //! Signing in then goes through at once, and projects kept in step land in
 //! the stand-in's memory until it stops.
+//!
+//! To try a drive filling up, set how full it is (bytes; `total: null` for
+//! no limit, `readable: false` to refuse saying):
+//!
+//! ```text
+//! curl -X POST http://127.0.0.1:8765/stand-in/room -d '{"total":41943040,"elsewhere":31457280,"readable":true}'
+//! ```
 
 #[path = "../tests/support/mod.rs"]
 mod support;

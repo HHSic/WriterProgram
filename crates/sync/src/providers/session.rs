@@ -155,17 +155,133 @@ impl Session {
     }
 }
 
+/// What the writer reads when the drive has no room left, the same for every
+/// drive.
+pub const FULL: &str = "드라이브 공간이 가득 참";
+
+/// Google's reasons for a full drive (`error.errors[].reason`, or
+/// `error.details[].reason` in its newer answers), compared without case or
+/// underscores.
+const GOOGLE_FULL: [&str; 2] = ["storagequotaexceeded", "quotaexceeded"];
+/// Google's reasons for "too many requests", which it answers with a 403.
+const GOOGLE_BUSY: [&str; 2] = ["ratelimitexceeded", "userratelimitexceeded"];
+
+/// The reasons in a Google error answer, lowercased without underscores.
+fn google_reasons(reply: &Reply) -> Vec<String> {
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&reply.body) else {
+        return Vec::new();
+    };
+    let error = &value["error"];
+    ["errors", "details"]
+        .iter()
+        .filter_map(|list| error[list].as_array())
+        .flatten()
+        .filter_map(|e| e["reason"].as_str())
+        .map(|r| r.replace('_', "").to_lowercase())
+        .collect()
+}
+
+/// Dropbox's `error_summary`, e.g. `path/insufficient_space/..`.
+fn dropbox_summary(reply: &Reply) -> String {
+    serde_json::from_slice::<serde_json::Value>(&reply.body)
+        .ok()
+        .and_then(|v| v["error_summary"].as_str().map(str::to_string))
+        .unwrap_or_default()
+}
+
+/// The drive says it has no room left: OneDrive's 507, Google's 403 with a
+/// storage quota reason, Dropbox's 409 with `insufficient_space`.
+pub(crate) fn space_full(reply: &Reply) -> bool {
+    match reply.status {
+        507 => true,
+        403 => google_reasons(reply)
+            .iter()
+            .any(|r| GOOGLE_FULL.contains(&r.as_str())),
+        409 => dropbox_summary(reply).contains("insufficient_space"),
+        _ => false,
+    }
+}
+
 /// A drive's error answer, for the screen.
 pub(crate) fn drive_error(what: &str, reply: &Reply) -> Error {
+    if space_full(reply) {
+        // The pass stops here; files not yet sent stay on this device and
+        // go up in a later pass, once there is room.
+        return Error::Drive(format!(
+            "{what} · {FULL}. 원고는 이 기기에 그대로 있고, 공간이 생기면 다시 올립니다."
+        ));
+    }
     match reply.status {
         401 => Error::SignedOut,
+        403 if google_reasons(reply)
+            .iter()
+            .any(|r| GOOGLE_BUSY.contains(&r.as_str())) =>
+        {
+            Error::Offline(format!("{what} · 드라이브가 잠시 바쁨"))
+        }
         403 => Error::Drive(format!(
             "{what} · 드라이브가 허락하지 않음 ({})",
             reply.text()
         )),
         404 => Error::Drive(format!("{what} · 드라이브에 없음")),
         429 | 503 => Error::Offline(format!("{what} · 드라이브가 잠시 바쁨")),
-        507 => Error::Drive(format!("{what} · 드라이브 공간이 가득 참")),
         _ => Error::Drive(format!("{what} · {} {}", reply.status, reply.text())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn reply(status: u16, body: serde_json::Value) -> Reply {
+        Reply {
+            status,
+            body: serde_json::to_vec(&body).unwrap(),
+        }
+    }
+
+    #[test]
+    fn a_full_drive_reads_the_same_on_every_drive() {
+        let answers = [
+            reply(
+                403,
+                json!({ "error": { "code": 403, "errors": [{ "domain": "usageLimits", "reason": "storageQuotaExceeded" }] } }),
+            ),
+            reply(
+                403,
+                json!({ "error": { "status": "PERMISSION_DENIED", "details": [{ "reason": "STORAGE_QUOTA_EXCEEDED" }] } }),
+            ),
+            reply(
+                409,
+                json!({ "error_summary": "path/insufficient_space/..", "error": { ".tag": "path" } }),
+            ),
+            reply(507, json!({ "error": { "code": "quotaLimitReached" } })),
+        ];
+        for r in &answers {
+            let message = drive_error("드라이브에 올리지 못함", r).user_message();
+            assert!(message.contains(FULL), "{message}");
+        }
+    }
+
+    #[test]
+    fn other_refusals_keep_their_words() {
+        let refused = reply(
+            403,
+            json!({ "error": { "errors": [{ "reason": "insufficientFilePermissions" }] } }),
+        );
+        assert!(
+            drive_error("x", &refused)
+                .user_message()
+                .contains("허락하지 않음")
+        );
+        let busy = reply(
+            403,
+            json!({ "error": { "errors": [{ "reason": "userRateLimitExceeded" }] } }),
+        );
+        assert!(matches!(drive_error("x", &busy), Error::Offline(_)));
+        let conflict = reply(409, json!({ "error_summary": "path/conflict/file/.." }));
+        assert!(!space_full(&conflict));
     }
 }

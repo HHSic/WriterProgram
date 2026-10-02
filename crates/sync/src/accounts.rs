@@ -17,7 +17,7 @@ use crate::base::Base;
 use crate::engine::{self, Report};
 use crate::http::Http;
 use crate::oauth::{self, Listener};
-use crate::providers::{self, Account, AppId, Endpoints, Provider, Session};
+use crate::providers::{self, Account, AppId, Endpoints, Provider, Session, Space};
 use crate::secrets::Secrets;
 
 /// A drive this device is signed in to.
@@ -114,7 +114,21 @@ pub fn sign_in(
     })
 }
 
-/// One pass for a linked project.
+/// A drive is running low with less than this left …
+pub const LOW_SPACE: u64 = 50 * 1024 * 1024;
+/// … or with less than this many times the project left.
+pub const LOW_SPACE_TIMES: u64 = 5;
+
+/// Whether to warn that the drive is filling up, for a project of
+/// `project` bytes.
+pub fn running_low(space: Space, project: u64) -> bool {
+    space.left() < LOW_SPACE.max(project.saturating_mul(LOW_SPACE_TIMES))
+}
+
+/// One pass for a linked project. Before it, how full the drive is is read
+/// lightly; when it is running low the report says how much is left. That
+/// read never stops the pass. When the drive is full the pass stops with an
+/// error; what was not sent stays on this device and goes up next time.
 pub fn sync_project(
     session: &Session,
     link: &Link,
@@ -123,9 +137,38 @@ pub fn sync_project(
     lock: &Mutex<()>,
 ) -> Result<Report> {
     let mut remote = providers::open(session, &link.folder, true)?;
+    let space = providers::space(session);
     let mut base = Base::load(base_file);
     let report = engine::sync(root, remote.as_mut(), &mut base, lock);
     // Keep what went through even when the pass stopped half way.
     base.save(base_file)?;
-    report
+    let mut report = report?;
+    if let Some(space) = space {
+        let project = writer_core::project::sizes(root)
+            .map(|s| s.travelling())
+            .unwrap_or(0);
+        if running_low(space, project) {
+            report.space_left = Some(space.left());
+        }
+    }
+    Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MB: u64 = 1024 * 1024;
+
+    #[test]
+    fn low_means_under_50_mb_or_five_times_the_project() {
+        let space = |left: u64| Space {
+            used: 1000 * MB - left,
+            total: 1000 * MB,
+        };
+        assert!(running_low(space(49 * MB), MB));
+        assert!(!running_low(space(51 * MB), MB));
+        assert!(running_low(space(90 * MB), 20 * MB));
+        assert!(!running_low(space(101 * MB), 20 * MB));
+    }
 }

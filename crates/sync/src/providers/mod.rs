@@ -22,8 +22,8 @@ pub mod onedrive;
 mod session;
 
 pub use config::{AppId, AppIds, DROPBOX_PORT, Endpoints, Provider, client};
-pub(crate) use session::drive_error;
-pub use session::{Account, Session};
+pub use session::{Account, FULL, Session};
+pub(crate) use session::{drive_error, space_full};
 
 /// Path of an item inside the folder `root`, for drives that keep files by id
 /// and tell only each item's parent: worked out up the chain of parents in
@@ -47,6 +47,30 @@ pub(crate) fn path_in<'a, T>(
         up = parent(folder)?;
     }
     None
+}
+
+/// How full a drive is, in bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Space {
+    pub used: u64,
+    pub total: u64,
+}
+
+impl Space {
+    pub fn left(&self) -> u64 {
+        self.total.saturating_sub(self.used)
+    }
+}
+
+/// How full the drive is, read lightly before a pass. None when the drive
+/// does not say: no limit, a refusal (OneDrive's app folder permission may
+/// not cover it), or no connection. Never stops a pass.
+pub fn space(s: &Session) -> Option<Space> {
+    match s.provider {
+        Provider::Google => google::space(s),
+        Provider::Onedrive => onedrive::space(s),
+        Provider::Dropbox => dropbox::space(s),
+    }
 }
 
 /// A project folder's name on a drive: its title, made safe for file names.

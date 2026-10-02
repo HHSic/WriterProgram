@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{Account, Session, drive_error, path_in};
+use super::{Account, Session, Space, drive_error, path_in};
 use crate::http::{Body, enc};
 use crate::remote::{Put, Remote, RemoteFile};
 use crate::{Error, Result};
@@ -36,6 +36,44 @@ pub fn account(s: &Session) -> Result<Account> {
     Ok(Account {
         name: me.display_name.unwrap_or_default(),
         email: me.mail.or(me.user_principal_name).unwrap_or_default(),
+    })
+}
+
+#[derive(Deserialize)]
+struct DriveQuota {
+    quota: Quota,
+}
+
+#[derive(Deserialize)]
+struct Quota {
+    #[serde(default)]
+    total: u64,
+    #[serde(default)]
+    remaining: Option<u64>,
+    #[serde(default)]
+    used: u64,
+}
+
+/// How full the OneDrive is (`GET /me/drive`). Microsoft lists `Files.Read`
+/// as the least permission for this, so with only the app folder it may be
+/// refused; then there is no answer.
+pub fn space(s: &Session) -> Option<Space> {
+    let url = format!("{}/me/drive?$select=quota", s.ends.api);
+    let reply = s.call("GET", &url, &[], &|| Body::Empty).ok()?;
+    if !reply.ok() {
+        return None;
+    }
+    let q = reply.json::<DriveQuota>().ok()?.quota;
+    if q.total == 0 {
+        return None;
+    }
+    let used = match q.remaining {
+        Some(left) => q.total.saturating_sub(left),
+        None => q.used,
+    };
+    Some(Space {
+        used,
+        total: q.total,
     })
 }
 
