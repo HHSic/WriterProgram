@@ -110,6 +110,11 @@ pub struct Project {
     pub parts: Vec<Part>,
     #[serde(default)]
     pub planning: Vec<String>,
+    /// Keeps each chapter's last record of every day when old automatic
+    /// records are cleared (창작 과정 보관, docs/creation-proof.md §4.3).
+    /// Off unless the writer turns it on.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keep_daily: bool,
     /// Keys written by newer versions, kept as they are.
     #[serde(flatten)]
     pub extra: Map<String, Value>,

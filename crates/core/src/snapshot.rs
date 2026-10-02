@@ -4,10 +4,11 @@
 //! `<UTC stamp>.<kind>.md` so names sort by time. The front matter carries
 //! `snapshotKind`, `snapshotName` and `snapshotAt`.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, Local, Utc};
 use serde::Serialize;
 
 use crate::count::{Counts, count_blocks};
@@ -236,13 +237,36 @@ fn older_than(stem: &str, cutoff: chrono::DateTime<Utc>) -> bool {
     parse_stamp(stem).is_some_and(|at| at < cutoff)
 }
 
+/// Each document's last record of every day (local time), from its stems
+/// newest first: the states kept for proof when the project keeps them
+/// (창작 과정 보관, docs/creation-proof.md §4.3).
+fn daily_last(stems: &[String]) -> HashSet<&str> {
+    let mut days = HashSet::new();
+    stems
+        .iter()
+        .filter(|stem| {
+            parse_stamp(stem).is_some_and(|at| days.insert(at.with_timezone(&Local).date_naive()))
+        })
+        .map(String::as_str)
+        .collect()
+}
+
 /// Removes automatic records (and ones kept before loading another device's
-/// text) older than `keep`. Other kinds stay.
-pub fn prune(root: &Path, keep: Duration) -> Result<()> {
+/// text) older than `keep`. Other kinds stay, and so does each document's
+/// last record of a day when `keep_daily`.
+pub fn prune(root: &Path, keep: Duration, keep_daily: bool) -> Result<()> {
     let cutoff = Utc::now() - keep;
     for (doc_id, stems) in all_stems(root)? {
-        for stem in stems {
-            if PRUNED.contains(&kind_of(&stem)) && older_than(&stem, cutoff) {
+        let daily = if keep_daily {
+            daily_last(&stems)
+        } else {
+            HashSet::new()
+        };
+        for stem in &stems {
+            if PRUNED.contains(&kind_of(stem))
+                && older_than(stem, cutoff)
+                && !daily.contains(stem.as_str())
+            {
                 let path = dir(root, &doc_id).join(format!("{stem}.md"));
                 fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
             }
@@ -259,34 +283,56 @@ pub const TIDY_DAYS: i64 = 14;
 /// after `keep`, and automatic records older than [`TIDY_DAYS`] except each
 /// document's newest automatic one. Records kept by hand (지금 원고 보관)
 /// and the ones taken before replacing, going back, revising or another
-/// device's text are left alone.
-pub fn tidy_plan(root: &Path, keep: Duration) -> Result<Vec<(PathBuf, u64)>> {
+/// device's text are left alone, and so is each document's last record of a
+/// day when `keep_daily`.
+pub fn tidy_plan(root: &Path, keep: Duration, keep_daily: bool) -> Result<Vec<(PathBuf, u64)>> {
+    Ok(plan(root, keep, keep_daily)?.0)
+}
+
+/// The bytes of records that tidying and clearing would remove but that stay
+/// as each document's last record of a day (창작 과정 보관).
+pub fn daily_size(root: &Path, keep: Duration) -> Result<u64> {
+    Ok(plan(root, keep, true)?.1)
+}
+
+/// What tidying removes, and the size of what it leaves only for `keep_daily`.
+fn plan(root: &Path, keep: Duration, keep_daily: bool) -> Result<(Vec<(PathBuf, u64)>, u64)> {
     let now = Utc::now();
     let (prune_cutoff, tidy_cutoff) = (now - keep, now - Duration::days(TIDY_DAYS));
     let mut out = Vec::new();
+    let mut kept = 0;
     for (doc_id, stems) in all_stems(root)? {
+        let daily = if keep_daily {
+            daily_last(&stems)
+        } else {
+            HashSet::new()
+        };
         let mut newest_auto = true;
-        for stem in stems {
-            let kind = kind_of(&stem);
-            let expired = PRUNED.contains(&kind) && older_than(&stem, prune_cutoff);
-            let old_auto = kind == "auto" && !newest_auto && older_than(&stem, tidy_cutoff);
+        for stem in &stems {
+            let kind = kind_of(stem);
+            let expired = PRUNED.contains(&kind) && older_than(stem, prune_cutoff);
+            let old_auto = kind == "auto" && !newest_auto && older_than(stem, tidy_cutoff);
             if kind == "auto" {
                 newest_auto = false;
             }
             if expired || old_auto {
                 let path = dir(root, &doc_id).join(format!("{stem}.md"));
                 let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-                out.push((path, size));
+                if daily.contains(stem.as_str()) {
+                    kept += size;
+                } else {
+                    out.push((path, size));
+                }
             }
         }
     }
-    Ok(out)
+    Ok((out, kept))
 }
 
 /// Tidies records (see [`tidy_plan`]); returns the bytes freed.
-pub fn tidy(root: &Path, keep: Duration) -> Result<u64> {
+pub fn tidy(root: &Path, keep: Duration, keep_daily: bool) -> Result<u64> {
     let mut freed = 0;
-    for (path, size) in tidy_plan(root, keep)? {
+    for (path, size) in tidy_plan(root, keep, keep_daily)? {
         match fs::remove_file(&path) {
             Ok(()) => freed += size,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}

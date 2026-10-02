@@ -80,6 +80,7 @@ pub fn create(opts: &NewProject) -> Result<PathBuf> {
         card_types: Some(cards::default_types()),
         parts: vec![part],
         planning,
+        keep_daily: false,
         extra: Map::new(),
     };
     save(&root, &project)?;
