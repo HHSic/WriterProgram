@@ -7,8 +7,8 @@ import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { useAutoHeight } from '../lib/autoHeight';
 import { errorText } from '../lib/format';
-import { registerFlusher } from '../lib/flush';
 import { docNoun } from '../lib/labels';
+import { useDebouncedSave } from '../lib/useDebouncedSave';
 import { patchCardSummary, refreshCardCounts, trashCard, useApp } from '../store';
 
 export function CardEditor({ cardId, locked = false }: { cardId: string; locked?: boolean }) {
@@ -43,50 +43,31 @@ function LoadedCard({ root, initial, locked }: { root: string; initial: Card; lo
   const appearsIn = useApp((s) => s.cardCounts[initial.id]);
   const [card, setCard] = useState(initial);
   const [alias, setAlias] = useState('');
-  const pending = useRef<Card | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const flushRef = useRef<() => Promise<void>>(async () => {});
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   // While the name box is empty the card keeps its last name on disk.
   const savedName = useRef(initial.name);
   const savedNames = useRef(namesOf(initial));
 
-  useEffect(() => {
-    // Saves run one after another, like the manuscript's (editor/session.ts),
-    // and share its 저장 표시 in the top bar.
-    let chain: Promise<void> = Promise.resolve();
-    const flush = () => {
-      clearTimeout(timer.current);
-      const next = pending.current;
-      if (!next) return chain;
-      pending.current = null;
-      const toSave = next.name.trim() ? next : { ...next, name: savedName.current };
-      chain = chain.then(async () => {
-        try {
-          const summary = await api.cardSave(root, toSave);
-          savedName.current = summary.name;
-          patchCardSummary(summary);
-          if (!pending.current) useApp.setState({ save: { state: 'saved' } });
-          const names = namesOf(summary);
-          if (names !== savedNames.current) {
-            savedNames.current = names;
-            void refreshCardCounts();
-          }
-        } catch (e) {
-          // Keep the card marked unsaved so the next change or retry sends it again.
-          pending.current ??= next;
-          useApp.setState({ save: { state: 'error', error: errorText(e) } });
+  // Saves run one after another, like the manuscript's (editor/session.ts),
+  // and share its 저장 표시 in the top bar.
+  const { pending, schedule } = useDebouncedSave<Card>(
+    {
+      prepare: (next) => (next.name.trim() ? next : { ...next, name: savedName.current }),
+      save: async (toSave) => {
+        const summary = await api.cardSave(root, toSave);
+        savedName.current = summary.name;
+        patchCardSummary(summary);
+        if (!pending.current) useApp.setState({ save: { state: 'saved' } });
+        const names = namesOf(summary);
+        if (names !== savedNames.current) {
+          savedNames.current = names;
+          void refreshCardCounts();
         }
-      });
-      return chain;
-    };
-    flushRef.current = flush;
-    const unregister = registerFlusher(flush);
-    return () => {
-      unregister();
-      void flush();
-    };
-  }, [root]);
+      },
+      onError: (e) => useApp.setState({ save: { state: 'error', error: errorText(e) } }),
+    },
+    [root],
+  );
 
   // Another device changed this card: take its version, unless it is being
   // changed here too (then this device's save wins, as before).
@@ -119,9 +100,7 @@ function LoadedCard({ root, initial, locked }: { root: string; initial: Card; lo
     const next = { ...card, ...patch };
     setCard(next);
     if (useApp.getState().save.state === 'saved') useApp.setState({ save: { state: 'saving' } });
-    pending.current = next;
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flushRef.current(), 600);
+    schedule(next);
   };
 
   const addAlias = () => {
