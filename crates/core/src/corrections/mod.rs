@@ -23,7 +23,7 @@ mod sent;
 mod tests;
 
 pub use apply::{Applied, Decisions, Skipped, apply};
-pub use review::{load_review, read_corrected};
+pub use review::{current_review, load_review, read_corrected};
 pub use sent::{Exchange, ExchangeInfo, Received, SentChapter, list, load, send};
 
 use serde::{Deserialize, Serialize};

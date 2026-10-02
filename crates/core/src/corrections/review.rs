@@ -28,7 +28,7 @@ use super::{ChangeKind, ChapterReview, EditorNote, Found, Look, Review, Span, St
 use crate::import::marked::{self, Edit, Marked, PARA, SCENE};
 use crate::markup::{Block, Mark};
 use crate::store::{atomic_write, now_iso, rev_of, stamp};
-use crate::{Error, Result, doc};
+use crate::{Error, Result, doc, journal};
 
 const REVIEW_FILE: &str = "review.json";
 
@@ -575,10 +575,80 @@ pub fn read_corrected(root: &Path, exchange_id: &str, file: &Path) -> Result<Rev
     save_review(root, &review)?;
     ex.received.push(Received {
         at,
-        name,
+        name: name.clone(),
         stored,
         fingerprint: rev_of(&bytes),
     });
     sent::save(root, &ex)?;
+    journal::note(
+        root,
+        journal::Entry::Exchange(journal::Exchange {
+            exchange: ex.id.clone(),
+            step: journal::ExchangeStep::Received,
+            files: vec![journal::ExchangeFile {
+                file: name,
+                file_hash: journal::fingerprint(&bytes),
+            }],
+            docs: Vec::new(),
+        }),
+    );
     Ok(review)
+}
+
+/// The last review of an exchange with every undecided change, look and
+/// note placed in the chapters as they are now: the writer may have
+/// changed them, or accepted corrections, since the file was read. A
+/// change whose paragraph the writer changed is 겹침 (`now` none).
+pub fn current_review(root: &Path, exchange_id: &str) -> Result<Option<Review>> {
+    let Some(mut review) = load_review(root, exchange_id)? else {
+        return Ok(None);
+    };
+    place_now(root, &mut review)?;
+    Ok(Some(review))
+}
+
+pub(crate) fn place_now(root: &Path, review: &mut Review) -> Result<()> {
+    let ex = sent::load(root, &review.exchange)?;
+    let bodies = sent::bodies(root, &ex)?;
+    for chapter in &mut review.chapters {
+        let Some(index) = ex.chapters.iter().position(|c| c.doc_id == chapter.doc_id) else {
+            continue;
+        };
+        let pending = |s: State| s == State::Pending;
+        let Ok(current) = doc::load(root, &chapter.doc_id) else {
+            chapter.gone = true;
+            for c in chapter.changes.iter_mut().filter(|c| pending(c.state)) {
+                c.now = None;
+            }
+            for l in &mut chapter.looks {
+                l.now = None;
+            }
+            for n in chapter.notes.iter_mut().filter(|n| pending(n.state)) {
+                n.now = None;
+            }
+            continue;
+        };
+        chapter.gone = false;
+        let sent = Flat::of(&bodies[index]);
+        let accepted: Vec<(Range<usize>, Vec<char>)> = chapter
+            .changes
+            .iter()
+            .filter(|c| c.state == State::Accepted)
+            .map(|c| (sent.range_of(c.at), c.after.chars().collect()))
+            .collect();
+        let now = Flat::of(&current.body);
+        let mapper = Mapper::new(&sent.chars(), &accepted, &now.chars());
+        let place = |at: Span| mapper.map(sent.range_of(at)).map(|r| now.span(r));
+        for c in chapter.changes.iter_mut().filter(|c| pending(c.state)) {
+            c.now = place(c.at);
+            c.overlap = c.now.is_none();
+        }
+        for l in &mut chapter.looks {
+            l.now = place(l.at);
+        }
+        for n in chapter.notes.iter_mut().filter(|n| pending(n.state)) {
+            n.now = n.at.and_then(place);
+        }
+    }
+    Ok(())
 }

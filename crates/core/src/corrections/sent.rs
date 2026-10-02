@@ -13,7 +13,7 @@ use crate::export::{self, DocOptions, ExportItem, FileKind};
 use crate::format::ManuscriptFormat;
 use crate::markup::{Block, parse_body, write_body};
 use crate::store::{atomic_write, new_id, now_iso, read_text, rev_of};
-use crate::{Error, Result, doc};
+use crate::{Error, Result, doc, journal};
 
 const RECORD_FILE: &str = "exchange.json";
 const SENT_DIR: &str = "sent";
@@ -134,9 +134,14 @@ pub fn send(
     };
     let sent = dir(root, &id)?.join(SENT_DIR);
     let mut chapters = Vec::new();
+    let mut sent_docs = Vec::new();
     for (i, (item, file)) in items.iter().zip(&docs).enumerate() {
         let text = write_body(&file.body);
         atomic_write(&sent.join(doc::file_name(&item.doc_id)), text.as_bytes())?;
+        sent_docs.push(journal::ExchangeDoc {
+            doc: item.doc_id.clone(),
+            body: journal::fingerprint(text.as_bytes()),
+        });
         chapters.push(SentChapter {
             doc_id: item.doc_id.clone(),
             title: file.meta.title.clone(),
@@ -155,6 +160,24 @@ pub fn send(
         received: Vec::new(),
     };
     save(root, &ex)?;
+    journal::note(
+        root,
+        journal::Entry::Exchange(journal::Exchange {
+            exchange: ex.id.clone(),
+            step: journal::ExchangeStep::Sent,
+            files: paths
+                .iter()
+                .filter_map(|p| {
+                    let bytes = fs::read(p).ok()?;
+                    Some(journal::ExchangeFile {
+                        file: name(p),
+                        file_hash: journal::fingerprint(&bytes),
+                    })
+                })
+                .collect(),
+            docs: sent_docs,
+        }),
+    );
     Ok(ex)
 }
 

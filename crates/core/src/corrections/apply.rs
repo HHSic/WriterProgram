@@ -14,14 +14,14 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::flat::{Flat, Mapper};
-use super::review::{load_review, save_review};
+use super::review::{load_review, place_now, save_review};
 use super::{ChangeClass, Review, State, sent};
 use crate::doc::{self, DocFile};
 use crate::import::marked::PARA;
-use crate::markup::{Mark, MemoAttrs};
+use crate::markup::{Mark, MemoAttrs, write_body};
 use crate::notes::{self, Anchor, NewNote};
 use crate::store::new_id;
-use crate::{Error, Result, snapshot};
+use crate::{Error, Result, journal, snapshot};
 
 /// What the writer decided. Ids are those of the review.
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -78,6 +78,8 @@ pub fn apply(root: &Path, exchange_id: &str, decisions: &Decisions) -> Result<Ap
         memos: Vec::new(),
         review: review.clone(),
     };
+    // Chapters written, for the creation journal.
+    let mut written = Vec::new();
 
     for chapter in &mut review.chapters {
         let Some(index) = ex.chapters.iter().position(|c| c.doc_id == chapter.doc_id) else {
@@ -204,6 +206,10 @@ pub fn apply(root: &Path, exchange_id: &str, decisions: &Decisions) -> Result<Ap
         }
         let body = now.blocks();
         if body != current.body {
+            written.push(journal::ExchangeDoc {
+                doc: chapter.doc_id.clone(),
+                body: journal::fingerprint(write_body(&body).as_bytes()),
+            });
             let name = format!("교정 반영 전 · {}", review.file);
             snapshot::create(root, &current, "before-corrections", &name)?;
             let (_, path) = doc::locate(root, &chapter.doc_id)?;
@@ -224,7 +230,20 @@ pub fn apply(root: &Path, exchange_id: &str, decisions: &Decisions) -> Result<Ap
             out.memos.push(made.id);
         }
     }
+    // What is still to decide, placed in the chapters as they are now.
+    place_now(root, &mut review)?;
     save_review(root, &review)?;
+    if !written.is_empty() {
+        journal::note(
+            root,
+            journal::Entry::Exchange(journal::Exchange {
+                exchange: review.exchange.clone(),
+                step: journal::ExchangeStep::Applied,
+                files: Vec::new(),
+                docs: written,
+            }),
+        );
+    }
     out.review = review;
     Ok(out)
 }

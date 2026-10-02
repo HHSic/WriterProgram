@@ -55,10 +55,11 @@ pub async fn exchange_read(
     corrections::read_corrected(Path::new(&root), &exchange_id, Path::new(&path)).map_err(fail)
 }
 
-/// The last corrected file read for an exchange, with the decisions so far.
+/// The last corrected file read for an exchange, with the decisions so far
+/// and what is still to decide placed in the chapters as they are now.
 #[tauri::command]
 pub async fn exchange_review(root: String, exchange_id: String) -> Res<Option<Review>> {
-    corrections::load_review(Path::new(&root), &exchange_id).map_err(fail)
+    corrections::current_review(Path::new(&root), &exchange_id).map_err(fail)
 }
 
 /// Accepts or rejects corrections.

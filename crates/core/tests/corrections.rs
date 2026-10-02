@@ -410,6 +410,26 @@ fn hangul_corrections_round_trip() {
     assert_eq!(list[0].exchange.received.len(), 1);
     let kept = corrections::load_review(&root, &ex.id).unwrap().unwrap();
     assert_eq!(kept.pending(), 1);
+
+    // The writer puts the rewritten paragraph back as it was sent and adds
+    // one before it: the change is no longer 겹침 and is placed one down.
+    save(
+        &root,
+        &second,
+        vec![
+            Block::text("새로 넣은 문단."),
+            Block::text("둘째 회차의 첫 문단이다."),
+            Block::text("작가가 나중에 고친 문단이다."),
+            Block::text("편집자가 손본 다른 문단."),
+        ],
+    );
+    let now = corrections::current_review(&root, &ex.id).unwrap().unwrap();
+    let back = &now.chapters[1].changes[0];
+    assert_eq!(back.state, State::Pending);
+    assert!(!back.overlap);
+    let at = back.now.unwrap();
+    assert_eq!((at.from.block, at.to.block), (2, 2));
+    assert_eq!(at.from.offset, back.at.from.offset);
 }
 
 #[test]

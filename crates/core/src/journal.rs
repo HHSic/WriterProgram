@@ -18,8 +18,8 @@
 //!
 //! The app keeps this device's id and the on/off switch in its settings
 //! folder (`Settings`) and turns the journal on by telling this module the
-//! device id (`set_device`); with none set, the hooks in `doc`, `snapshot` and
-//! `import` write nothing.
+//! device id (`set_device`); with none set, the hooks in `doc`, `snapshot`,
+//! `import` and `corrections` write nothing.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -124,7 +124,10 @@ pub enum Entry {
     Import(Import),
     /// A record (기록) was kept.
     Snapshot(Snapshot),
-    // Later: `exchange` (교정 주고받기) and `anchor` (time-stamping, §4.2).
+    /// 교정 주고받기: chapters sent to an editor, a corrected file taken
+    /// back, or corrections applied.
+    Exchange(Exchange),
+    // Later: `anchor` (time-stamping, §4.2).
     // `verify` and `summary` read kinds they do not know, so older versions
     // keep checking newer journals.
 }
@@ -180,6 +183,43 @@ pub struct Snapshot {
     pub snapshot_kind: String,
 }
 
+/// Which step of 교정 주고받기 an `exchange` line is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ExchangeStep {
+    /// Chapters went out to an editor (`files` written, `docs` as sent).
+    Sent,
+    /// A corrected file came back (`files`: that file).
+    Received,
+    /// Corrections were applied (`docs`: the chapters as they are after).
+    Applied,
+}
+
+/// A file that went out or came back: its name only, never the folder.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExchangeFile {
+    pub file: String,
+    /// SHA-256 (hex) of the file's bytes.
+    pub file_hash: String,
+}
+
+/// A chapter and the SHA-256 (hex) of its text (`markup::write_body`).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExchangeDoc {
+    pub doc: String,
+    pub body: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Exchange {
+    /// The exchange's id (`.exchanges/<id>`).
+    pub exchange: String,
+    pub step: ExchangeStep,
+    pub files: Vec<ExchangeFile>,
+    pub docs: Vec<ExchangeDoc>,
+}
+
 impl Entry {
     pub fn kind(&self) -> &'static str {
         match self {
@@ -188,6 +228,7 @@ impl Entry {
             Entry::Paste(_) => "paste",
             Entry::Import(_) => "import",
             Entry::Snapshot(_) => "snapshot",
+            Entry::Exchange(_) => "exchange",
         }
     }
 
@@ -198,6 +239,7 @@ impl Entry {
             Entry::Paste(e) => serde_json::to_string(e),
             Entry::Import(e) => serde_json::to_string(e),
             Entry::Snapshot(e) => serde_json::to_string(e),
+            Entry::Exchange(e) => serde_json::to_string(e),
         }
         .expect("entries serialize");
         // `{"a":1,"b":2}` → `"a":1,"b":2`
@@ -501,6 +543,8 @@ pub struct Summary {
     pub sessions: usize,
     pub pastes: usize,
     pub imports: usize,
+    /// 교정 주고받기 lines: chapters sent, files taken back, corrections applied.
+    pub exchanges: usize,
     /// Devices with a journal in this project.
     pub devices: usize,
     /// Lines written by this device.
@@ -526,6 +570,7 @@ pub fn summary(root: &Path, device: Option<&str>) -> Result<Summary> {
                 Some("session") => out.sessions += 1,
                 Some("paste") => out.pastes += 1,
                 Some("import") => out.imports += 1,
+                Some("exchange") => out.exchanges += 1,
                 _ => {}
             }
             if let Some(t) = v.get("time").and_then(Value::as_str).and_then(parse_iso)
@@ -680,6 +725,53 @@ mod tests {
         append(root, "dev1aaaaaaaa", &big).unwrap();
         append(root, "dev1aaaaaaaa", &save("d1", 1)).unwrap();
         assert!(verify(root).unwrap().ok);
+    }
+
+    #[test]
+    fn exchange_lines_name_files_and_fingerprints_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let sent = Entry::Exchange(Exchange {
+            exchange: "x1".into(),
+            step: ExchangeStep::Sent,
+            files: vec![ExchangeFile {
+                file: "보낸 원고.hwpx".into(),
+                file_hash: fingerprint(b"file"),
+            }],
+            docs: vec![ExchangeDoc {
+                doc: "d1".into(),
+                body: fingerprint(b"text"),
+            }],
+        });
+        append_at(root, "dev1aaaaaaaa", &sent, "2026-10-03T01:00:00.000Z").unwrap();
+        let received = Entry::Exchange(Exchange {
+            exchange: "x1".into(),
+            step: ExchangeStep::Received,
+            files: vec![ExchangeFile {
+                file: "교정본.hwpx".into(),
+                file_hash: fingerprint(b"back"),
+            }],
+            docs: Vec::new(),
+        });
+        append(root, "dev1aaaaaaaa", &received).unwrap();
+        let text = fs::read_to_string(root.join(".journal/dev1aaaaaaaa.jsonl")).unwrap();
+        let first = text.lines().next().unwrap();
+        assert_eq!(
+            first,
+            format!(
+                "{{\"kind\":\"exchange\",\"time\":\"2026-10-03T01:00:00.000Z\",\"exchange\":\"x1\",\"step\":\"sent\",\"files\":[{{\"file\":\"보낸 원고.hwpx\",\"fileHash\":\"{}\"}}],\"docs\":[{{\"doc\":\"d1\",\"body\":\"{}\"}}],\"prev\":\"{NO_PREV}\"}}",
+                fingerprint(b"file"),
+                fingerprint(b"text"),
+            )
+        );
+        assert!(
+            text.lines()
+                .nth(1)
+                .unwrap()
+                .contains("\"step\":\"received\"")
+        );
+        assert!(verify(root).unwrap().ok);
+        assert_eq!(summary(root, None).unwrap().exchanges, 2);
     }
 
     #[test]
