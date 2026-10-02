@@ -13,8 +13,10 @@
 
 mod hangul;
 mod page;
+mod para;
 mod text;
 mod word;
+mod xml;
 
 pub use page::PageSetup;
 
