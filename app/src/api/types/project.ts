@@ -71,6 +71,8 @@ export interface ProjectSizes {
   trash: number;
   /** The writing journal; 0 when there is none. */
   journal: number;
+  /** What was sent to editors and the corrected files (교정본 주고받기). */
+  exchanges: number;
   /** What tidying old automatic records would free. */
   tidyFrees: number;
   /** Records have grown much bigger than the writing: suggest tidying. */

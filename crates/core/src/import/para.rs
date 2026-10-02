@@ -13,6 +13,11 @@ pub(super) struct Run {
     pub strike: bool,
     pub underline: bool,
     pub dot: bool,
+    /// Text colour other than black, and a highlight or shading behind the
+    /// text. Not marks in the app: only read when comparing a corrected file
+    /// (교정본) with what was sent.
+    pub color: bool,
+    pub shade: bool,
 }
 
 impl Run {

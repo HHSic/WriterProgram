@@ -16,7 +16,8 @@
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수, 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝) |
 | `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |
 | `export.rs`, `docx/`, `hwpx/`, `xml.rs` | 내보내기. docx는 `layout.rs`(머리글·꼬리글), `styles.rs`, `body.rs`. HWPX는 `header.rs`(글자·문단 모양, 스타일), `section.rs`(본문, 머리말·꼬리말 조판 부호). `xml.rs`는 둘이 함께 쓰는 이스케이프·zip 묶기·시각 |
-| `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모) |
+| `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모), `marked/`(교정본 읽기: 글자 모양·변경 추적·편집자 메모) |
+| `corrections/` | 교정본 주고받기 ([corrections.md](corrections.md)): `sent.rs`(보낸 기록), `compare.rs`(문단·어절·글자 비교, 종류 나누기), `review.rs`(교정본과 보낸 원고 비교), `flat.rs`(회차를 글자 줄로, 자리 옮기기), `apply.rs`(받아들이기·되돌리기) |
 | `cards.rs`, `notes.rs`, `search.rs`, `snapshot.rs`, `trash.rs` | 설정집, 메모, 찾기·바꾸기, 기록, 휴지통 |
 | `journal.rs` | 창작 일지: 기기별 `.journal/<기기 id>.jsonl`, 해시 사슬, 저장·기록·가져오기 항목(각 모듈이 `journal::note`로 남김), 확인(`verify`), 요약, 기기 설정(`Settings`). 화면 쪽은 `editor/journal.ts`(쓰기 묶음·붙여넣기), `store/journal.ts`(켜고 끄기·첫 알림), `workspace/settings/JournalField.tsx`, 명령은 `commands/journal.rs` |
 | `copies/`, `changes.rs`, `places.rs`, `recent.rs` | 다른 기기: `scan.rs`(동기화 사본 찾기), `merge.rs`(project.json 사본 합치기), 바뀐 파일 알아보기, 저장 위치 찾기, 최근 작품 |
@@ -27,7 +28,7 @@
 |---|---|
 | `crates/sync` (writer-sync) | 드라이브와 맞추기: `engine.rs`(이 기기·드라이브·지난번 셋을 비교), `base.rs`(지난번 모습), `remote.rs`(드라이브가 해 줘야 할 일), `folder.rs`(흉내 드라이브), `providers/`(`config.rs` 앱 등록·주소, `session.rs` 로그인 세션과 오류 말(공간 부족 포함), 드라이브별 파일과 남은 공간 읽기), `oauth.rs`(PKCE 로그인), `http.rs`(ureq 감싸기), `secrets.rs`(자격 증명), `accounts.rs`(연결·맞추는 작품 목록) |
 | `crates/revise` (writer-revise) | 퇴고 점검 시제품: `rules/`에 점검 종류별 파일(`repetition.rs` 반복, `rhythm.rs` 문장 리듬, `expression.rs` 표현, `dialogue.rs` 대사, `names.rs` 이름) |
-| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, output, search, cards, notes, journal, sync_folder), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
+| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, output, search, cards, notes, journal, exchange, sync_folder), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
 
 ## TypeScript (`app/src`)
 
@@ -74,7 +75,7 @@ npm --prefix app test
 
 ## 라이브러리를 쓴 곳과 일부러 직접 짠 곳
 
-이미 쓰는 것: quick-xml(XML 읽기·엔티티), zip, chrono(시각 글), encoding_rs(EUC-KR 등), sha2, regex, ureq(HTTP), base64·getrandom(로그인), notify-debouncer-mini(폴더 감시), keyring-core, lindera(형태소), Tiptap, zustand.
+이미 쓰는 것: quick-xml(XML 읽기·엔티티), zip, similar(교정본 비교의 diff), chrono(시각 글), encoding_rs(EUC-KR 등), sha2, regex, ureq(HTTP), base64·getrandom(로그인), notify-debouncer-mini(폴더 감시), keyring-core, lindera(형태소), Tiptap, zustand.
 
 직접 짠 채로 둔 것과 이유:
 

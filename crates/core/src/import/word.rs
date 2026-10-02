@@ -16,13 +16,13 @@ use crate::markup::Inline;
 // Styles
 
 #[derive(Default)]
-struct Styles {
+pub(super) struct Styles {
     /// styleId -> (name, basedOn)
     map: HashMap<String, (String, Option<String>)>,
 }
 
 impl Styles {
-    fn read(xml: &str) -> Styles {
+    pub(super) fn read(xml: &str) -> Styles {
         let mut styles = Styles::default();
         let mut id = String::new();
         let mut name = String::new();
@@ -51,7 +51,7 @@ impl Styles {
     }
 
     /// Heading level of a paragraph style (1 to 9), following `basedOn`.
-    fn heading(&self, id: &str) -> Option<u8> {
+    pub(super) fn heading(&self, id: &str) -> Option<u8> {
         let mut id = id;
         for _ in 0..6 {
             let (name, based) = match self.map.get(id) {
@@ -81,7 +81,7 @@ impl Styles {
         None
     }
 
-    fn is_toc(&self, id: &str) -> bool {
+    pub(super) fn is_toc(&self, id: &str) -> bool {
         self.map.get(id).is_some_and(|(name, _)| {
             let name = name.to_lowercase();
             name.starts_with("toc")
@@ -211,7 +211,7 @@ fn body(xml: &str, styles: &Styles) -> Result<Vec<Item>, String> {
 }
 
 /// Paragraph and run properties.
-fn property(
+pub(super) fn property(
     name: &str,
     a: &Attrs,
     in_ppr: bool,
@@ -234,6 +234,16 @@ fn property(
             "strike" | "dstrike" => run.strike = flag(a),
             "u" => run.underline = flag(a),
             "em" => run.dot = flag(a),
+            "color" => {
+                run.color = val(a, "val")
+                    .is_some_and(|c| !matches!(c.to_ascii_lowercase().as_str(), "auto" | "000000"))
+            }
+            "highlight" => run.shade = val(a, "val").is_some_and(|c| c != "none"),
+            "shd" => {
+                run.shade = val(a, "fill").is_some_and(|c| {
+                    !matches!(c.to_ascii_lowercase().as_str(), "" | "auto" | "ffffff")
+                })
+            }
             _ => {}
         }
     }

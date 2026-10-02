@@ -17,6 +17,7 @@ export const projectMethods = {
       records,
       trash: p.trash.length ? bytesOf(p.trash) : 0,
       journal: 0,
+      exchanges: 0,
       tidyFrees,
       suggestTidy: records > 20 * MB && records > 10 * writing && tidyFrees > 0,
       diskFree: 64 * 1024 * MB,

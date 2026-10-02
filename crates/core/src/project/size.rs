@@ -34,6 +34,8 @@ pub struct Sizes {
     pub trash: u64,
     /// The writing journal (.journal); 0 when there is none.
     pub journal: u64,
+    /// What was sent to editors and the corrected files (.exchanges).
+    pub exchanges: u64,
     /// What tidying old automatic records would free.
     pub tidy_frees: u64,
     /// Records have grown much bigger than the writing, and tidying would
@@ -44,10 +46,10 @@ pub struct Sizes {
 }
 
 impl Sizes {
-    /// What goes to a drive when the project is kept in step with one (the
-    /// journal stays on the device).
+    /// What goes to a drive when the project is kept in step with one: all
+    /// of it (the journal and the exchanges travel too, crates/sync engine).
     pub fn travelling(&self) -> u64 {
-        self.writing + self.records + self.trash
+        self.writing + self.records + self.trash + self.journal + self.exchanges
     }
 }
 
@@ -95,6 +97,7 @@ pub fn sizes(root: &Path) -> Result<Sizes> {
         records,
         trash: size_of(&root.join(TRASH_DIR)),
         journal: size_of(&root.join(JOURNAL_DIR)),
+        exchanges: size_of(&root.join(crate::corrections::EXCHANGE_DIR)),
         tidy_frees,
         suggest_tidy: crowded(writing, records) && tidy_frees > 0,
         disk_free: disk_free(root),

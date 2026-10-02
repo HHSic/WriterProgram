@@ -6,6 +6,7 @@
 pub mod cards;
 pub mod doc;
 pub mod journal;
+pub mod exchange;
 pub mod notes;
 pub mod output;
 pub mod project;

@@ -9,6 +9,7 @@ import { cardMethods } from './cards';
 import { deviceMethods, otherDevice } from './devices';
 import { docMethods } from './docs';
 import { driveMethods } from './drives';
+import { exchangeMethods } from './exchange';
 import { formatMethods } from './formats';
 import { ioMethods } from './io';
 import { journalMethods } from './journal';
@@ -31,6 +32,7 @@ export function startMockBackend(): Backend {
     ...projectMethods,
     ...docMethods,
     ...ioMethods,
+    ...exchangeMethods,
     ...searchMethods,
     ...cardMethods,
     ...noteMethods,

@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::format::ManuscriptFormat;
 use crate::markup::{Block, Inline, Mark};
@@ -209,7 +209,7 @@ pub struct DocInfo {
     pub author: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FileKind {
     Docx,
@@ -253,29 +253,47 @@ pub fn export_file(
         return Err(Error::Invalid("내보낼 회차를 골라 주세요".into()));
     }
     format.validate()?;
+    let bodies = items
+        .iter()
+        .map(|item| Ok(doc::load(root, &item.doc_id)?.body))
+        .collect::<Result<Vec<_>>>()?;
+    export_bodies(root, items, &bodies, opts, format, kind, dest, per_doc)
+}
+
+/// `export_file` with the chapters' text already loaded (`bodies`, one per
+/// item), so the caller knows exactly what went into the files.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn export_bodies(
+    root: &Path,
+    items: &[ExportItem],
+    bodies: &[Vec<Block>],
+    opts: &DocOptions,
+    format: &ManuscriptFormat,
+    kind: FileKind,
+    dest: &Path,
+    per_doc: bool,
+) -> Result<Vec<PathBuf>> {
+    if items.is_empty() {
+        return Err(Error::Invalid("내보낼 회차를 골라 주세요".into()));
+    }
+    format.validate()?;
     let project = project::load(root)?;
     let info = DocInfo {
         title: project.title.clone(),
         author: project.pen_name.clone(),
     };
-    let load = |item: &ExportItem| -> Result<ExportDoc> {
-        Ok(ExportDoc {
-            heading: item.heading.clone(),
-            blocks: crate::indent::apply(
-                &doc::load(root, &item.doc_id)?.body,
-                format.indent,
-                format.indent_rules,
-            ),
-        })
+    let load = |item: &ExportItem, body: &[Block]| ExportDoc {
+        heading: item.heading.clone(),
+        blocks: crate::indent::apply(body, format.indent, format.indent_rules),
     };
     if !per_doc {
-        let docs = items.iter().map(load).collect::<Result<Vec<_>>>()?;
+        let docs: Vec<ExportDoc> = items.iter().zip(bodies).map(|(i, b)| load(i, b)).collect();
         atomic_write(dest, &kind.build(&docs, format, opts, &info)?)?;
         return Ok(vec![dest.to_path_buf()]);
     }
     let paths = per_doc_paths(dest, items, kind.ext());
-    for (item, path) in items.iter().zip(&paths) {
-        let docs = [load(item)?];
+    for ((item, body), path) in items.iter().zip(bodies).zip(&paths) {
+        let docs = [load(item, body)];
         atomic_write(path, &kind.build(&docs, format, opts, &info)?)?;
     }
     Ok(paths)

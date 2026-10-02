@@ -24,7 +24,9 @@ export type SnapshotKind =
   | 'this-device'
   | 'other-device'
   | 'before-reload'
-  | 'before-copy';
+  | 'before-copy'
+  // Before an editor's corrections were accepted (crates/core/src/corrections).
+  | 'before-corrections';
 
 export interface Counts {
   withSpaces: number;

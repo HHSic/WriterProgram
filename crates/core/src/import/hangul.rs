@@ -18,16 +18,18 @@ use super::{Item, Raw, SkipKind};
 use crate::format::{HeadAlign, Margins};
 use crate::markup::Inline;
 
-const BROKEN: &str = "한글 문서(HWPX)가 아니거나 손상됨";
+pub(super) const BROKEN: &str = "한글 문서(HWPX)가 아니거나 손상됨";
 
 /// Character shapes: `charPr` id to what the text looks like.
-fn char_shapes(header: &str) -> HashMap<String, Run> {
+pub(super) fn char_shapes(header: &str) -> HashMap<String, Run> {
     let mut out = HashMap::new();
     let mut current: Option<(String, Run)> = None;
     let _ = walk(header, |tok| match tok {
         Tok::Start(n, a) if n == "charPr" => {
             let run = Run {
                 dot: val(&a, "symMark").is_some_and(|m| m != "NONE"),
+                color: val(&a, "textColor").is_some_and(|c| !is_plain_color(c, "#000000")),
+                shade: val(&a, "shadeColor").is_some_and(|c| !is_plain_color(c, "#FFFFFF")),
                 ..Run::default()
             };
             current = Some((val(&a, "id").unwrap_or_default().to_string(), run));
@@ -53,8 +55,13 @@ fn char_shapes(header: &str) -> HashMap<String, Run> {
     out
 }
 
+/// Whether a colour attribute means "nothing special": none, or `plain`.
+fn is_plain_color(color: &str, plain: &str) -> bool {
+    color.is_empty() || color.eq_ignore_ascii_case("none") || color.eq_ignore_ascii_case(plain)
+}
+
 /// Heading levels (1–9) of paragraph shapes with an outline level.
-fn outline_shapes(header: &str) -> HashMap<String, u8> {
+pub(super) fn outline_shapes(header: &str) -> HashMap<String, u8> {
     let mut out = HashMap::new();
     let mut current: Option<String> = None;
     let _ = walk(header, |tok| match tok {
@@ -75,12 +82,12 @@ fn outline_shapes(header: &str) -> HashMap<String, u8> {
 
 /// What each paragraph style means here: a heading level, or a 차례 line.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum StyleKind {
+pub(super) enum StyleKind {
     Heading(u8),
     Toc,
 }
 
-fn styles(header: &str) -> HashMap<String, StyleKind> {
+pub(super) fn styles(header: &str) -> HashMap<String, StyleKind> {
     let mut out = HashMap::new();
     let _ = walk(header, |tok| {
         if let Tok::Start(n, a) | Tok::Empty(n, a) = tok
@@ -246,7 +253,7 @@ fn pages(xml: &str, aligns: &HashMap<String, HeadAlign>, first: bool, found: &mu
 }
 
 /// What a subtree left out is, by the element that opens it.
-fn left_out(name: &str) -> Option<Option<SkipKind>> {
+pub(super) fn left_out(name: &str) -> Option<Option<SkipKind>> {
     Some(match name {
         "tbl" => Some(SkipKind::Table),
         "pic" | "ole" | "container" | "equation" | "rect" | "ellipse" | "arc" | "polygon"

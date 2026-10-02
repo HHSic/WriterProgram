@@ -65,14 +65,13 @@ struct Here {
     stamp: Option<(u64, i64)>,
 }
 
-/// Hidden folders that travel with the project: records, trash and the
+/// Hidden folders that travel with the project: records, trash, the
 /// creation journal (one file per device, so both sides never change the same
-/// one).
-const HIDDEN_KEPT: [&str; 3] = [".snapshots", ".trash", ".journal"];
+/// one) and what was sent to editors (교정본 주고받기).
+const HIDDEN_KEPT: [&str; 4] = [".snapshots", ".trash", ".journal", ".exchanges"];
 
 /// Which files belong to the project on a drive: everything but temporary
-/// files, hidden folders other than records, trash and the journal, and
-/// system files.
+/// files, hidden folders other than the kept ones, and system files.
 fn wanted(rel: &str) -> bool {
     let parts: Vec<&str> = rel.split('/').collect();
     let (name, dirs) = parts.split_last().expect("at least a name");
@@ -442,6 +441,7 @@ mod tests {
     fn which_files_travel() {
         assert!(wanted("manuscript/abc.md"));
         assert!(wanted(".snapshots/abc/20260928-101500-000.auto.md"));
+        assert!(wanted(".exchanges/abc/exchange.json"));
         assert!(wanted(".trash/x/item.json"));
         assert!(wanted(".journal/k7q2m9x4t1ab.jsonl"));
         assert!(!wanted("manuscript/.abc.md.x1.tmp"));

@@ -12,6 +12,7 @@
 //! the chapters it makes are the ones the preview listed.
 
 mod hangul;
+pub(crate) mod marked;
 mod notes;
 mod page;
 mod para;

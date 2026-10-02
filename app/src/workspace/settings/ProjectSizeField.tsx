@@ -32,7 +32,8 @@ export function ProjectSizeField() {
   const parts = [`원고 ${sizeText(sizes.writing)}`];
   if (sizes.records) parts.push(`기록 ${sizeText(sizes.records)}`);
   if (sizes.trash) parts.push(`휴지통 ${sizeText(sizes.trash)}`);
-  if (sizes.journal) parts.push(`작업 일지 ${sizeText(sizes.journal)}`);
+  if (sizes.exchanges) parts.push(`교정 주고받기 ${sizeText(sizes.exchanges)}`);
+  if (sizes.journal) parts.push(`창작 일지 ${sizeText(sizes.journal)}`);
 
   const tidy = () =>
     openDialog({
