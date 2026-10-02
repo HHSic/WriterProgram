@@ -10,7 +10,7 @@
 
 | 모듈 | 하는 일 |
 |---|---|
-| `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기) |
+| `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간) |
 | `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기 재시도 |
 | `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수, 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝) |
@@ -24,7 +24,7 @@
 
 | 위치 | 하는 일 |
 |---|---|
-| `crates/sync` (writer-sync) | 드라이브와 맞추기: `engine.rs`(이 기기·드라이브·지난번 셋을 비교), `base.rs`(지난번 모습), `remote.rs`(드라이브가 해 줘야 할 일), `folder.rs`(흉내 드라이브), `providers/`(`config.rs` 앱 등록·주소, `session.rs` 로그인 세션, 드라이브별 파일), `oauth.rs`(PKCE 로그인), `http.rs`(ureq 감싸기), `secrets.rs`(자격 증명), `accounts.rs`(연결·맞추는 작품 목록) |
+| `crates/sync` (writer-sync) | 드라이브와 맞추기: `engine.rs`(이 기기·드라이브·지난번 셋을 비교), `base.rs`(지난번 모습), `remote.rs`(드라이브가 해 줘야 할 일), `folder.rs`(흉내 드라이브), `providers/`(`config.rs` 앱 등록·주소, `session.rs` 로그인 세션과 오류 말(공간 부족 포함), 드라이브별 파일과 남은 공간 읽기), `oauth.rs`(PKCE 로그인), `http.rs`(ureq 감싸기), `secrets.rs`(자격 증명), `accounts.rs`(연결·맞추는 작품 목록) |
 | `crates/revise` (writer-revise) | 퇴고 점검 시제품: `rules/`에 점검 종류별 파일(`repetition.rs` 반복, `rhythm.rs` 문장 리듬, `expression.rs` 표현, `dialogue.rs` 대사, `names.rs` 이름) |
 | `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, output, search, cards, notes, sync_folder), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
 
@@ -37,7 +37,7 @@
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
 | `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web …), 화면은 `store/index.ts`에서 가져다 씀 |
 | `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`) |
-| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/` |
+| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`) |
 | `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`) |
 | `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
 
