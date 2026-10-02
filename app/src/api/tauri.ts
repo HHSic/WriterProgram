@@ -40,6 +40,12 @@ export const tauriBackend: Backend = {
   exportTxt: (root, items, opts, dest, perDoc) => invoke('export_txt', { root, items, opts, dest, perDoc }),
   exportFile: (root, items, opts, format, kind, dest, perDoc) =>
     invoke('export_file', { root, items, opts, format, kind, dest, perDoc }),
+  exchangeSend: (root, items, opts, format, kind, dest, perDoc) =>
+    invoke('exchange_send', { root, items, opts, format, kind, dest, perDoc }),
+  exchangeList: (root) => invoke('exchange_list', { root }),
+  exchangeRead: (root, exchangeId, path) => invoke('exchange_read', { root, exchangeId, path }),
+  exchangeReview: (root, exchangeId) => invoke('exchange_review', { root, exchangeId }),
+  exchangeApply: (root, exchangeId, decisions) => invoke('exchange_apply', { root, exchangeId, decisions }),
   importPreview: (paths, opts) => invoke('import_preview', { paths, opts }),
   importCommit: (root, paths, opts, spec) => invoke('import_commit', { root, paths, opts, spec }),
   search: (root, query) => invoke('search', { root, query }),

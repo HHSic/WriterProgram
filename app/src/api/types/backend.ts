@@ -15,6 +15,7 @@ import type {
   SyncOutcome,
 } from './devices';
 import type { DocData, DocMeta, MetaPatch, NewDoc, SaveOutcome, Section, SnapshotInfo, SnapshotKind, TrashItem } from './docs';
+import type { Applied, Decisions, Exchange, ExchangeInfo, Review } from './exchange';
 import type { FormatCatalog, ManuscriptFormat, UserPreset } from './format';
 import type { ImportOptions, ImportPreview, ImportSpec, Imported } from './import';
 import type { NewNote, Note } from './notes';
@@ -64,6 +65,24 @@ export interface Backend {
     dest: string,
     perDoc: boolean,
   ): Promise<string[]>;
+  /** "편집자에게 보내기": exports like `exportFile` and keeps what was sent. */
+  exchangeSend(
+    root: string,
+    items: ExportItem[],
+    opts: DocOptions,
+    format: ManuscriptFormat,
+    kind: FileKind,
+    dest: string,
+    perDoc: boolean,
+  ): Promise<Exchange>;
+  /** Chapters sent to editors, newest first. */
+  exchangeList(root: string): Promise<ExchangeInfo[]>;
+  /** Reads a corrected file (hwpx, docx) and compares it with what was sent. */
+  exchangeRead(root: string, exchangeId: string, path: string): Promise<Review>;
+  /** The last corrected file read, with the decisions so far. */
+  exchangeReview(root: string, exchangeId: string): Promise<Review | null>;
+  /** Accepts or rejects corrections; keeps a record of each chapter first. */
+  exchangeApply(root: string, exchangeId: string, decisions: Decisions): Promise<Applied>;
   search(root: string, query: SearchQuery): Promise<SearchResult>;
   replaceAll(root: string, query: SearchQuery, replacement: string): Promise<ReplaceOutcome>;
   cardLoad(root: string, cardId: string): Promise<Card>;

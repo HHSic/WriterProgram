@@ -7,6 +7,7 @@ export type * from './browser';
 export type * from './cards';
 export type * from './devices';
 export type * from './docs';
+export type * from './exchange';
 export type * from './format';
 export type * from './import';
 export type * from './notes';
