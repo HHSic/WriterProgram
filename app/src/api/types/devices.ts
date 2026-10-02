@@ -72,6 +72,8 @@ export interface SyncReport {
   copies: string[];
   merged: boolean;
   later: string[];
+  /** Room left on the drive in bytes when it is running low; null when there is room or the drive does not say. */
+  spaceLeft: number | null;
 }
 
 export interface SyncOutcome {

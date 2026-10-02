@@ -40,6 +40,19 @@ export function localDate(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const KB = 1024;
+const MB = 1024 * KB;
+const GB = 1024 * MB;
+
+/** "0", "12KB", "0.2MB", "3.1MB", "41MB", "1.5GB". */
+export function sizeText(bytes: number): string {
+  if (bytes <= 0) return '0';
+  if (bytes < 100 * KB) return `${Math.max(1, Math.round(bytes / KB))}KB`;
+  if (bytes < 10 * MB) return `${(bytes / MB).toFixed(1)}MB`;
+  if (bytes < GB) return `${Math.round(bytes / MB)}MB`;
+  return `${(bytes / GB).toFixed(1)}GB`;
+}
+
 /** File-name friendly text: drops characters Windows does not allow. */
 export function fileSafe(s: string): string {
   return s.replace(/[\\/:*?"<>|]/g, '_').trim();

@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
-use writer_core::project::{self, NewProject, Overview, ProjectInfo, ProjectPatch};
+use writer_core::project::{self, NewProject, Overview, ProjectInfo, ProjectPatch, Sizes};
 use writer_core::recent::{self, RecentItem};
 
 use crate::error::{Res, fail};
@@ -91,6 +91,13 @@ pub async fn part_rename(
 pub async fn part_remove(state: State<'_, AppState>, root: String, part_id: String) -> Res<()> {
     let _write = state.write();
     project::remove_part(Path::new(&root), &part_id).map_err(fail)
+}
+
+/// 이 작품 크기: the writing, records, trash and journal, whether to suggest
+/// tidying records, and the free room on the project's disk.
+#[tauri::command]
+pub async fn project_size(root: String) -> Res<Sizes> {
+    project::sizes(Path::new(&root)).map_err(fail)
 }
 
 /// Shows a file or folder in the system file manager.

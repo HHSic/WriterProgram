@@ -2,6 +2,7 @@
 
 import { api } from '../api';
 import type { DriveProvider, Overview } from '../api/types';
+import { localDate, sizeText } from '../lib/format';
 import { get, set } from './state';
 import { saveEverything, showToast, toastError } from './ui';
 import { refreshOverview } from './project';
@@ -39,6 +40,29 @@ export function stopAutoSync() {
   window.removeEventListener('focus', onFocus);
 }
 
+const SPACE_WARNED_KEY = 'writer.driveSpaceWarned';
+let spaceWarnedOn = '';
+
+/**
+ * The words for a drive running low on room, once a day (also across
+ * restarts when the browser storage works); null when already said today.
+ */
+function lowSpaceWarning(left: number): string | null {
+  const today = localDate();
+  if (spaceWarnedOn === today) return null;
+  try {
+    if (localStorage.getItem(SPACE_WARNED_KEY) === today) {
+      spaceWarnedOn = today;
+      return null;
+    }
+    localStorage.setItem(SPACE_WARNED_KEY, today);
+  } catch {
+    // Without storage, once a day while the app stays open.
+  }
+  spaceWarnedOn = today;
+  return `드라이브 남은 공간이 ${sizeText(left)}뿐입니다. 공간이 차면 맞추기가 멈춥니다.`;
+}
+
 /** One pass with the drive now. Quiet passes only speak up about problems in the status bar. */
 export async function syncNow(opts: { quiet?: boolean } = {}) {
   const ov = get().overview;
@@ -56,12 +80,13 @@ export async function syncNow(opts: { quiet?: boolean } = {}) {
       void loadNotes();
       void refreshCardCounts();
     }
-    if (!opts.quiet) {
-      showToast(
-        out.link.error
-          ? { text: `드라이브와 맞추지 못함 · ${out.link.error}`, tone: 'error' }
-          : { text: '드라이브와 맞춤' },
-      );
+    const lowSpace = r?.spaceLeft != null ? lowSpaceWarning(r.spaceLeft) : null;
+    if (!opts.quiet && out.link.error) {
+      showToast({ text: `드라이브와 맞추지 못함 · ${out.link.error}`, tone: 'error' });
+    } else if (lowSpace) {
+      showToast({ text: lowSpace });
+    } else if (!opts.quiet) {
+      showToast({ text: '드라이브와 맞춤' });
     }
   } catch (e) {
     if (!opts.quiet) toastError('드라이브와 맞추지 못함', e);

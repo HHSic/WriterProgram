@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Modal } from '../components/Modal';
-import { closeDialog, type Dialog } from '../store';
+import { closeDialog, useApp, type Dialog } from '../store';
 
 export function ConfirmDialog({ dialog }: { dialog: Extract<Dialog, { kind: 'confirm' }> }) {
   const [busy, setBusy] = useState(false);
@@ -23,7 +23,8 @@ export function ConfirmDialog({ dialog }: { dialog: Extract<Dialog, { kind: 'con
             onClick={async () => {
               setBusy(true);
               await dialog.onConfirm();
-              closeDialog();
+              // onConfirm may have opened the dialog to go back to.
+              if (useApp.getState().dialog === dialog) closeDialog();
             }}
           >
             {dialog.confirm}
