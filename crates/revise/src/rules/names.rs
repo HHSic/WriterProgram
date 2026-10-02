@@ -10,22 +10,13 @@ const PARTICLES: &[&str] = &[
     "이는", "이가", "이를", "이의", "이도", "이와", "이만", "이야", "이에게", "이한테",
 ];
 
+/// Whitespace-delimited words with their byte offsets in `s`.
 fn split_words(s: &str) -> Vec<(usize, &str)> {
-    let mut words = Vec::new();
-    let mut start: Option<usize> = None;
-    for (i, c) in s.char_indices() {
-        if c.is_whitespace() {
-            if let Some(st) = start.take() {
-                words.push((st, &s[st..i]));
-            }
-        } else if start.is_none() {
-            start = Some(i);
-        }
-    }
-    if let Some(st) = start {
-        words.push((st, &s[st..]));
-    }
-    words
+    // Each word is a slice of `s`, so its offset is how far its start lies
+    // from the start of `s`.
+    s.split_whitespace()
+        .map(|w| (w.as_ptr() as usize - s.as_ptr() as usize, w))
+        .collect()
 }
 
 /// E1: a name one jamo away from a setting-card name, used rarely, while the card name is common.
@@ -87,5 +78,17 @@ pub(super) fn name_typos(doc: &Doc, names: &Names, out: &mut Vec<Issue>) {
                 break;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn words_with_offsets() {
+        assert_eq!(
+            super::split_words(" 가나  다\t라\u{3000}마 "),
+            [(1, "가나"), (9, "다"), (13, "라"), (19, "마")]
+        );
+        assert!(super::split_words(" \n ").is_empty());
     }
 }
