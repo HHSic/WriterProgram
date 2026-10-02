@@ -6,6 +6,7 @@
 //! tested with plain `cargo test` and reused on mobile. The on-disk format is
 //! described in `docs/architecture.md`.
 
+pub mod anchor;
 pub mod cards;
 pub mod changes;
 pub mod copies;

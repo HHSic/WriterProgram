@@ -10,7 +10,17 @@ name = "writer_core"
 path = "src/lib.rs"
 
 [dependencies]
+base64 = "0.22"
 chrono = "0.4"
+# Time stamps (RFC 3161, anchor/tsp.rs): reading the authorities' signed
+# replies and checking their signatures. One RustCrypto family (der 0.7).
+cms = "0.2"
+der = { version = "0.7", features = ["alloc"] }
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+p384 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+rsa = { version = "0.9", features = ["sha2"] }
+x509-cert = "0.2"
+x509-tsp = "0.1"
 encoding_rs = "0.8"
 quick-xml = "0.42"
 regex = "1"
