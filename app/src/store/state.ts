@@ -33,7 +33,10 @@ export type Dialog =
   | { kind: 'newProject' }
   | { kind: 'project'; tab?: SettingsTab }
   | { kind: 'trash' }
-  | { kind: 'export' }
+  /** 내보내기; `toEditor`: 편집자에게 보내기 (what is sent is kept), with `docIds` picked to start. */
+  | { kind: 'export'; toEditor?: boolean; docIds?: string[] }
+  /** 교정본 주고받기: chapters sent to editors and corrected files taken back. */
+  | { kind: 'exchanges' }
   /** 가져오기: txt, md, docx, hwpx into chapters, into `partId` when given. */
   | { kind: 'import'; partId?: string }
   | { kind: 'view' }
@@ -104,6 +107,10 @@ interface AppState {
   docVersion: number;
   /** Bumped when the records of the open document change. */
   recordsVersion: number;
+  /** Bumped when chapters are sent, a corrected file is read or corrections are applied. */
+  exchangesVersion: number;
+  /** The corrected file's name for each review tab (교정본 검토), once loaded. */
+  reviewFiles: Record<string, string>;
   /** Manuscript formats, fonts and paper sizes offered in settings. */
   catalog: FormatCatalog | null;
   findRequest: FindRequest | null;
@@ -161,6 +168,8 @@ export const useApp = create<AppState>(() => ({
   toast: null,
   docVersion: 0,
   recordsVersion: 0,
+  exchangesVersion: 0,
+  reviewFiles: {},
   catalog: null,
   findRequest: null,
   pendingJump: null,

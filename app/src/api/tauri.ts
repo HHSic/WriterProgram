@@ -118,12 +118,12 @@ export const tauriBackend: Backend = {
     const picked = await open({ directory: true, multiple: false, title, defaultPath });
     return typeof picked === 'string' ? picked : null;
   },
-  pickFiles: async (title) => {
+  pickFiles: async (title, only) => {
     const picked = await open({
-      multiple: true,
+      multiple: !only,
       directory: false,
       title,
-      filters: [{ name: '원고 파일 (txt, md, docx, hwpx)', extensions: ['txt', 'md', 'markdown', 'docx', 'hwpx', 'hwp'] }],
+      filters: [only ?? { name: '원고 파일 (txt, md, docx, hwpx)', extensions: ['txt', 'md', 'markdown', 'docx', 'hwpx', 'hwp'] }],
     });
     return Array.isArray(picked) ? picked : typeof picked === 'string' ? [picked] : [];
   },

@@ -21,6 +21,8 @@ export interface JournalSummary {
   sessions: number;
   pastes: number;
   imports: number;
+  /** 교정 주고받기 lines: chapters sent, corrected files taken back, corrections applied. */
+  exchanges: number;
   /** Devices with a journal in this project. */
   devices: number;
   /** Lines written by this device. */

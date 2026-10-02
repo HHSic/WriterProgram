@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { JournalSummary } from '../api/types';
 import { journalCheckText, journalSummaryText } from './journalText';
 
-const empty: JournalSummary = { since: null, saves: 0, sessions: 0, pastes: 0, imports: 0, devices: 0, thisDevice: 0 };
+const empty: JournalSummary = { since: null, saves: 0, sessions: 0, pastes: 0, imports: 0, exchanges: 0, devices: 0, thisDevice: 0 };
 
 describe('journal sentences', () => {
   it('says how long and how often', () => {

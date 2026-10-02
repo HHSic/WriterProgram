@@ -5,6 +5,7 @@ import { CompareDialog } from './Compare';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CopiesDialog } from './Copies';
 import { DriveImportDialog, DrivesDialog } from './Drives';
+import { ExchangesDialog } from './Exchanges';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
 import { MoveDialog } from './MoveProject';
@@ -26,7 +27,9 @@ export function DialogHost() {
     case 'trash':
       return <TrashDialog />;
     case 'export':
-      return <ExportDialog />;
+      return <ExportDialog key={dialog.toEditor ? 'editor' : 'export'} toEditor={dialog.toEditor} docIds={dialog.docIds} />;
+    case 'exchanges':
+      return <ExchangesDialog />;
     case 'import':
       return <ImportDialog partId={dialog.partId} />;
     case 'view':

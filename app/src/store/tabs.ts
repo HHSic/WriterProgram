@@ -93,6 +93,7 @@ function targetExists(ov: Overview, t: Target): boolean {
       return ov.parts.some((p) => p.id === t.id);
     case 'notes':
     case 'web':
+    case 'review':
       return true;
   }
 }

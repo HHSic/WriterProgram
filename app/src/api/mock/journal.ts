@@ -9,13 +9,13 @@ const journals = new Map<string, JournalSummary>();
 function journal(root: string): JournalSummary {
   let j = journals.get(root);
   if (!j) {
-    j = { since: null, saves: 0, sessions: 0, pastes: 0, imports: 0, devices: 0, thisDevice: 0 };
+    j = { since: null, saves: 0, sessions: 0, pastes: 0, imports: 0, exchanges: 0, devices: 0, thisDevice: 0 };
     journals.set(root, j);
   }
   return j;
 }
 
-function add(root: string, kind: 'saves' | 'sessions' | 'pastes') {
+function add(root: string, kind: 'saves' | 'sessions' | 'pastes' | 'exchanges') {
   if (!settings.enabled) return;
   const j = journal(root);
   j.since ??= now();
@@ -27,6 +27,11 @@ function add(root: string, kind: 'saves' | 'sessions' | 'pastes') {
 /** Called by the stand-in's save, as the Rust save adds a line. */
 export function noteMockSave(root: string) {
   add(root, 'saves');
+}
+
+/** Called when chapters are sent, a corrected file is read or corrections are applied. */
+export function noteMockExchange(root: string) {
+  add(root, 'exchanges');
 }
 
 export const journalMethods = {

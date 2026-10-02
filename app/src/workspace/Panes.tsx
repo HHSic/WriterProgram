@@ -27,12 +27,17 @@ import { CardEditor } from './CardEditor';
 import { DocPane } from './DocPane';
 import { NotesBoard } from './Notes';
 import { OutlineTable } from './OutlineTable';
+import { ReviewPane } from './ReviewPane';
 import { WebPane } from './WebPane';
 
 const TAB_DRAG = 'application/x-writer-tab';
 
 export function tabLabel(ov: Overview, target: Target): { label: string; icon: IconName } {
   if (target.kind === 'notes') return { label: '메모함', icon: 'note' };
+  if (target.kind === 'review') {
+    const file = useApp.getState().reviewFiles[target.id];
+    return { label: file ? `교정본 · ${file}` : '교정본 검토', icon: 'correction' };
+  }
   if (target.kind === 'web') {
     const page = webPages(ov.project.id)[target.id];
     return { label: page?.title || '웹', icon: 'globe' };
@@ -108,6 +113,8 @@ function TabContent({ tab, locked, active }: { tab: Tab; locked: boolean; active
       return <NotesBoard />;
     case 'table':
       return <OutlineTable key={t.id} partId={t.id} />;
+    case 'review':
+      return <ReviewPane key={t.id} exchangeId={t.id} active={active} />;
     case 'doc':
       return <DocPane key={t.id} docId={t.id} tabKey={tab.key} locked={locked} />;
   }
@@ -115,8 +122,9 @@ function TabContent({ tab, locked, active }: { tab: Tab; locked: boolean; active
 
 function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: boolean }) {
   const ov = useApp((s) => s.overview)!;
-  // Browser tabs are labeled by their page's title.
+  // Browser tabs are labeled by their page's title, review tabs by their file.
   useApp((s) => s.webVersion);
+  useApp((s) => s.reviewFiles);
   const [dropBefore, setDropBefore] = useState<string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
 

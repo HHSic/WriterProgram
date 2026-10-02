@@ -1,0 +1,563 @@
+/* 교정본 주고받기: sending to an editor (ExportDialog), what was sent
+   (Exchanges.tsx) and the review tab (ReviewPane.tsx). Deleted text is struck
+   through in the accent colour, inserted text underlined in blue, 살펴볼 곳 a
+   soft amber wash, editor notes like 메모. */
+
+/* 편집자에게 보내기: picking chapters ---------------------------------------- */
+
+.send-picks {
+  max-height: 200px;
+  margin: 8px 0 0;
+  padding: 4px 10px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.send-picks li .check {
+  min-width: 0;
+}
+
+.send-pick-num {
+  flex: none;
+  min-width: 36px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 교정본 주고받기: the list ---------------------------------------------------- */
+
+.exchanges {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.exchanges li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.exchanges li > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.exchange-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.exchange-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 14px;
+}
+
+.exchange-title span,
+.exchange-files {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.exchange-files {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.exchange-state {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.exchange-state.open {
+  color: var(--amber-text);
+}
+
+.exchange-actions {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.exchanges-empty {
+  margin: 4px 0 16px;
+}
+
+/* The review tab ------------------------------------------------------------- */
+
+.review {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  container: review / inline-size;
+}
+
+.review-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.review-title h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.review-title p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.review-title .review-progress {
+  margin-top: 4px;
+  color: var(--text-2);
+}
+
+.review-actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+
+.review-chapters {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-chapter {
+  flex: none;
+  max-width: 220px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.review-chapter:hover {
+  background: var(--hover);
+}
+
+.review-chapter.on {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.review-chapter.missing {
+  color: var(--muted);
+}
+
+.review-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.review-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+}
+
+.review-text {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 32px 80px;
+}
+
+.review-notice {
+  max-width: var(--measure);
+  margin: 0 auto 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.review-page {
+  max-width: var(--measure);
+  margin: 0 auto;
+  font-family: var(--body-font);
+  font-size: 16px;
+  line-height: 1.9;
+  color: var(--body-text);
+}
+
+.rv-para {
+  margin: 0 0 0.8em;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.rv-scene {
+  margin: 0 0 0.8em;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* Changes in place. */
+.rv-del,
+.rv-ins {
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.rv-del {
+  color: var(--accent);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.rv-ins {
+  color: var(--blue-strong);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  background: var(--blue-soft);
+}
+
+.rv-del.para {
+  padding: 0 2px;
+  font-family: var(--ui-font);
+  font-size: 0.85em;
+}
+
+/* Picked to accept: the deleted text fades, the new text stays. */
+.rv-del.accept {
+  opacity: 0.45;
+}
+
+.rv-ins.accept {
+  background: color-mix(in srgb, var(--blue) 22%, transparent);
+}
+
+/* Picked to keep the original: the other way round. */
+.rv-del.reject {
+  color: inherit;
+  text-decoration: none;
+  background: none;
+  box-shadow: inset 0 -1px 0 var(--muted);
+}
+
+.rv-ins.reject {
+  opacity: 0.45;
+  text-decoration: line-through;
+  background: none;
+}
+
+.rv-del.on,
+.rv-ins.on {
+  outline: 2px solid color-mix(in srgb, var(--blue) 55%, transparent);
+  outline-offset: 1px;
+}
+
+/* 살펴볼 곳 and the text a note is on. */
+.rv-look {
+  background: var(--amber-soft);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--amber) 70%, transparent);
+}
+
+.rv-noted {
+  background: var(--memo);
+  box-shadow: inset 0 -1px 0 var(--memo-line);
+}
+
+.rv-look.rv-noted {
+  background: color-mix(in srgb, var(--amber-soft) 50%, var(--memo));
+}
+
+.rv-look.on,
+.rv-noted.on {
+  background: var(--memo-focus);
+}
+
+.rv-pin {
+  position: relative;
+  top: -0.55em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin: 0 1px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--amber-text);
+  font-family: var(--ui-font);
+  font-size: 9px;
+  line-height: 1;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+
+.rv-pin:hover,
+.rv-pin.on {
+  background: var(--amber-soft);
+}
+
+/* The list beside the text. */
+.review-side {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 60px;
+  border-left: 1px solid var(--border);
+  background: var(--sidebar);
+}
+
+.rv-section + .rv-section {
+  margin-top: 20px;
+}
+
+.rv-section h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rv-section .hint {
+  margin: -2px 0 8px;
+}
+
+.rv-classes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rv-class-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.rv-n {
+  color: var(--muted);
+}
+
+.rv-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rv-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.rv-item.on {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue);
+}
+
+.rv-item.accepted,
+.rv-item.rejected {
+  opacity: 0.75;
+}
+
+.rv-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rv-class {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--chip-violet-bg);
+  color: var(--chip-violet-fg);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rv-class.spacing {
+  background: var(--chip-green-bg);
+  color: var(--chip-green-fg);
+}
+
+.rv-class.punctuation {
+  background: var(--chip-blue-bg);
+  color: var(--chip-blue-fg);
+}
+
+.rv-class.look {
+  background: var(--chip-amber-bg);
+  color: var(--chip-amber-fg);
+}
+
+.rv-quote {
+  min-width: 0;
+  font-family: var(--body-font);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.rv-quote del {
+  color: var(--accent);
+  text-decoration-thickness: 1.5px;
+}
+
+.rv-quote ins {
+  color: var(--blue-strong);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.rv-around {
+  color: var(--muted);
+}
+
+.rv-how {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.rv-overlap {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.rv-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.rv-picked,
+.rv-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.rv-done {
+  color: var(--muted);
+}
+
+.rv-decided {
+  margin-top: 10px;
+}
+
+.rv-decided summary {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rv-decided .rv-list {
+  margin-top: 8px;
+}
+
+.rv-note {
+  cursor: pointer;
+}
+
+.rv-note-quote {
+  margin: 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--memo-line);
+  color: var(--text-2);
+  font-family: var(--body-font);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.rv-note-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* A narrow middle column (split, small window): the list goes under the text. */
+@container review (max-width: 720px) {
+  .review-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+  }
+
+  .review-side {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .review-text {
+    padding: 16px 16px 40px;
+  }
+
+  .review-head {
+    flex-wrap: wrap;
+  }
+}

@@ -55,7 +55,7 @@ export function RightPanel() {
   const editor = useApp((s) => s.editor);
   const activeDocId = useApp((s) => s.activeDocId);
   const activeCardId = useApp((s) => s.activeCardId);
-  const board = useApp((s) => s.activeTarget?.kind === 'notes' || s.activeTarget?.kind === 'table');
+  const board = useApp((s) => s.activeTarget?.kind === 'notes' || s.activeTarget?.kind === 'table' || s.activeTarget?.kind === 'review');
   const previewCardId = useApp((s) => s.previewCardId);
   const planning = useApp((s) => (s.activeDocId ? findDoc(s.overview!, s.activeDocId)?.section === 'planning' : false));
   const kind = useApp((s) => s.overview!.project.kind);
@@ -82,6 +82,10 @@ export function RightPanel() {
             openMenu(e, [
               { label: '작품 설정', onSelect: () => openDialog({ kind: 'project' }) },
               { label: '원고 가져오기…', onSelect: () => openDialog({ kind: 'import' }) },
+              { separator: true },
+              { label: '편집자에게 보내기…', onSelect: () => openDialog({ kind: 'export', toEditor: true }) },
+              { label: '교정본 주고받기', onSelect: () => openDialog({ kind: 'exchanges' }) },
+              { separator: true },
               { label: '보기 설정', onSelect: () => openDialog({ kind: 'view' }) },
               { label: '휴지통', onSelect: () => openDialog({ kind: 'trash' }) },
               { separator: true },

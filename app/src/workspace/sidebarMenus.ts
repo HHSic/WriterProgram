@@ -140,6 +140,11 @@ export function partMenu({ ov, expand }: SidebarMenuContext, part: PartView): Me
     },
     { label: '개요 표로 보기', onSelect: () => void openTable(part.id) },
     {
+      label: '이 부를 편집자에게 보내기…',
+      disabled: part.docs.length === 0,
+      onSelect: () => openDialog({ kind: 'export', toEditor: true, docIds: part.docs.map((d) => d.id) }),
+    },
+    {
       label: '이름 바꾸기',
       onSelect: () =>
         openDialog({

@@ -115,6 +115,14 @@ const PATHS = {
       <path d="M19 4v4h-4" />
     </>
   ),
+  /** 교정본: a page with a correction mark. */
+  correction: (
+    <>
+      <path d="M6 3.5h8l4 4v13H6z" />
+      <path d="M9 12h6M9 16l1.5 1.5L14 14" />
+    </>
+  ),
+  check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

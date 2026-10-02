@@ -2,15 +2,17 @@
 // "분할"). Plain data and pure helpers; the store owns the state.
 
 /** What a tab shows: a document, a setting card, 메모함 (id "all"), the
- * 개요 표 of a part (id = the part), or a web page (id = the browser tab's). */
+ * 개요 표 of a part (id = the part), a web page (id = the browser tab's), or
+ * the review of a corrected file (교정본 검토, id = the exchange's). */
 export type Target =
   | { kind: 'doc'; id: string }
   | { kind: 'card'; id: string }
   | { kind: 'notes'; id: 'all' }
   | { kind: 'table'; id: string }
-  | { kind: 'web'; id: string };
+  | { kind: 'web'; id: string }
+  | { kind: 'review'; id: string };
 
-const KINDS = ['doc', 'card', 'notes', 'table', 'web'];
+const KINDS = ['doc', 'card', 'notes', 'table', 'web', 'review'];
 
 export interface Tab {
   /** Stays the same while the tab shows other things (React key). */

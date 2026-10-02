@@ -16,5 +16,6 @@ export { markConflict, clearConflict, keepMine, takeTheirs, resolveCopy, movePro
 export { syncNow, linkProject, unlinkProject } from './drives';
 export { webPages, rememberWebPage, openWeb, clipPage } from './web';
 export { loadJournal, setJournalEnabled } from './journal';
+export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';
 export type { WebPage } from './web';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';

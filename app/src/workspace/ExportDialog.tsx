@@ -1,4 +1,7 @@
-// 내보내기 (S11): 한글 (HWPX), Word (docx), text or clipboard.
+// 내보내기 (S11): 한글 (HWPX), Word (docx), text or clipboard. With "편집자에게
+// 보내는 원고로 남기기" (or opened as 편집자에게 보내기) a 한글 or Word file is
+// sent through `exchange_send`, which keeps the chapters as sent so the
+// corrected file can be compared with them later (docs/corrections.md).
 
 import { useState } from 'react';
 import { api } from '../api';
@@ -6,10 +9,10 @@ import type { ExportItem, FileKind, ManuscriptFormat } from '../api/types';
 import { Modal } from '../components/Modal';
 import { noteInAppCopy } from '../editor/journal';
 import { fileSafe, num } from '../lib/format';
-import { docNoun, docNumber, formatName } from '../lib/labels';
-import { allManuscript, closeDialog, saveEverything, showToast, toastError, useApp } from '../store';
+import { UNTITLED, docNoun, docNumber, formatName, withObject } from '../lib/labels';
+import { allManuscript, closeDialog, noteSent, openDialog, saveEverything, showToast, toastError, useApp } from '../store';
 
-type Scope = 'current' | 'all';
+type Scope = 'current' | 'all' | 'pick';
 type Target = FileKind | 'txt' | 'clipboard';
 
 const TARGETS: { id: Target; label: string }[] = [
@@ -19,7 +22,7 @@ const TARGETS: { id: Target; label: string }[] = [
   { id: 'clipboard', label: '클립보드' },
 ];
 
-export function ExportDialog() {
+export function ExportDialog({ toEditor = false, docIds }: { toEditor?: boolean; docIds?: string[] }) {
   const ov = useApp((s) => s.overview)!;
   const activeDocId = useApp((s) => s.activeDocId);
   const catalog = useApp((s) => s.catalog);
@@ -28,8 +31,10 @@ export function ExportDialog() {
   const manuscript = allManuscript(ov);
   const activeIsManuscript = manuscript.some((d) => d.id === activeDocId);
 
-  const [scope, setScope] = useState<Scope>(activeIsManuscript ? 'current' : 'all');
-  const [target, setTarget] = useState<Target>(kind === 'print' ? 'hwpx' : 'txt');
+  const [scope, setScope] = useState<Scope>(docIds?.length ? 'pick' : activeIsManuscript ? 'current' : 'all');
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(docIds ?? (activeDocId && activeIsManuscript ? [activeDocId] : [])));
+  const [forEditor, setForEditor] = useState(toEditor);
+  const [target, setTarget] = useState<Target>(toEditor || kind === 'print' ? 'hwpx' : 'txt');
   const [perDoc, setPerDoc] = useState(false);
   const [includeTitles, setIncludeTitles] = useState(true);
   const [blankLine, setBlankLine] = useState(kind === 'webnovel');
@@ -38,6 +43,7 @@ export function ExportDialog() {
   const [busy, setBusy] = useState(false);
 
   const isFile = target === 'hwpx' || target === 'docx';
+  const sending = forEditor && isFile;
   const formatFor = (choice: string): ManuscriptFormat => {
     const [source, key] = choice.split(':');
     if (source === 'builtin') {
@@ -53,7 +59,7 @@ export function ExportDialog() {
 
   const items: ExportItem[] = manuscript
     .map((doc, i) => ({ doc, n: i + 1 }))
-    .filter(({ doc }) => scope === 'all' || doc.id === activeDocId)
+    .filter(({ doc }) => (scope === 'all' ? true : scope === 'pick' ? picked.has(doc.id) : doc.id === activeDocId))
     .map(({ doc, n }) => ({
       docId: doc.id,
       heading: `${docNumber(kind, n)}${doc.title ? ` ${doc.title}` : ''}`,
@@ -79,13 +85,24 @@ export function ExportDialog() {
       const extension = target;
       let dest: string | null;
       if (many) {
-        dest = await api.pickFolder('내보낼 폴더');
+        dest = await api.pickFolder(sending ? '편집자에게 보낼 파일을 둘 폴더' : '내보낼 폴더');
       } else {
         const base = items.length === 1 ? items[0].fileName : fileSafe(ov.project.title);
         const labels: Record<string, string> = { hwpx: '한글 파일로', docx: 'Word 파일로', txt: '텍스트 파일로' };
-        dest = await api.pickSaveFile(`${labels[extension]} 내보내기`, `${base}.${extension}`, extension);
+        dest = await api.pickSaveFile(sending ? '편집자에게 보낼 파일' : `${labels[extension]} 내보내기`, `${base}.${extension}`, extension);
       }
       if (!dest) return;
+      const reveal = (path: string) => (api.isDesktop ? { label: '폴더 열기', run: () => void api.reveal(path) } : undefined);
+      if (sending) {
+        const ex = await api.exchangeSend(ov.root, items, { includeTitles, sceneBreak }, formatFor(formatChoice), target, dest, many);
+        noteSent();
+        closeDialog();
+        showToast({
+          text: `편집자에게 보낼 파일을 만들었습니다${ex.files.length > 1 ? ` (${ex.files.length}개)` : ''}. 교정본을 받으면 ‘교정본 주고받기’에서 가져오세요.`,
+          action: reveal(dest),
+        });
+        return;
+      }
       const files =
         target === 'txt'
           ? await api.exportTxt(ov.root, items, { includeTitles, blankLineBetween: blankLine, sceneBreak }, dest, many)
@@ -93,32 +110,53 @@ export function ExportDialog() {
       closeDialog();
       showToast({
         text: files.length > 1 ? `내보냄 · 파일 ${files.length}개` : '내보냄',
-        action: api.isDesktop ? { label: '폴더 열기', run: () => void api.reveal(files[0]) } : undefined,
+        action: reveal(files[0]),
       });
     } catch (e) {
-      toastError('내보내지 못함', e);
+      toastError(sending ? '보내지 못함' : '내보내지 못함', e);
     } finally {
       setBusy(false);
     }
   };
 
+  const targets = forEditor ? TARGETS.filter((t) => t.id === 'hwpx' || t.id === 'docx') : TARGETS;
+  const togglePick = (id: string, on: boolean) =>
+    setPicked((old) => {
+      const next = new Set(old);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
   return (
     <Modal
-      title="내보내기"
+      title={toEditor ? '편집자에게 보내기' : '내보내기'}
       onClose={closeDialog}
       width={540}
       footer={
         <>
+          {sending && (
+            <button type="button" className="btn ghost" onClick={() => openDialog({ kind: 'exchanges' })}>
+              보낸 원고 보기
+            </button>
+          )}
+          <span className="grow" />
           <button type="button" className="btn" onClick={closeDialog}>
             취소
           </button>
           <button type="button" className="btn primary" disabled={!items.length || busy} onClick={() => void run()}>
-            {target === 'clipboard' ? '복사하기' : '내보내기'}
+            {target === 'clipboard' ? '복사하기' : sending ? '보낼 파일 만들기' : '내보내기'}
           </button>
         </>
       }
     >
       <div className="form">
+        {toEditor && (
+          <p className="hint">
+            고른 {withObject(noun)} 한글이나 Word 파일로 만들고, 보낸 원고를 따로 남겨 둡니다. 편집자가 고친 파일(교정본)을 돌려주면 이 원고와 비교해
+            바뀐 곳을 보여 드립니다.
+          </p>
+        )}
         <fieldset className="field">
           <legend className="field-label">범위</legend>
           <div className="segmented">
@@ -130,19 +168,44 @@ export function ExportDialog() {
               <input type="radio" checked={scope === 'all'} onChange={() => setScope('all')} />
               작품 전체 ({manuscript.length}개)
             </label>
+            {forEditor && (
+              <label className={scope === 'pick' ? 'on' : ''}>
+                <input type="radio" checked={scope === 'pick'} onChange={() => setScope('pick')} />
+                골라서
+              </label>
+            )}
           </div>
+          {forEditor && scope === 'pick' && (
+            <ul className="send-picks" aria-label={`보낼 ${noun}`}>
+              {manuscript.map((doc, i) => (
+                <li key={doc.id}>
+                  <label className="check">
+                    <input type="checkbox" checked={picked.has(doc.id)} onChange={(e) => togglePick(doc.id, e.target.checked)} />
+                    <span className="send-pick-num">{docNumber(kind, i + 1)}</span>
+                    <span className="ellipsis">{doc.title || UNTITLED}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
         </fieldset>
 
         <fieldset className="field">
           <legend className="field-label">형식</legend>
           <div className="segmented">
-            {TARGETS.map((t) => (
+            {targets.map((t) => (
               <label key={t.id} className={target === t.id ? 'on' : ''}>
                 <input type="radio" checked={target === t.id} onChange={() => setTarget(t.id)} />
                 {t.label}
               </label>
             ))}
           </div>
+          {isFile && !toEditor && (
+            <label className="check">
+              <input type="checkbox" checked={forEditor} onChange={(e) => setForEditor(e.target.checked)} />
+              편집자에게 보내는 원고로 남기기 (교정본을 받으면 이 원고와 비교)
+            </label>
+          )}
         </fieldset>
 
         {isFile && (
@@ -167,7 +230,7 @@ export function ExportDialog() {
           </label>
         )}
 
-        {target !== 'clipboard' && scope === 'all' && (
+        {target !== 'clipboard' && items.length > 1 && (
           <fieldset className="field">
             <legend className="field-label">파일</legend>
             <div className="segmented">

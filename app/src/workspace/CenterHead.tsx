@@ -15,6 +15,7 @@ export function CenterHead() {
   const rightOpen = useApp((s) => s.rightOpen);
   const activeCardId = useApp((s) => s.activeCardId);
   const target = useApp((s) => s.activeTarget);
+  const reviewFile = useApp((s) => (s.activeTarget?.kind === 'review' ? s.reviewFiles[s.activeTarget.id] : undefined));
   const split = useApp((s) => (s.panes.length > 1 ? s.split : null));
   const reading = useApp((s) => s.reading !== null && s.reading.status !== 'noVoice' && s.reading.editor === s.editor);
   const card = activeCardId ? ov.cards.find((c) => c.id === activeCardId) : undefined;
@@ -24,6 +25,13 @@ export function CenterHead() {
     <div className="col-head center-head">
       <nav className="crumbs" aria-label="현재 위치">
         {target?.kind === 'notes' && <strong>메모함</strong>}
+        {target?.kind === 'review' && (
+          <>
+            <span>교정본 검토</span>
+            <Icon name="chevronRight" size={12} />
+            <strong>{reviewFile || '받은 교정본'}</strong>
+          </>
+        )}
         {target?.kind === 'web' && (
           <>
             <span>웹</span>

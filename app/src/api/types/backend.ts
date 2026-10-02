@@ -156,8 +156,11 @@ export interface Backend {
   onBrowserPage(handler: (event: PageEvent) => void): () => void;
   reveal(path: string): Promise<void>;
   pickFolder(title: string, defaultPath?: string): Promise<string | null>;
-  /** Files to import (txt, md, docx, hwpx); empty when the writer cancels. */
-  pickFiles(title: string): Promise<string[]>;
+  /**
+   * Files to import (txt, md, docx, hwpx); empty when the writer cancels.
+   * With `only`, one file of those kinds (a corrected file: hwpx, docx).
+   */
+  pickFiles(title: string, only?: { name: string; extensions: string[] }): Promise<string[]>;
   /** `extension` without the dot: txt, docx or hwpx. */
   pickSaveFile(title: string, defaultName: string, extension: string): Promise<string | null>;
   /**
