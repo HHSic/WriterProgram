@@ -11,6 +11,7 @@ import { docMethods } from './docs';
 import { driveMethods } from './drives';
 import { formatMethods } from './formats';
 import { ioMethods } from './io';
+import { journalMethods } from './journal';
 import { noteMethods } from './notes';
 import { projectMethods } from './projects';
 import { searchMethods } from './search';
@@ -36,6 +37,7 @@ export function startMockBackend(): Backend {
     ...formatMethods,
     ...deviceMethods,
     ...driveMethods,
+    ...journalMethods,
     ...browserMethods,
   };
 }

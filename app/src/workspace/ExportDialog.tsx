@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import type { ExportItem, FileKind, ManuscriptFormat } from '../api/types';
 import { Modal } from '../components/Modal';
+import { noteInAppCopy } from '../editor/journal';
 import { fileSafe, num } from '../lib/format';
 import { docNoun, docNumber, formatName } from '../lib/labels';
 import { allManuscript, closeDialog, saveEverything, showToast, toastError, useApp } from '../store';
@@ -68,6 +69,8 @@ export function ExportDialog() {
       if (target === 'clipboard') {
         const text = await api.exportText(ov.root, items, { includeTitles, blankLineBetween: blankLine, sceneBreak });
         await navigator.clipboard.writeText(text);
+        // Pasting it back into a chapter is not text from outside.
+        noteInAppCopy(text);
         closeDialog();
         showToast({ text: `클립보드에 복사함 · ${num([...text].length)}자` });
         return;

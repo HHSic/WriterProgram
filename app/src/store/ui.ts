@@ -1,7 +1,7 @@
 // Small helpers: toasts, dialogs, find, jumps, view settings.
 
 import type { DocSummary, Overview, PartView, Section } from '../api/types';
-import { flushAll } from '../lib/flush';
+import { closeAll, flushAll } from '../lib/flush';
 import { errorText } from '../lib/format';
 import { type ViewSettings, saveView } from '../lib/view';
 import { type Dialog, type FindRequest, type Jump, type Toast, get, set } from './state';
@@ -34,9 +34,13 @@ export function allManuscript(ov: Overview): DocSummary[] {
   return ov.parts.flatMap((p) => p.docs);
 }
 
-/** Waits for every pending save. False when something could not be saved. */
-export async function saveEverything(): Promise<boolean> {
-  await flushAll();
+/**
+ * Waits for every pending save. False when something could not be saved.
+ * `closing`: the project or the window is closing, so writing sessions of
+ * the creation journal end too.
+ */
+export async function saveEverything(closing = false): Promise<boolean> {
+  await (closing ? closeAll() : flushAll());
   const save = get().save;
   if (save.state === 'error') {
     set({ toast: { text: `저장하지 못함 · ${save.error ?? ''}`, tone: 'error' } });

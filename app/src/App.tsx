@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { api } from './api';
 import { MenuHost } from './components/Menu';
 import { ToastHost } from './components/ToastHost';
+import { installJournal } from './editor/journal';
 import { applyColors } from './lib/colors';
 import { StartScreen } from './screens/StartScreen';
 import { saveEverything, useApp } from './store';
@@ -50,7 +51,8 @@ export function App() {
 
   useEffect(() => {
     // Finish the last save before the window closes; keep it open if saving fails.
-    api.onCloseRequested(saveEverything);
+    api.onCloseRequested(() => saveEverything(true));
+    installJournal();
   }, []);
 
   return (

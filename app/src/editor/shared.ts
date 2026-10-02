@@ -5,6 +5,7 @@ import type { Editor, JSONContent } from '@tiptap/core';
 import type { Transaction } from '@tiptap/pm/state';
 import type { SaveOutcome } from '../api/types';
 import { clearConflict } from '../store';
+import { noteEdit } from './journal';
 import { SaveSession } from './session';
 
 /** Marks a transaction passed on from the other editor. */
@@ -113,6 +114,8 @@ export function attach(
 
   const pass = ({ transaction }: { transaction: Transaction }) => {
     if (!transaction.docChanged || transaction.getMeta(FROM_PEER)) return;
+    // The writer's own edit (passed-on and reloaded text is marked FROM_PEER).
+    noteEdit(root, docId, transaction, editor.view.composing);
     for (const other of entry.editors) {
       if (other === editor || other.isDestroyed) continue;
       const tr = other.state.tr;

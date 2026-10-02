@@ -17,6 +17,7 @@ import type {
 import type { DocData, DocMeta, MetaPatch, NewDoc, SaveOutcome, Section, SnapshotInfo, SnapshotKind, TrashItem } from './docs';
 import type { FormatCatalog, ManuscriptFormat, UserPreset } from './format';
 import type { ImportOptions, ImportPreview, ImportSpec, Imported } from './import';
+import type { JournalEvent, JournalReport, JournalSettings, JournalSummary } from './journal';
 import type { NewNote, Note } from './notes';
 import type { NewProject, Overview, ProjectInfo, ProjectPatch, RecentItem } from './project';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
@@ -98,6 +99,15 @@ export interface Backend {
    */
   watchProject(root: string, onChange: (changes: Change[]) => void): () => void;
   driveStatus(): Promise<DriveStatus>;
+  /** This device's creation journal settings (its id is made the first time). */
+  journalSettings(): Promise<JournalSettings>;
+  /** Turns the journal on or off on this device, or notes the first-use notice as seen. */
+  journalSet(patch: { enabled?: boolean; noticed?: boolean }): Promise<JournalSettings>;
+  /** A writing session or paste for the journal; ignored while it is off. */
+  journalEvent(root: string, event: JournalEvent): Promise<void>;
+  journalSummary(root: string): Promise<JournalSummary>;
+  /** Checks that no journal line was changed or removed. */
+  journalVerify(root: string): Promise<JournalReport>;
   /** What the files would become; nothing is made. */
   importPreview(paths: string[], opts: ImportOptions): Promise<ImportPreview>;
   /** Makes the chapters picked in the preview. */

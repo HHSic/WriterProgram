@@ -9,6 +9,7 @@ import { refreshCardCounts } from './cards';
 import { loadNotes } from './notes';
 import { startWatching, stopWatching } from './devices';
 import { loadLink, stopAutoSync } from './drives';
+import { loadJournal } from './journal';
 
 // ---------------------------------------------------------------------------
 // Projects
@@ -39,6 +40,7 @@ export function enterProject(ov: Overview) {
   void loadCatalog();
   void refreshCardCounts();
   void loadNotes();
+  void loadJournal(ov.copies.length > 0);
   if (ov.copies.length) {
     showToast({
       text: `다른 기기에서 생긴 사본 ${ov.copies.length}개가 있음`,
@@ -85,7 +87,7 @@ export async function openProject(path: string): Promise<boolean> {
 }
 
 export async function leaveProject() {
-  if (!(await saveEverything())) return;
+  if (!(await saveEverything(true))) return;
   stopWatching();
   stopAutoSync();
   set({

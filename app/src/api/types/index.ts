@@ -9,6 +9,7 @@ export type * from './devices';
 export type * from './docs';
 export type * from './format';
 export type * from './import';
+export type * from './journal';
 export type * from './notes';
 export type * from './project';
 export type * from './search-export';

@@ -15,4 +15,5 @@ export { selectPart, newDocPartId, openNotesBoard, openTable } from './places';
 export { markConflict, clearConflict, keepMine, takeTheirs, resolveCopy, moveProject } from './devices';
 export { syncNow, linkProject, unlinkProject } from './drives';
 export { webPages, rememberWebPage, openWeb, clipPage } from './web';
+export { loadJournal, setJournalEnabled } from './journal';
 export type { WebPage } from './web';
