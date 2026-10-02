@@ -25,3 +25,7 @@ tempfile = "3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
+# Free disk room (statvfs) on macOS and phones; already in the tree via Tauri.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

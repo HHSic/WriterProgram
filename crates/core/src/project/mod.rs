@@ -15,11 +15,13 @@
 mod create;
 mod overview;
 mod relocate;
+mod size;
 mod structure;
 
 pub use create::{NewProject, create};
 pub use overview::{DocSummary, Overview, PartView, ProjectInfo, estimate_pages, open, overview};
 pub use relocate::{Moved, relocate};
+pub use size::{JOURNAL_DIR, Sizes, disk_free, sizes, tidy_records};
 pub(crate) use structure::place_docs;
 pub use structure::{
     NewDoc, ProjectPatch, add_doc, add_part, doc_ids, move_doc, remove_part, rename_part, update,
