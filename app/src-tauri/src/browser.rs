@@ -49,7 +49,7 @@ fn check_label(label: &str) -> Res<()> {
 }
 
 /// An address typed in the bar: a web address, or else words to search for.
-pub fn address(input: &str) -> Url {
+fn address(input: &str) -> Url {
     let input = input.trim();
     if input.is_empty() {
         return Url::parse(HOME).expect("home parses");

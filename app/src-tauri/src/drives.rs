@@ -257,19 +257,15 @@ pub async fn drive_connect(
 fn open_sign_in(app: &AppHandle, url: &str) -> writer_sync::Result<()> {
     if std::env::var("WRITER_SIGN_IN").as_deref() == Ok("fetch") {
         let url = url.to_string();
+        // The stand-in answers the sign-in page with a redirect back to the app.
         std::thread::spawn(move || {
-            let _ = ureq_get(&url);
+            let _ = writer_sync::http::fetch(&url);
         });
         return Ok(());
     }
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|e| writer_sync::Error::Invalid(format!("브라우저를 열지 못함 ({e})")))
-}
-
-fn ureq_get(url: &str) -> Result<(), String> {
-    // The stand-in answers the sign-in page with a redirect back to the app.
-    writer_sync::http::fetch(url).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
