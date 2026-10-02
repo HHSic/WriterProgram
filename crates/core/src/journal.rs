@@ -16,9 +16,10 @@
 //!
 //! No manuscript text goes in: only ids, fingerprints, counts and times.
 //!
-//! The app turns the journal on by telling this module the device id
-//! (`set_device`); with none set, the hooks in `doc`, `snapshot` and `import`
-//! write nothing.
+//! The app keeps this device's id and the on/off switch in its settings
+//! folder (`Settings`) and turns the journal on by telling this module the
+//! device id (`set_device`); with none set, the hooks in `doc`, `snapshot` and
+//! `import` write nothing.
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
@@ -27,11 +28,11 @@ use std::sync::{Mutex, RwLock};
 use std::thread;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::copies::is_id;
-use crate::store::{new_id, now_iso, parse_iso, sha256, to_iso};
+use crate::store::{atomic_write, new_id, now_iso, parse_iso, sha256, to_iso};
 use crate::{Error, Result};
 
 pub const JOURNAL_DIR: &str = ".journal";
@@ -58,11 +59,56 @@ pub fn device() -> Option<String> {
     DEVICE.read().unwrap_or_else(|p| p.into_inner()).clone()
 }
 
-/// A new device id: 12 random characters, like file ids. The app keeps it in
-/// its settings folder (outside any project), so it stays the same for this
-/// device and differs from every other one.
-pub fn new_device_id() -> String {
-    new_id()
+/// This device's journal settings, kept by the app in its settings folder
+/// (outside any project), so the device id stays the same for this device
+/// and differs from every other one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    /// 12 random characters, like file ids; names this device's journal file.
+    pub device: String,
+    /// On unless the writer turned it off.
+    #[serde(default = "on")]
+    pub enabled: bool,
+    /// The writer has been told the journal is kept (spec §7).
+    #[serde(default)]
+    pub noticed: bool,
+}
+
+fn on() -> bool {
+    true
+}
+
+impl Settings {
+    /// The device to write for: none while the journal is off.
+    pub fn active_device(&self) -> Option<String> {
+        self.enabled.then(|| self.device.clone())
+    }
+}
+
+/// Reads the settings at `path`; the first time (no file, or no usable device
+/// id in it) makes a new device id, on by default, and saves it.
+pub fn load_settings(path: &Path) -> Result<Settings> {
+    let found = match fs::read(path) {
+        Ok(bytes) => serde_json::from_slice::<Settings>(&bytes).ok(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => return Err(Error::io(path, e)),
+    };
+    if let Some(settings) = found.filter(|s| is_id(&s.device)) {
+        return Ok(settings);
+    }
+    let settings = Settings {
+        device: new_id(),
+        enabled: true,
+        noticed: false,
+    };
+    save_settings(path, &settings)?;
+    Ok(settings)
+}
+
+pub fn save_settings(path: &Path, settings: &Settings) -> Result<()> {
+    let text = serde_json::to_string_pretty(settings).expect("settings serialize");
+    atomic_write(path, text.as_bytes())
 }
 
 /// One line of the journal, without its time and chain link.
@@ -269,7 +315,7 @@ pub(crate) fn note(root: &Path, entry: Entry) {
 }
 
 /// A writing session or paste reported by the editor.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum EditorEvent {
     Session {
@@ -674,6 +720,27 @@ mod tests {
         };
         assert_eq!(editor_entry(paste(99)).unwrap(), None);
         assert!(editor_entry(paste(100)).unwrap().is_some());
+    }
+
+    #[test]
+    fn settings_keep_the_device_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("journal.json");
+        let first = load_settings(&path).unwrap();
+        assert!(first.enabled && !first.noticed);
+        assert_eq!(first.device.len(), 12);
+        assert_eq!(first.active_device(), Some(first.device.clone()));
+        let off = Settings {
+            enabled: false,
+            ..first.clone()
+        };
+        save_settings(&path, &off).unwrap();
+        let again = load_settings(&path).unwrap();
+        assert_eq!(again, off);
+        assert_eq!(again.active_device(), None);
+        // A damaged file gets a new id rather than writing to a bad name.
+        fs::write(&path, r#"{"device":"a/b"}"#).unwrap();
+        assert_ne!(load_settings(&path).unwrap().device, "a/b");
     }
 
     #[test]

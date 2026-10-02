@@ -33,6 +33,12 @@ pub fn apps_file(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "drive-apps.json")
 }
 
+/// This device's creation journal settings: its device id and the on/off
+/// switch (`writer_core::journal::Settings`).
+pub fn journal_file(app: &AppHandle) -> Res<PathBuf> {
+    config_file(app, "journal.json")
+}
+
 /// What each project looked like after its last pass (`sync/<id>.json`).
 pub fn base_dir(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "sync")
