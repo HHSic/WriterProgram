@@ -7,6 +7,7 @@ import { NodeSelection, TextSelection } from '@tiptap/pm/state';
 import { api } from '../api';
 import type { DocData, MetaPatch } from '../api/types';
 import { setCardNames } from '../editor/cards';
+import { afterComposition } from '../editor/composition';
 import { setIndentRules } from '../editor/indent';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { setWhitespaceMarks } from '../editor/marks';
@@ -104,8 +105,11 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
         // Text loaded from disk (another device's) needs no saving.
         if (!transaction.getMeta(RELOAD)) sessionRef.current?.changed();
         clearTimeout(countTimer.current);
+        // Counted once the Korean syllable being composed is done (editor/composition.ts).
         countTimer.current = setTimeout(() => {
-          if (isFocusedTab(tabKey)) useApp.setState({ liveCounts: countBlocks(blocksFromNode(editor.state.doc)) });
+          afterComposition(editor.view, () => {
+            if (isFocusedTab(tabKey)) useApp.setState({ liveCounts: countBlocks(blocksFromNode(editor.state.doc)) });
+          });
         }, 150);
       },
       onSelectionUpdate: ({ editor }) => {
