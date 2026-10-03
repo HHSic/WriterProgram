@@ -140,6 +140,93 @@ fn automatic_records() {
 }
 
 #[test]
+fn a_big_deletion_keeps_the_text_before_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    let hour = Duration::hours(1);
+    let long = "가".repeat(1000);
+    let kept_part = "남길 문장.";
+
+    // Written, with an automatic record just taken: none is due for an hour.
+    doc::save_body(
+        &root,
+        &id,
+        body(&[kept_part]),
+        Duration::zero(),
+        Default::default(),
+    )
+    .unwrap();
+    let out = doc::save_body(
+        &root,
+        &id,
+        body(&[kept_part, &long]),
+        Duration::zero(),
+        Default::default(),
+    )
+    .unwrap();
+    assert_eq!(out.snapshot.unwrap().kind, "auto");
+
+    // 100 characters go: no record.
+    let shorter = "가".repeat(900);
+    let out = doc::save_body(
+        &root,
+        &id,
+        body(&[kept_part, &shorter]),
+        hour,
+        Default::default(),
+    )
+    .unwrap();
+    assert!(out.snapshot.is_none());
+
+    // The 900 characters left go at once: kept before saving.
+    let out = doc::save_body(&root, &id, body(&[kept_part]), hour, Default::default()).unwrap();
+    let rec = out.snapshot.expect("text before the deletion is kept");
+    assert_eq!(rec.kind, "before-shrink");
+    assert_eq!(
+        snapshot::load(&root, &id, &rec.id).unwrap().body,
+        body(&[kept_part, &shorter])
+    );
+    snapshot::restore(&root, &id, &rec.id).unwrap();
+    assert_eq!(
+        doc::load(&root, &id).unwrap().body,
+        body(&[kept_part, &shorter])
+    );
+
+    // 250 of 1,000 characters (25%) counts too; 250 of 2,000 (12.5%) does not.
+    assert!(snapshot::shrinks_a_lot(1000, 750));
+    assert!(!snapshot::shrinks_a_lot(2000, 1750));
+    assert!(snapshot::shrinks_a_lot(5000, 4500));
+    assert!(!snapshot::shrinks_a_lot(150, 0));
+}
+
+#[test]
+fn a_big_deletion_record_is_cleared_like_automatic_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    doc::save_body(
+        &root,
+        &id,
+        body(&["기록할 문장."]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
+    let old = old_record(&root, &id, "before-shrink", 100);
+    let recent = old_record(&root, &id, "before-shrink", 10);
+    let done = snapshot::prune(&root, Duration::days(90), false);
+    assert_eq!(done.removed, 1);
+    let left: Vec<_> = snapshot::list(&root, &id)
+        .unwrap()
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
+    assert_eq!(left, [recent]);
+    assert!(!left.contains(&old));
+}
+
+#[test]
 fn records_by_hand_and_going_back() {
     let dir = tempfile::tempdir().unwrap();
     let root = new_project(dir.path(), ProjectKind::Print);

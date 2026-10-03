@@ -107,7 +107,16 @@ export const docMethods = {
       const snapshot = record(p, { ...d, body: clone(b) }, 'this-device', '');
       return { counts: c, pages, snapshot, rev: disk, conflict: true };
     }
-    const snapshot = elsewhere ? record(p, d, 'other-device', '') : null;
+    // A big deletion keeps the text before it, like doc.rs save_body.
+    const before = counts(d.body).withSpaces;
+    const removed = before - c.withSpaces;
+    const shrinks = removed >= 500 || (removed >= 200 && removed * 100 >= before * 20);
+    const newest = p.records.get(docId)?.[0];
+    const snapshot = elsewhere
+      ? record(p, d, 'other-device', '')
+      : shrinks && !(newest && revOf(newest.body) === disk)
+        ? record(p, d, 'before-shrink', '')
+        : null;
     d.body = clone(b);
     d.modified = now();
     noteMockSave(root);

@@ -39,6 +39,7 @@ export const RECORD_KIND_LABEL: Record<SnapshotKind, string> = {
   'before-reload': '다른 기기 것 불러오기 전',
   'before-copy': '사본으로 바꾸기 전',
   'before-corrections': '교정 반영 전',
+  'before-shrink': '크게 지우기 전',
 };
 
 /** "12화" for web novels, "12장" for print. */

@@ -26,8 +26,9 @@ pub const SNAPSHOT_DIR: &str = ".snapshots";
 /// another device's text replaced by this one's, this device's text before
 /// another device's was loaded, and the text before a copy replaced it.
 /// `before-corrections` is the text before an editor's corrections were
-/// accepted (corrections/).
-pub const KINDS: [&str; 10] = [
+/// accepted (corrections/). `before-shrink` is the text before a save that
+/// took a lot of it away ([`shrinks_a_lot`]).
+pub const KINDS: [&str; 11] = [
     "auto",
     "manual",
     "before-replace",
@@ -38,10 +39,28 @@ pub const KINDS: [&str; 10] = [
     "before-reload",
     "before-copy",
     "before-corrections",
+    "before-shrink",
 ];
 
 /// Kinds removed after a while, like automatic records.
-const PRUNED: [&str; 2] = ["auto", "before-reload"];
+const PRUNED: [&str; 3] = ["auto", "before-reload", "before-shrink"];
+
+/// A save that takes away this many characters (spaces included) or more
+/// keeps the text before it as a `before-shrink` record, however recent the
+/// last record is …
+pub const SHRINK_CHARS: u32 = 500;
+/// … and so does one taking away at least this many characters …
+pub const SHRINK_SOME_CHARS: u32 = 200;
+/// … when they are this share (in percent) of the text or more.
+pub const SHRINK_PERCENT: u32 = 20;
+
+/// Whether going from `before` to `after` characters takes away enough of the
+/// text to keep it first (크게 지우기 전).
+pub fn shrinks_a_lot(before: u32, after: u32) -> bool {
+    let removed = before.saturating_sub(after);
+    removed >= SHRINK_CHARS
+        || (removed >= SHRINK_SOME_CHARS && removed * 100 >= before * SHRINK_PERCENT)
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -252,7 +271,7 @@ fn daily_last(stems: &[String]) -> HashSet<&str> {
 }
 
 /// Removes automatic records (and ones kept before loading another device's
-/// text) older than `keep`. Other kinds stay, and so does each document's
+/// text or before a big deletion) older than `keep`. Other kinds stay, and so does each document's
 /// last record of a day when `keep_daily`. A record that cannot be removed
 /// now (held by another program) is skipped and listed in the result; the
 /// next pass tries it again.
