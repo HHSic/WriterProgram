@@ -7,6 +7,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { CardSummary } from '../api/types';
 import { decorateAll, redecorate, type BlockDecorator } from './decorate';
+import { findNames } from './names';
 import { blockText } from './search';
 
 /** Names shorter than this are not highlighted (too many false hits). */
@@ -48,8 +49,8 @@ export function castOf(doc: PmNode, index: NameIndex | null): Map<string, number
   if (!index) return found;
   doc.descendants((node, pos) => {
     if (!node.isTextblock) return true;
-    for (const m of blockText(node, pos).text.matchAll(index.regex)) {
-      const id = index.owners.get(m[0]);
+    for (const m of findNames(index.regex, blockText(node, pos).text)) {
+      const id = index.owners.get(m.name);
       if (id) found.set(id, (found.get(id) ?? 0) + 1);
     }
     return false;
@@ -67,12 +68,11 @@ interface CardState {
 function namesIn(index: NameIndex): BlockDecorator {
   return (block, pos, out) => {
     const { text, positions } = blockText(block, pos);
-    for (const m of text.matchAll(index.regex)) {
-      if (m.index === undefined) continue;
-      const id = index.owners.get(m[0]);
+    for (const m of findNames(index.regex, text)) {
+      const id = index.owners.get(m.name);
       if (!id) continue;
       const from = positions[m.index];
-      const to = positions[m.index + m[0].length - 1] + 1;
+      const to = positions[m.index + m.name.length - 1] + 1;
       out.push(Decoration.inline(from, to, { class: 'card-name', 'data-card': id }));
     }
   };

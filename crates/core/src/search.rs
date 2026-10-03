@@ -4,6 +4,7 @@
 //! so a match never crosses paragraphs. Offsets sent to the editor are in
 //! UTF-16 code units, the way ProseMirror counts text.
 
+use std::ops::Range;
 use std::path::Path;
 
 use regex::{Regex, RegexBuilder};
@@ -112,14 +113,27 @@ fn context_after(text: &str, byte: usize) -> String {
 
 /// Matches in one document's blocks.
 pub fn find_in_blocks(blocks: &[Block], re: &Regex, limit: usize) -> Vec<Match> {
+    find_in_blocks_by(blocks, limit, |text| {
+        re.find_iter(text).map(|m| m.range()).collect()
+    })
+}
+
+/// Matches in one document's blocks, found in each paragraph's text by
+/// `find` (byte ranges).
+pub fn find_in_blocks_by(
+    blocks: &[Block],
+    limit: usize,
+    find: impl Fn(&str) -> Vec<Range<usize>>,
+) -> Vec<Match> {
     let mut out = Vec::new();
     for (block, b) in blocks.iter().enumerate() {
         let Block::Paragraph { content, .. } = b else {
             continue;
         };
         let text = inline_text(content);
-        for m in re.find_iter(&text) {
-            if m.is_empty() || m.as_str().contains('\n') {
+        for r in find(&text) {
+            let found = &text[r.clone()];
+            if found.is_empty() || found.contains('\n') {
                 continue;
             }
             if out.len() >= limit {
@@ -127,11 +141,11 @@ pub fn find_in_blocks(blocks: &[Block], re: &Regex, limit: usize) -> Vec<Match> 
             }
             out.push(Match {
                 block,
-                start: utf16_len(&text[..m.start()]),
-                end: utf16_len(&text[..m.end()]),
-                before: context_before(&text, m.start()),
-                text: m.as_str().to_string(),
-                after: context_after(&text, m.end()),
+                start: utf16_len(&text[..r.start]),
+                end: utf16_len(&text[..r.end]),
+                before: context_before(&text, r.start),
+                text: found.to_string(),
+                after: context_after(&text, r.end),
             });
         }
     }

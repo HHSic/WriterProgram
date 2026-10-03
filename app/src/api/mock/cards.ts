@@ -1,6 +1,7 @@
 // Cards (인물, 장소, 용어 …), their kinds, and where their names appear.
 
 import type { JSONContent } from '@tiptap/core';
+import { findNames } from '../../editor/names';
 import type { Appearance, Backend, Card, CardType, SearchMatch, TrashItem } from '../types';
 import { cardSummary, clone, doc, id, now, project, type MockDoc } from './state';
 
@@ -95,17 +96,16 @@ export const cardMethods = {
       const samples: SearchMatch[] = [];
       let count = 0;
       for (const { block, text } of paragraphTexts(doc(p, docId).body)) {
-        for (const m of text.matchAll(re)) {
-          if (m.index === undefined) continue;
+        for (const m of findNames(re, text)) {
           count += 1;
           if (samples.length < 3) {
             samples.push({
               block,
               start: m.index,
-              end: m.index + m[0].length,
+              end: m.index + m.name.length,
               before: text.slice(Math.max(0, m.index - 24), m.index),
-              text: m[0],
-              after: text.slice(m.index + m[0].length, m.index + m[0].length + 24),
+              text: m.name,
+              after: text.slice(m.index + m.name.length, m.index + m.name.length + 24),
             });
           }
         }
@@ -121,7 +121,7 @@ export const cardMethods = {
       const n = re
         ? p.parts
             .flatMap((x) => x.docs)
-            .filter((d) => paragraphTexts(doc(p, d).body).some(({ text }) => new RegExp(re.source, 'u').test(text))).length
+            .filter((d) => paragraphTexts(doc(p, d).body).some(({ text }) => findNames(re, text).length > 0)).length
         : 0;
       return [c.id, n];
     });
