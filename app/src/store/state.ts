@@ -2,12 +2,23 @@
 
 import type { Editor } from '@tiptap/core';
 import { create } from 'zustand';
-import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, SnapshotInfo } from '../api/types';
+import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, RescueFile, SnapshotInfo } from '../api/types';
 import type { Pane, SplitDir, Target } from '../lib/tabs';
 import { type ViewSettings, loadView } from '../lib/view';
 
 
-export type SaveState = { state: 'saved' | 'saving' | 'error'; error?: string };
+/** How saving one target (a chapter's text, its title, a card, a note) is going (store/saves.ts). */
+export interface SaveState {
+  state: 'saved' | 'saving' | 'error';
+  /** Why the last save failed, in the writer's words. */
+  error?: string;
+  /** When saves started failing (ms since 1970). */
+  since?: number;
+  /** When the next try runs (ms since 1970). */
+  retryAt?: number;
+  /** Where the unsaved text was kept when saves kept failing (비상 보관). */
+  rescued?: string;
+}
 export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'records' | 'ai';
 export type FindScope = 'doc' | 'part' | 'all';
 
@@ -48,8 +59,11 @@ export type Dialog =
   | { kind: 'import'; partId?: string }
   | { kind: 'view' }
   | { kind: 'symbols' }
-  /** 둘 다 보기: this device's text next to another device's, or a document next to its copy. */
-  | { kind: 'compare'; docId: string; copy?: CopyInfo }
+  /**
+   * 둘 다 보기: this device's text next to another device's, a document next
+   * to its copy, or a chapter next to its rescue copy (비상 보관).
+   */
+  | { kind: 'compare'; docId: string; copy?: CopyInfo; rescue?: RescueFile }
   /** Every copy left by sync programs (다른 기기 사본). */
   | { kind: 'copies' }
   /** 기기 간 맞추기: connecting drives. */
@@ -109,7 +123,10 @@ interface AppState {
   activeCardId: string | null;
   /** Editor of the focused pane's open tab, when that is a document. */
   editor: Editor | null;
-  save: SaveState;
+  /** Save state per target: `doc:<id>`, `meta:<id>`, `card:<id>`, `note:<id>` (store/saves.ts). */
+  saves: Record<string, SaveState>;
+  /** The window is closing with writing not saved: the writer picks what to do. */
+  closeAsk: { resolve: (close: boolean) => void } | null;
   liveCounts: Counts | null;
   selection: { withSpaces: number; withoutSpaces: number } | null;
   rightTab: RightTab;
@@ -175,7 +192,8 @@ export const useApp = create<AppState>(() => ({
   activeDocId: null,
   activeCardId: null,
   editor: null,
-  save: { state: 'saved' },
+  saves: {},
+  closeAsk: null,
   liveCounts: null,
   selection: null,
   rightTab: 'outline',

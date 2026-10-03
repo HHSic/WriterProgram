@@ -33,6 +33,15 @@ export function CardEditor({ cardId, locked = false }: { cardId: string; locked?
   return <LoadedCard key={cardId} root={root} initial={card} locked={locked} />;
 }
 
+/** A card as plain text, for its rescue copy. */
+function cardText(card: Card): string {
+  const lines = [`# ${card.name}`];
+  if (card.aliases.length) lines.push(`다른 이름: ${card.aliases.join(', ')}`);
+  for (const [key, value] of card.fields) lines.push(`${key}: ${value}`);
+  if (card.description) lines.push('', card.description);
+  return `${lines.join('\n')}\n`;
+}
+
 function namesOf(card: { name: string; aliases: string[] }): string {
   return [card.name, ...card.aliases].join('\t');
 }
@@ -49,22 +58,22 @@ function LoadedCard({ root, initial, locked }: { root: string; initial: Card; lo
   const savedNames = useRef(namesOf(initial));
 
   // Saves run one after another, like the manuscript's (editor/session.ts),
-  // and share its 저장 표시 in the top bar.
+  // and report to the 저장 표시 in the top bar as `card:<id>`.
   const { pending, schedule } = useDebouncedSave<Card>(
     {
+      key: `card:${initial.id}`,
       prepare: (next) => (next.name.trim() ? next : { ...next, name: savedName.current }),
+      rescue: (value) => ({ item: `card-${value.id}`, content: { text: cardText(value) } }),
       save: async (toSave) => {
         const summary = await api.cardSave(root, toSave);
         savedName.current = summary.name;
         patchCardSummary(summary);
-        if (!pending.current) useApp.setState({ save: { state: 'saved' } });
         const names = namesOf(summary);
         if (names !== savedNames.current) {
           savedNames.current = names;
           void refreshCardCounts();
         }
       },
-      onError: (e) => useApp.setState({ save: { state: 'error', error: errorText(e) } }),
     },
     [root],
   );
@@ -99,7 +108,6 @@ function LoadedCard({ root, initial, locked }: { root: string; initial: Card; lo
   const change = (patch: Partial<Card>) => {
     const next = { ...card, ...patch };
     setCard(next);
-    if (useApp.getState().save.state === 'saved') useApp.setState({ save: { state: 'saving' } });
     schedule(next);
   };
 

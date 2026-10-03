@@ -13,6 +13,7 @@ pub mod notes;
 pub mod output;
 pub mod project;
 pub mod proof;
+pub mod rescue;
 pub mod search;
 pub mod sync_folder;
 pub mod update;

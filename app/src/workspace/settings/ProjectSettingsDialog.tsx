@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { api } from '../../api';
 import type { Goal, ManuscriptFormat, ProjectKind } from '../../api/types';
 import { Modal } from '../../components/Modal';
+import { useChanged } from '../../lib/useChanged';
 import { placeNote, usePlaceOf } from '../../components/PlacePicker';
 import { KIND_LABEL, docNoun } from '../../lib/labels';
 import { closeDialog, openDialog, toastError, updateProject, useApp, type SettingsTab } from '../../store';
@@ -34,6 +35,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
   const [format, setFormat] = useState<ManuscriptFormat>(project.manuscriptFormat);
   const [keepDaily, setKeepDaily] = useState(project.keepDaily);
   const [busy, setBusy] = useState(false);
+  const dirty = useChanged({ title, kind, penName, sceneBreak, goal, format, keepDaily });
   const where = usePlaceOf(ov.root);
 
   const save = async () => {
@@ -56,6 +58,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
     <Modal
       title="작품 설정"
       onClose={closeDialog}
+      dirty={dirty}
       width={tab === 'format' ? 1040 : 560}
       footer={
         <>

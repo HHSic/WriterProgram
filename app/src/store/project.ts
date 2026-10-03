@@ -11,6 +11,7 @@ import { startWatching, stopWatching } from './devices';
 import { loadLink, stopAutoSync } from './drives';
 import { loadJournal } from './journal';
 import { loadAi } from './ai';
+import { offerRescues } from './rescue';
 
 // ---------------------------------------------------------------------------
 // Projects
@@ -29,7 +30,6 @@ export function enterProject(ov: Overview) {
     conflicts: {},
     cardReloads: {},
     link: null,
-    save: { state: 'saved' },
     liveCounts: null,
     selection: null,
   });
@@ -43,6 +43,8 @@ export function enterProject(ov: Overview) {
   void loadNotes();
   void loadJournal(ov.copies.length > 0);
   void loadAi();
+  // Writing kept in the rescue folder last time, newer than its chapter.
+  void offerRescues();
   if (ov.copies.length) {
     showToast({
       text: `다른 기기에서 생긴 사본 ${ov.copies.length}개가 있음`,

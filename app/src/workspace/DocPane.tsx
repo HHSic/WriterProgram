@@ -18,7 +18,7 @@ import { RELOAD, attach, peerOf } from '../editor/shared';
 import { useAutoHeight } from '../lib/autoHeight';
 import { loadCursor, saveCursor } from '../lib/cursor';
 import { errorText } from '../lib/format';
-import { registerFlusher } from '../lib/flush';
+import { useDebouncedSave } from '../lib/useDebouncedSave';
 import { UNTITLED, docNoun, withObject } from '../lib/labels';
 import { selectNote } from '../editor/notes';
 import {
@@ -29,7 +29,6 @@ import {
   patchSummary,
   previewCard,
   registerEditor,
-  toastError,
   useApp,
 } from '../store';
 import { touchCapable, touchLike } from '../lib/pointer';
@@ -237,6 +236,14 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   );
 }
 
+/** Title and synopsis as plain text, for their rescue copy. */
+function metaText(patch: MetaPatch): string {
+  const lines: string[] = [];
+  if (patch.title !== undefined) lines.push(`제목: ${patch.title}`);
+  if (patch.synopsis !== undefined) lines.push('시놉시스:', patch.synopsis);
+  return `${lines.join('\n')}\n`;
+}
+
 function DocHeader({
   root,
   data,
@@ -257,11 +264,8 @@ function DocHeader({
   const summary = useApp((s) => findDoc(s.overview!, docId)?.doc);
   const [title, setTitle] = useState(data.meta.title);
   const [synopsis, setSynopsis] = useState(data.meta.synopsis);
-  const pending = useRef<MetaPatch>({});
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const titleRef = useRef<HTMLInputElement>(null);
   const synopsisRef = useRef<HTMLTextAreaElement>(null);
-  const flushRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (summary && document.activeElement !== titleRef.current) setTitle(summary.title);
@@ -271,33 +275,25 @@ function DocHeader({
     if (summary && document.activeElement !== synopsisRef.current) setSynopsis(summary.synopsis);
   }, [summary?.synopsis]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const flush = async () => {
-      clearTimeout(timer.current);
-      const patch = pending.current;
-      pending.current = {};
-      if (Object.keys(patch).length === 0) return;
-      try {
+  // Title and synopsis are saved as a patch of what changed; a patch that
+  // failed is merged under anything typed since, and cleared only once saved.
+  const { pending, schedule } = useDebouncedSave<MetaPatch>(
+    {
+      key: `meta:${docId}`,
+      save: async (patch) => {
         await api.docUpdateMeta(root, docId, patch);
-      } catch (e) {
-        toastError('제목·시놉시스를 저장하지 못함', e);
-      }
-    };
-    flushRef.current = flush;
-    const unregister = registerFlusher(flush);
-    return () => {
-      unregister();
-      void flush();
-    };
-  }, [root, docId]);
+      },
+      merge: (failed, newer) => ({ ...failed, ...newer }),
+      rescue: (patch) => ({ item: `meta-${docId}`, content: { text: metaText(patch) } }),
+    },
+    [root, docId],
+  );
 
   useAutoHeight(synopsisRef, synopsis);
 
   const change = (patch: MetaPatch) => {
-    Object.assign(pending.current, patch);
     patchSummary(docId, patch);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => void flushRef.current(), 600);
+    schedule({ ...pending.current, ...patch });
   };
 
   return (

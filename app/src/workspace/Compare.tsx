@@ -1,19 +1,20 @@
 // 둘 다 보기: two versions of a document side by side, changed paragraphs
 // marked, with the choices that fit: this device's text against another
-// device's (a save that met another device's edits), or a document against a
-// copy a sync program left.
+// device's (a save that met another device's edits), a document against a
+// copy a sync program left, or a chapter against its rescue copy (비상 보관:
+// text that could not be saved into the project last time).
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import type { JSONContent } from '@tiptap/core';
 import { api } from '../api';
-import type { CopyAction, CopyInfo } from '../api/types';
+import type { CopyAction, CopyInfo, RescueFile } from '../api/types';
 import { Modal } from '../components/Modal';
 import { blocksFromJSON } from '../editor/counts';
 import { peerOf } from '../editor/shared';
 import { diffParagraphs, placesChanged, type Piece, type Row } from '../lib/diff';
-import { errorText, num } from '../lib/format';
+import { errorText, num, timeLabel } from '../lib/format';
 import { UNTITLED } from '../lib/labels';
-import { closeDialog, findDoc, keepMine, resolveCopy, takeTheirs, useApp } from '../store';
+import { closeDialog, findDoc, keepMine, resolveCopy, setRescueAside, takeRescue, takeTheirs, useApp } from '../store';
 import { copyWhere } from './Copies';
 
 /** Runs of unchanged paragraphs longer than this are folded. */
@@ -27,7 +28,7 @@ function chars(texts: string[]): number {
   return texts.reduce((n, t) => n + Array.from(t).length, 0);
 }
 
-export function CompareDialog({ docId, copy }: { docId: string; copy?: CopyInfo }) {
+export function CompareDialog({ docId, copy, rescue }: { docId: string; copy?: CopyInfo; rescue?: RescueFile }) {
   const ov = useApp((s) => s.overview)!;
   const conflict = useApp((s) => s.conflicts[docId]);
   const [texts, setTexts] = useState<{ left: string[]; right: string[] } | null>(null);
@@ -42,10 +43,12 @@ export function CompareDialog({ docId, copy }: { docId: string; copy?: CopyInfo 
       try {
         // Left: this device's text (the editor's, when it is open).
         const left = peerOf(docId)?.getJSON() ?? (await api.docLoad(ov.root, docId)).body;
-        // Right: the copy, or what another device saved.
+        // Right: the copy, the rescue copy, or what another device saved.
         const right = copy
           ? (await api.copyLoad(ov.root, copy.section, copy.file)).body
-          : (await api.docLoad(ov.root, docId)).body;
+          : rescue
+            ? await api.rescueLoad(rescue.path)
+            : (await api.docLoad(ov.root, docId)).body;
         if (alive) setTexts({ left: paragraphs(left, scene), right: paragraphs(right, scene) });
       } catch (e) {
         if (alive) setError(errorText(e));
@@ -54,12 +57,12 @@ export function CompareDialog({ docId, copy }: { docId: string; copy?: CopyInfo 
     return () => {
       alive = false;
     };
-  }, [ov.root, docId, copy, scene]);
+  }, [ov.root, docId, copy, rescue, scene]);
 
   const rows = useMemo(() => (texts ? diffParagraphs(texts.left, texts.right) : null), [texts]);
   const places = rows ? placesChanged(rows) : 0;
-  const leftLabel = copy ? '지금 글' : '이 기기';
-  const rightLabel = copy ? `사본 · ${copyWhere(copy)}` : '다른 기기';
+  const leftLabel = copy || rescue ? '지금 글' : '이 기기';
+  const rightLabel = copy ? `사본 · ${copyWhere(copy)}` : rescue ? `비상 보관 · ${timeLabel(rescue.saved)}` : '다른 기기';
 
   const run = async (fn: () => Promise<unknown>) => {
     if (busy) return;
@@ -70,7 +73,20 @@ export function CompareDialog({ docId, copy }: { docId: string; copy?: CopyInfo 
   };
   const copyAction = (action: CopyAction) => () => run(() => resolveCopy(copy!, action));
 
-  const footer = copy ? (
+  const footer = rescue ? (
+    <>
+      <button type="button" className="btn" onClick={closeDialog}>
+        닫기
+      </button>
+      <span className="grow" />
+      <button type="button" className="btn" disabled={busy} onClick={() => void run(() => setRescueAside(rescue))}>
+        지금 글 두기
+      </button>
+      <button type="button" className="btn primary" disabled={busy} onClick={() => void run(() => takeRescue(rescue))}>
+        비상 보관 글로 바꾸기
+      </button>
+    </>
+  ) : copy ? (
     <>
       <button type="button" className="btn" onClick={closeDialog}>
         닫기
@@ -110,9 +126,10 @@ export function CompareDialog({ docId, copy }: { docId: string; copy?: CopyInfo 
         <>
           <p className="compare-summary">
             {places === 0 ? '두 글이 같습니다.' : `달라진 곳 ${num(places)}군데`} · {leftLabel} {num(chars(texts.left))}자 ·{' '}
-            {copy ? '사본' : rightLabel} {num(chars(texts.right))}자
-            {!copy && <span className="hint">고르지 않은 쪽 글도 기록에 남습니다.</span>}
+            {copy ? '사본' : rescue ? '비상 보관' : rightLabel} {num(chars(texts.right))}자
+            {!copy && !rescue && <span className="hint">고르지 않은 쪽 글도 기록에 남습니다.</span>}
             {copy && <span className="hint">사본으로 바꾸면 지금 글은 기록에 남습니다.</span>}
+            {rescue && <span className="hint">비상 보관 글로 바꾸면 지금 글은 기록에 남습니다. 지금 글을 두어도 비상 보관 파일은 지우지 않습니다.</span>}
           </p>
           <div className="compare" role="table" aria-label="두 글 비교">
             <div className="compare-head" role="row">

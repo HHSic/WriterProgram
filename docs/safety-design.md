@@ -10,9 +10,9 @@
 | S4 | 읽을 수 없는 회차가 알림 없이 사라짐 | 중간~높음 | 중간 |
 | S5 | project.json이 깨지면 복구할 길이 없음 | 중간 | 중간 |
 | S6 | 크게 지운 글이 기록에 남지 않을 수 있음 | 중간 | 작음 |
-| S7 | 저장 실패 뒤 다시 시도 없음, 실패 표시 덮어씀, 고친 값 버림 | 중간 | 중간 |
+| S7 | 저장 실패 뒤 다시 시도 없음, 실패 표시 덮어씀, 고친 값 버림 (완료) | 중간 | 중간 |
 | K1 | 한글 조합 중 꾸밈 다시 계산, 다른 기기 글 불러오기 | 높음 | 중간 |
-| K2 | 대화상자 Esc·바깥 누르기·포커스 | 중간 | 작음 |
+| K2 | 대화상자 Esc·바깥 누르기·포커스 (완료) | 중간 | 작음 |
 
 ## S1. 정리 작업은 실패해도 작품을 연다
 
@@ -139,6 +139,13 @@
 
 **시험**: 저장 명령을 실패시키는 흉내(vitest, 가짜 api)로 다시 시도 간격, 대상별 상태, 메타 값 유지, 닫기 막기를 확인한다. 앱(CDP)에서 작품 폴더를 읽기 전용으로 바꿔 비상 저장을 확인한다.
 
+**구현 (2026-10-03, 완료)**
+- 대상별 상태와 다시 시도는 `store/saves.ts`(`registerSave`, `markSaving`·`markSaved`·`markFailed`, `retryNow`, `rescue`, `worstSave`). 본문은 `editor/session.ts`, 제목·시놉시스·카드·메모는 `lib/useDebouncedSave.ts`(`debouncedSaver`, 실패 값 되돌려 합치기 `merge`)가 알린다. 화면이 닫힌 대상도 저장될 때까지 남아 다시 시도한다.
+- 상단 표시 `workspace/SaveStatus.tsx`, 원인 문장 `lib/saveReason.ts`. Rust 쪽은 다른 프로그램이 잡은 파일(Windows 공유 위반 32·33, `ResourceBusy`)에 "파일이 다른 프로그램에 잡혀 있음"을 따로 준다(`writer_core::Error::user_message`).
+- 비상 보관: core `rescue.rs`, 명령 `commands/rescue.rs`(`rescue_save`, `rescue_list`, `rescue_load`, `rescue_set_aside`, `rescue_folder`). 한 번 이어진 실패는 시각이 같은 한 파일을 덮어 쓰고(최대 30초마다), 처리한 파일은 `old/`로 옮긴다. 작품을 열 때 `store/rescue.ts`가 회차보다 새 파일을 찾아 둘 다 보기(`workspace/Compare.tsx`의 `rescue`)를 권한다. 처음에 쓴 대로 기록 비교 화면이 아니라 둘 다 보기를 썼다(바꾸기·두기 단추가 이미 있음).
+- 창 닫기: `confirmClose`(`store/ui.ts`)와 `workspace/CloseAskDialog.tsx`.
+- 시험: `store/saves.test.ts`, `lib/saveReason.test.ts`, core `rescue.rs`·`error.rs` 단위 시험. 앱(CDP)에서 읽기 전용 폴더로 비상 저장을 확인하는 일은 남았다.
+
 ## K1. 한글 조합 중에는 꾸밈을 다시 계산하지 않는다
 
 **지금**: 조합 중에도 설정집 이름 강조(`editor/cards.ts`), 찾기 강조(`editor/search.ts`), 첫 줄 들여쓰기 꾸밈(`editor/indent.ts`)이 다시 계산된다. 예를 들어 "서하"의 둘째 글자를 조합하는 순간 인라인 꾸밈이 생겨, WebView2에서 조합이 깨질(자모가 쪼개지거나 겹칠) 위험이 있다. 다른 기기 글 불러오기(`editor/shared.ts` `reloadDoc`)도 조합 중인지 보지 않는다.
@@ -177,6 +184,8 @@
 - 포커스: 열 때 이전 포커스를 기억하고 닫을 때 돌려준다. Tab·Shift+Tab을 창 안에서 돈다.
 
 **시험**: vitest(jsdom)로 조합 중 Esc 무시, 바깥 누르기, 포커스 순환과 복귀를 확인한다.
+
+**구현 (2026-10-03, 완료)**: `components/Modal.tsx`. `dismissOnBackdrop`은 확인 창(`ConfirmDialog`)만 켠다. `dirty`는 가져오기(파일을 고른 뒤), 내보내기·편집자에게 보내기, 작품 설정(원고 서식 포함), 증명서 창에 연결했다(`lib/useChanged.ts`: 연 뒤 고른 값이 달라졌는지). "고친 내용을 버릴까요?"는 창 아래에 [계속 고치기] [버리고 닫기]로 뜨고, 한 번 더 누른 Esc는 "계속 고치기"다. 창이 겹치면 맨 위 창만 Esc를 받는다. 교정 검토는 대화상자가 아니라 탭(`ReviewPane.tsx`)이라 해당 없음. 시험은 `components/Modal.test.tsx`(jsdom, devDependency로 추가).
 
 ## 진행 순서
 

@@ -16,6 +16,7 @@ import { ioMethods } from './io';
 import { journalMethods } from './journal';
 import { noteMethods } from './notes';
 import { projectMethods } from './projects';
+import { rescueMethods } from './rescue';
 import { searchMethods } from './search';
 import { seed } from './state';
 
@@ -43,5 +44,6 @@ export function startMockBackend(): Backend {
     ...journalMethods,
     ...aiMethods,
     ...browserMethods,
+    ...rescueMethods,
   };
 }

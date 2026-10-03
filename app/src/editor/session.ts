@@ -6,13 +6,17 @@
 // (`base`). When another device changed the file in the meantime, the save is
 // refused and the editor's text kept as a record; the session then stops
 // saving until the writer picks a version (store.ts: keepMine / takeTheirs).
+//
+// How saving goes is reported as the target `doc:<id>` (store/saves.ts), which
+// tries a failed save again with growing waits and keeps a rescue copy when
+// saving keeps failing.
 
 import type { JSONContent } from '@tiptap/core';
 import { api } from '../api';
 import type { SaveOutcome } from '../api/types';
-import { errorText } from '../lib/format';
 import { registerFlusher } from '../lib/flush';
-import { markConflict, useApp } from '../store';
+import { markConflict } from '../store';
+import { markFailed, markSaved, markSaving, registerSave } from '../store/saves';
 
 const IDLE_MS = 800;
 const MAX_WAIT_MS = 5000;
@@ -23,6 +27,8 @@ export class SaveSession {
   private dirty = false;
   private chain: Promise<void> = Promise.resolve();
   private readonly unregister: () => void;
+  private readonly unregisterSave: () => void;
+  private readonly key: string;
   /** Fingerprint of the text on disk that the editor's text is based on. */
   base: string;
   /** Another device changed the text; saving waits for the writer's choice. */
@@ -36,13 +42,26 @@ export class SaveSession {
     base: string,
   ) {
     this.base = base;
+    this.key = `doc:${docId}`;
     this.unregister = registerFlusher(() => this.flush());
+    this.unregisterSave = registerSave(this.key, {
+      // With nothing left to send (the text was reloaded from disk meanwhile)
+      // the failure is over.
+      retry: () =>
+        this.dirty && !this.conflict
+          ? this.flush()
+          : this.chain.then(() => {
+              if (!this.dirty || this.conflict) markSaved(this.key);
+            }),
+      pending: () => this.dirty && !this.conflict,
+      rescue: () => ({ item: this.docId, content: { body: this.getBody() } }),
+    });
   }
 
   changed() {
     this.dirty = true;
     if (this.conflict) return;
-    if (useApp.getState().save.state === 'saved') useApp.setState({ save: { state: 'saving' } });
+    markSaving(this.key);
     clearTimeout(this.idleTimer);
     this.idleTimer = setTimeout(() => void this.flush(), IDLE_MS);
     this.maxTimer ??= setTimeout(() => void this.flush(), MAX_WAIT_MS);
@@ -74,17 +93,17 @@ export class SaveSession {
           // window closes now.
           this.conflict = true;
           this.dirty = false;
-          if (useApp.getState().save.state !== 'error') useApp.setState({ save: { state: 'saved' } });
+          markSaved(this.key);
           markConflict(this.docId, outcome.snapshot);
           return;
         }
         this.base = outcome.rev;
-        if (!this.dirty) useApp.setState({ save: { state: 'saved' } });
+        if (!this.dirty) markSaved(this.key);
         this.onSaved(outcome);
       } catch (e) {
-        // Keep the text marked unsaved so the next change or retry sends it again.
+        // Keep the text marked unsaved; store/saves.ts sends it again later.
         this.dirty = true;
-        useApp.setState({ save: { state: 'error', error: errorText(e) } });
+        markFailed(this.key, e);
       }
     });
     return this.chain;
@@ -99,6 +118,7 @@ export class SaveSession {
     this.base = rev;
     this.dirty = false;
     this.conflict = false;
+    markSaved(this.key);
   }
 
   /** Saves the editor's text over another device's (kept as a record). */
@@ -106,6 +126,7 @@ export class SaveSession {
     await this.chain;
     const outcome = await api.docSave(this.root, this.docId, this.getBody(), this.base, true);
     this.loaded(outcome.rev);
+    markSaved(this.key);
     this.onSaved(outcome);
     return outcome;
   }
@@ -113,5 +134,7 @@ export class SaveSession {
   async dispose() {
     await this.flush();
     this.unregister();
+    // A text that could not be saved stays with store/saves.ts until it is.
+    this.unregisterSave();
   }
 }

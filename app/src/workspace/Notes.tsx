@@ -64,6 +64,15 @@ function AutoTextarea({
   );
 }
 
+/** A note as plain text, for its rescue copy. */
+function noteText(note: Note): string {
+  const lines = [note.text];
+  if (note.quote) lines.unshift(`> ${note.quote}`, '');
+  for (const r of note.replies) lines.push('', `- ${r.text}`);
+  if (note.tags.length) lines.push('', note.tags.map((t) => `#${t}`).join(' '));
+  return `${lines.join('\n')}\n`;
+}
+
 /** One note, edited in place; saves itself shortly after each change. */
 export function NoteItem({
   note,
@@ -87,11 +96,13 @@ export function NoteItem({
   const box = useRef<HTMLElement>(null);
   const { pending, schedule } = useDebouncedSave<Note>(
     {
+      key: `note:${note.id}`,
       save: async (next) => {
         patchNote(await api.noteSave(root, next));
-        setError(null);
       },
+      onSaved: () => setError(null),
       onError: (e) => setError(errorText(e)),
+      rescue: (value) => ({ item: `note-${value.id}`, content: { text: noteText(value) } }),
     },
     [root],
   );

@@ -5,7 +5,8 @@ import { ToastHost } from './components/ToastHost';
 import { installJournal } from './editor/journal';
 import { applyColors } from './lib/colors';
 import { StartScreen } from './screens/StartScreen';
-import { checkForUpdateDaily, saveEverything, useApp } from './store';
+import { checkForUpdateDaily, confirmClose, useApp } from './store';
+import { CloseAskDialog } from './workspace/CloseAskDialog';
 import { DialogHost } from './workspace/dialogs';
 import { Workspace } from './workspace/Workspace';
 
@@ -50,10 +51,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    // Finish the last save before the window closes; keep it open if saving fails.
-    // Then the creation journal writes the saves it was still gathering.
+    // Finish the last save before the window closes; when something could
+    // not be saved, the writer picks: try again, keep it in the rescue
+    // folder and close, or stay. Then the creation journal writes the saves
+    // it was still gathering.
     api.onCloseRequested(async () => {
-      if (!(await saveEverything(true))) return false;
+      if (!(await confirmClose())) return false;
       await api.journalFlush(null).catch(() => {});
       return true;
     });
@@ -67,6 +70,7 @@ export function App() {
     <>
       {hasProject ? <Workspace /> : <StartScreen />}
       <DialogHost />
+      <CloseAskDialog />
       <MenuHost />
       <ToastHost />
       {busy && (

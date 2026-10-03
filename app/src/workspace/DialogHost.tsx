@@ -43,7 +43,14 @@ export function DialogHost() {
     case 'project':
       return <ProjectSettingsDialog tab={dialog.tab} />;
     case 'compare':
-      return <CompareDialog key={`${dialog.docId}/${dialog.copy?.file ?? ''}`} docId={dialog.docId} copy={dialog.copy} />;
+      return (
+        <CompareDialog
+          key={`${dialog.docId}/${dialog.copy?.file ?? dialog.rescue?.path ?? ''}`}
+          docId={dialog.docId}
+          copy={dialog.copy}
+          rescue={dialog.rescue}
+        />
+      );
     case 'copies':
       return <CopiesDialog />;
     case 'move':
