@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::count::count_blocks;
 use crate::doc::{self, Section};
-use crate::store::{atomic_write, parse_iso, read_text, stamp, to_iso};
+use crate::store::{
+    Cleanup, atomic_write, parse_iso, read_text, remove_dir_all_retry, remove_file_retry,
+    rename_retry, stamp, to_iso,
+};
 use crate::{Error, Result, cards, notes, project, snapshot};
 
 pub const TRASH_DIR: &str = ".trash";
@@ -34,6 +37,29 @@ pub struct TrashItem {
     /// back under, next to the original.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file: Option<String>,
+}
+
+/// Retries for moving and removing trash files that a sync program or virus
+/// scanner holds for a moment (see `store::rename_retry`).
+const TRIES: u32 = 4;
+const WAIT: std::time::Duration = std::time::Duration::from_millis(40);
+
+fn move_file(from: &Path, to: &Path) -> Result<()> {
+    rename_retry(from, to, TRIES, WAIT).map_err(|e| Error::io(from, e))
+}
+
+/// Removes an item's folder. `item.json` goes last, so an item whose file is
+/// held by another program stays a whole item and is tried again later.
+fn remove_item_dir(dir: &Path) -> Result<()> {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if entry.file_name() != ITEM_FILE && path.is_file() {
+                remove_file_retry(&path, TRIES, WAIT).map_err(|e| Error::io(&path, e))?;
+            }
+        }
+    }
+    remove_dir_all_retry(dir, TRIES, WAIT).map_err(|e| Error::io(dir, e))
 }
 
 fn item_dir(root: &Path, id: &str) -> Result<PathBuf> {
@@ -70,7 +96,7 @@ pub fn trash_doc(root: &Path, doc_id: &str) -> Result<TrashItem> {
         file: None,
     };
     let target = dir.join(doc::file_name(doc_id));
-    fs::rename(&path, &target).map_err(|e| Error::io(&path, e))?;
+    move_file(&path, &target)?;
     write_item(&dir, &item)?;
     project::save(root, &project)?;
     Ok(item)
@@ -156,7 +182,7 @@ pub fn trash_card(root: &Path, card_id: &str) -> Result<TrashItem> {
         chars: card.description.chars().count() as u32,
         file: None,
     };
-    fs::rename(&path, dir.join(doc::file_name(card_id))).map_err(|e| Error::io(&path, e))?;
+    move_file(&path, &dir.join(doc::file_name(card_id)))?;
     write_item(&dir, &item)?;
     Ok(item)
 }
@@ -187,7 +213,7 @@ pub fn trash_note(root: &Path, note_id: &str) -> Result<TrashItem> {
         chars: note.text.chars().count() as u32,
         file: None,
     };
-    fs::rename(&path, dir.join(doc::file_name(note_id))).map_err(|e| Error::io(&path, e))?;
+    move_file(&path, &dir.join(doc::file_name(note_id)))?;
     write_item(&dir, &item)?;
     Ok(item)
 }
@@ -232,7 +258,7 @@ pub fn trash_copy_as(
         chars,
         file: Some(restore_as.into()),
     };
-    fs::rename(&path, dir.join(restore_as)).map_err(|e| Error::io(&path, e))?;
+    move_file(&path, &dir.join(restore_as))?;
     write_item(&dir, &item)?;
     Ok(item)
 }
@@ -252,8 +278,8 @@ pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
             fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
         }
         let source = dir.join(name);
-        fs::rename(&source, &target).map_err(|e| Error::io(&source, e))?;
-        fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+        move_file(&source, &target)?;
+        remove_item_dir(&dir)?;
         return Ok(item);
     }
     let target = root
@@ -268,10 +294,10 @@ pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent).map_err(|e| Error::io(parent, e))?;
     }
-    fs::rename(&source, &target).map_err(|e| Error::io(&source, e))?;
+    move_file(&source, &target)?;
 
     if matches!(item.section, Section::Cards | Section::Notes) {
-        fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+        remove_item_dir(&dir)?;
         return Ok(item);
     }
     let mut project = project::load(root)?;
@@ -286,7 +312,7 @@ pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
         }
     }
     project::save(root, &project)?;
-    fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    remove_item_dir(&dir)?;
     Ok(item)
 }
 
@@ -294,7 +320,7 @@ pub fn restore(root: &Path, id: &str) -> Result<TrashItem> {
 pub fn delete(root: &Path, id: &str) -> Result<()> {
     let item = read_item(root, id)?;
     let dir = item_dir(root, id)?;
-    fs::remove_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
+    remove_item_dir(&dir)?;
     if item.file.is_some() {
         // A copy: the records belong to the original, which is still there.
         return Ok(());
@@ -302,13 +328,28 @@ pub fn delete(root: &Path, id: &str) -> Result<()> {
     snapshot::remove_all(root, &item.doc_id)
 }
 
-/// Deletes items older than `keep`.
-pub fn purge(root: &Path, keep: Duration) -> Result<()> {
+/// Deletes items older than `keep`. An item that cannot be deleted now (a
+/// file held by another program) is skipped and listed in the result; the
+/// next pass tries it again.
+pub fn purge(root: &Path, keep: Duration) -> Cleanup {
+    let mut done = Cleanup::default();
+    let items = match list(root) {
+        Ok(items) => items,
+        Err(_) => {
+            done.failed.push(root.join(TRASH_DIR));
+            return done;
+        }
+    };
     let cutoff = Utc::now() - keep;
-    for item in list(root)? {
-        if parse_iso(&item.deleted_at).is_some_and(|t| t < cutoff) {
-            delete(root, &item.id)?;
+    for item in items {
+        if !parse_iso(&item.deleted_at).is_some_and(|t| t < cutoff) {
+            continue;
+        }
+        match delete(root, &item.id) {
+            Ok(()) => done.removed += 1,
+            Err(Error::Io { path, .. }) => done.failed.push(path),
+            Err(_) => done.failed.push(root.join(TRASH_DIR).join(&item.id)),
         }
     }
-    Ok(())
+    done
 }

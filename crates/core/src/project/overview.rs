@@ -15,7 +15,7 @@ use crate::doc::{self, DocFile, Section};
 use crate::format::ManuscriptFormat;
 use crate::layout::PageMetrics;
 use crate::markup::Block;
-use crate::store::modified_iso;
+use crate::store::{Cleanup, modified_iso};
 use crate::{Error, Result, snapshot, trash};
 
 #[derive(Debug, Clone, Serialize)]
@@ -108,25 +108,73 @@ pub struct Overview {
 /// Opens a project: sorts out what sync programs left (copies/), brings the
 /// structure in line with the files on disk, clears expired trash and old
 /// automatic records, and returns the overview.
+///
+/// The steps that guard the manuscript stop the opening when they fail, with
+/// a reason in the writer's words. Clearing comes last and never stops it:
+/// what cannot be removed now is only logged and tried again next time.
 pub fn open(root: &Path) -> Result<Overview> {
     if root.is_dir() {
-        copies::restore_project_file(root)?;
+        guard(
+            "다른 기기의 작품 구조 파일을 되살리지 못함",
+            copies::restore_project_file(root),
+        )?;
     }
     let mut project = load(root)?;
-    copies::reconcile(root)?;
-    if copies::merge_project_copies(root)? {
+    guard(
+        "동기화 프로그램이 남긴 사본을 정리하지 못함",
+        copies::reconcile(root),
+    )?;
+    if guard(
+        "다른 기기의 작품 구조를 합치지 못함",
+        copies::merge_project_copies(root),
+    )? {
         project = load(root)?;
     }
-    if repair(root, &mut project)? {
-        save(root, &project)?;
+    let what = "작품 구조를 원고 파일과 맞추지 못함";
+    if guard(what, repair(root, &mut project))? {
+        guard(what, save(root, &project))?;
     }
-    trash::purge(root, chrono::Duration::days(TRASH_DAYS))?;
-    snapshot::prune(
+    clean_up(root, project.keep_daily);
+    overview(root)
+}
+
+/// Puts the step that failed in front of the reason, and the file name after
+/// it: "사본을 정리하지 못함 · 이 위치에 쓸 권한이 없음 (k7q2m9x4t1ab.md)".
+fn guard<T>(what: &str, result: Result<T>) -> Result<T> {
+    result.map_err(|e| {
+        let file = match &e {
+            Error::Io { path, .. } => path
+                .file_name()
+                .map(|n| format!(" ({})", n.to_string_lossy()))
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+        Error::Invalid(format!("{what} · {}{file}", e.user_message()))
+    })
+}
+
+/// Clears expired trash and old automatic records. Nothing for the writer to
+/// do when a file is held by another program, so a failure is only logged.
+fn clean_up(root: &Path, keep_daily: bool) -> Cleanup {
+    let mut done = trash::purge(root, chrono::Duration::days(TRASH_DAYS));
+    done.add(snapshot::prune(
         root,
         chrono::Duration::days(AUTO_RECORD_DAYS),
-        project.keep_daily,
-    )?;
-    overview(root)
+        keep_daily,
+    ));
+    if !done.failed.is_empty() {
+        let names: Vec<String> = done
+            .failed
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect();
+        eprintln!(
+            "정리하지 못한 항목 {}개(다음에 작품을 열 때 다시 시도): {}",
+            done.failed.len(),
+            names.join(", ")
+        );
+    }
+    done
 }
 
 /// Reads the documents the structure lists. One whose file is not there
