@@ -51,7 +51,12 @@ export function App() {
 
   useEffect(() => {
     // Finish the last save before the window closes; keep it open if saving fails.
-    api.onCloseRequested(() => saveEverything(true));
+    // Then the creation journal writes the saves it was still gathering.
+    api.onCloseRequested(async () => {
+      if (!(await saveEverything(true))) return false;
+      await api.journalFlush(null).catch(() => {});
+      return true;
+    });
     installJournal();
     // A new version, looked for once a day a little after start.
     const timer = window.setTimeout(() => void checkForUpdateDaily(), 8000);

@@ -37,13 +37,32 @@ impl From<&Settings> for JournalSettings {
 
 /// Reads this device's settings (making its id the first time) and turns the
 /// journal on or off to match. Called once when the app starts; a journal
-/// that cannot be set up stays off.
+/// that cannot be set up stays off. Also starts the minute check that writes
+/// gathered saves once they are ten minutes old (`journal::flush_due`).
 pub fn init(app: &AppHandle) {
     let settings = journal_file(app).and_then(|path| journal::load_settings(&path).map_err(fail));
     match settings {
         Ok(settings) => journal::set_device(settings.active_device()),
         Err(e) => eprintln!("창작 일지를 켜지 못함: {e}"),
     }
+    std::thread::spawn(|| {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            journal::flush_due(chrono::Utc::now());
+        }
+    });
+}
+
+/// Writes the saves still gathering: for `root` when the writer leaves the
+/// project, for every project (none given) when the window closes. The app
+/// also does the latter when it exits (`lib.rs`).
+#[tauri::command]
+pub async fn journal_flush(root: Option<String>) -> Res<()> {
+    match root {
+        Some(root) => journal::flush(Path::new(&root)),
+        None => journal::flush_all(),
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -100,10 +119,13 @@ pub async fn journal_event(
 #[tauri::command]
 pub async fn journal_summary(app: AppHandle, root: String) -> Res<Summary> {
     let settings = journal::load_settings(&journal_file(&app)?).map_err(fail)?;
+    // Saves still gathering count too.
+    journal::flush(Path::new(&root));
     journal::summary(Path::new(&root), Some(&settings.device)).map_err(fail)
 }
 
 #[tauri::command]
 pub async fn journal_verify(root: String) -> Res<Report> {
+    journal::flush(Path::new(&root));
     journal::verify(Path::new(&root)).map_err(fail)
 }

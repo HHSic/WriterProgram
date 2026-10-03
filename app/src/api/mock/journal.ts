@@ -73,6 +73,7 @@ export const journalMethods = {
     const j = journal(root);
     return { ok: true, files: j.devices ? [{ device: settings.device, lines: j.thisDevice, firstBad: null }] : [] };
   },
+  async journalFlush() {},
   async journalAnchor(root, force) {
     if (settings.anchor !== true) return { state: 'notAllowed', signed: [] };
     if (!settings.enabled) return { state: 'journalOff', signed: [] };

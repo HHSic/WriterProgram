@@ -141,6 +141,8 @@ export interface Backend {
   journalSummary(root: string): Promise<JournalSummary>;
   /** Checks that no journal line was changed or removed. */
   journalVerify(root: string): Promise<JournalReport>;
+  /** Writes the journal's saves still gathering: for one project, or for all (null) when the window closes. */
+  journalFlush(root: string | null): Promise<void>;
   /** Sends the day's fingerprint to the time-stamping authorities when due (or now, `force`). */
   journalAnchor(root: string, force: boolean): Promise<AnchorResult>;
   /** The summary sentence a certificate would open with. */

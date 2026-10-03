@@ -99,6 +99,7 @@ export const tauriBackend: Backend = {
   journalEvent: (root, event) => invoke('journal_event', { root, event }),
   journalSummary: (root) => invoke('journal_summary', { root }),
   journalVerify: (root) => invoke('journal_verify', { root }),
+  journalFlush: (root) => invoke('journal_flush', { root }),
   journalAnchor: (root, force) => invoke('journal_anchor', { root, force }),
   proofPreview: (root, options) => invoke('proof_preview', { root, options }),
   proofMake: (root, options, folder) => invoke('proof_make', { root, options, folder }),

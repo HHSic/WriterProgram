@@ -90,6 +90,9 @@ export async function openProject(path: string): Promise<boolean> {
 
 export async function leaveProject() {
   if (!(await saveEverything(true))) return;
+  // The creation journal's saves still gathering go in as the project closes.
+  const root = get().overview?.root;
+  if (root) await api.journalFlush(root).catch(() => {});
   stopWatching();
   stopAutoSync();
   set({

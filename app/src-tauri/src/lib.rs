@@ -97,6 +97,7 @@ pub fn run() {
             commands::journal::journal_event,
             commands::journal::journal_summary,
             commands::journal::journal_verify,
+            commands::journal::journal_flush,
             commands::anchor::journal_anchor,
             commands::proof::proof_preview,
             commands::proof::proof_make,
@@ -123,6 +124,13 @@ pub fn run() {
             drives::projects::project_unlink,
             drives::projects::project_sync,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running WriterProgram");
+        .build(tauri::generate_context!())
+        .expect("error while running WriterProgram")
+        .run(|_, event| {
+            // Saves of the creation journal still gathering go in before
+            // the app is gone (the window's close flow does it too).
+            if let tauri::RunEvent::Exit = event {
+                writer_core::journal::flush_all();
+            }
+        });
 }
