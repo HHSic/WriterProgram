@@ -135,6 +135,7 @@ export const docMethods = {
     if (patch.synopsis !== undefined) d.meta.synopsis = patch.synopsis.trim();
     if (patch.status !== undefined) d.meta.status = patch.status;
     if (patch.target !== undefined) d.meta.target = patch.target && patch.target > 0 ? patch.target : null;
+    if (patch.locked !== undefined) d.meta.locked = patch.locked;
     d.modified = now();
     return clone(d.meta);
   },

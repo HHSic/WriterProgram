@@ -15,6 +15,7 @@ import {
   renameDoc,
   renamePart,
   selectDoc,
+  setLocked,
   setStatus,
   setTarget,
   trashDoc,
@@ -130,6 +131,11 @@ export function docMenu(ctx: SidebarMenuContext, doc: DocSummary, part: PartView
           onSelect: () => void setStatus(doc.id, status),
         }),
       ),
+      { separator: true },
+      // 완료 회차 잠금: a finished chapter kept as it is.
+      doc.locked
+        ? { label: '잠금 풀기', onSelect: () => void setLocked(doc.id, false) }
+        : { label: `이 ${noun} 잠그기 (고치지 않게)`, onSelect: () => void setLocked(doc.id, true) },
     );
   }
   items.push({ separator: true }, { label: '휴지통으로', danger: true, onSelect: () => void trashDoc(doc.id) });

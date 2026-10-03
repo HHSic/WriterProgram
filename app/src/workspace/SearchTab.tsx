@@ -7,7 +7,8 @@ import type { SearchMatch, SearchResult } from '../api/types';
 import { buildRegex, replaceMatch, setHighlight } from '../editor/search';
 import { errorText, num } from '../lib/format';
 import { flushAll } from '../lib/flush';
-import { UNTITLED, docNumber } from '../lib/labels';
+import { UNTITLED, docNoun, docNumber } from '../lib/labels';
+import { Icon } from '../components/Icon';
 import {
   findDoc,
   jumpTo,
@@ -125,10 +126,20 @@ export function SearchTab() {
     return found.text.replace(new RegExp(one.source, 'u'), replacement);
   };
 
+  const noun = docNoun(ov.project.kind);
+  const isLocked = (docId: string) => !!findDoc(ov, docId)?.doc.locked;
+  // Matches in locked chapters (완료 회차 잠금) are shown but never replaced.
+  const lockedHits = result?.docs.filter((d) => isLocked(d.docId)) ?? [];
+  const lockedCount = lockedHits.reduce((n, d) => n + d.matches.length, 0);
+
   const replaceOne = () => {
     const found = flat[current];
     if (!found) {
       step(1);
+      return;
+    }
+    if (isLocked(found.docId)) {
+      showToast({ text: `잠근 ${noun}입니다 · 잠금을 풀면 바꿀 수 있습니다` });
       return;
     }
     if (found.docId !== activeDocId || !editor) {
@@ -147,16 +158,23 @@ export function SearchTab() {
     openDialog({
       kind: 'confirm',
       title: '모두 바꾸기',
-      message: `${where}에서 찾은 ${num(result.total)}곳을 바꿉니다 ('${text}' → '${replacement}'). 바뀌는 문서마다 '바꾸기 전' 기록이 남아서 되돌릴 수 있습니다.`,
-      confirm: `${num(result.total)}곳 바꾸기`,
+      message: `${where}에서 찾은 ${num(result.total - lockedCount)}곳을 바꿉니다 ('${text}' → '${replacement}'). 바뀌는 문서마다 '바꾸기 전' 기록이 남아서 되돌릴 수 있습니다.${
+        lockedCount ? ` 잠근 ${noun} ${lockedHits.length}개의 ${num(lockedCount)}곳은 그대로 둡니다.` : ''
+      }`,
+      confirm: `${num(result.total - lockedCount)}곳 바꾸기`,
       onConfirm: async () => {
         if (!(await saveEverything())) return;
         try {
           const outcome = await api.replaceAll(ov.root, { text, regex, wholeWord, docIds }, replacement);
           useApp.setState((s) => ({ docVersion: s.docVersion + 1, recordsVersion: s.recordsVersion + 1 }));
           await refreshOverview();
+          const passed = outcome.locked.length ? ` · 잠근 ${noun} ${outcome.locked.length}개는 건너뜀` : '';
+          if (!outcome.docs.length) {
+            showToast({ text: `바꾼 곳이 없습니다${passed}` });
+            return;
+          }
           showToast({
-            text: `${num(outcome.replaced)}곳 바꿈 · 문서 ${outcome.docs.length}개`,
+            text: `${num(outcome.replaced)}곳 바꿈 · 문서 ${outcome.docs.length}개${passed}`,
             action: {
               label: '되돌리기',
               run: () => {
@@ -235,8 +253,8 @@ export function SearchTab() {
         <button type="button" className="btn small" disabled={!flat.length} onClick={replaceOne}>
           바꾸기
         </button>
-        <button type="button" className="btn small" disabled={!flat.length} onClick={replaceAll}>
-          모두 바꾸기{result?.total ? ` (${num(result.total)}곳)` : ''}
+        <button type="button" className="btn small" disabled={!flat.length || lockedCount === result?.total} onClick={replaceAll}>
+          모두 바꾸기{result?.total ? ` (${num(result.total - lockedCount)}곳)` : ''}
         </button>
       </div>
 
@@ -252,6 +270,12 @@ export function SearchTab() {
           <section key={d.docId} className="find-doc">
             <h3>
               <span className="ellipsis">{docLabel(d.docId)}</span>
+              {isLocked(d.docId) && (
+                <span className="find-locked" title={`잠근 ${noun}: 바꾸지 않음`}>
+                  <Icon name="lock" size={11} />
+                  잠금
+                </span>
+              )}
               <span className="count">{d.matches.length}곳</span>
             </h3>
             <ul>

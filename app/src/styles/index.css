@@ -26,3 +26,4 @@
 @import './page-editor.css'; /* Page editor of the manuscript format (workspace/PageEditor.tsx). */
 @import './import.css'; /* 가져오기 wizard (workspace/ImportDialog.tsx). */
 @import './review.css'; /* 교정본 주고받기: sending, what was sent, the review tab. */
+@import './lock.css'; /* 완료 회차 잠금: tree lock, banner, find results. */

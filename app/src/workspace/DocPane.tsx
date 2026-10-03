@@ -21,6 +21,7 @@ import { loadCursor, saveCursor } from '../lib/cursor';
 import { errorText } from '../lib/format';
 import { useDebouncedSave } from '../lib/useDebouncedSave';
 import { UNTITLED, docNoun, withObject } from '../lib/labels';
+import { Icon } from '../components/Icon';
 import { selectNote } from '../editor/notes';
 import {
   addTextNote,
@@ -30,6 +31,7 @@ import {
   patchSummary,
   previewCard,
   registerEditor,
+  setLocked,
   useApp,
 } from '../store';
 import { touchCapable, touchLike } from '../lib/pointer';
@@ -147,9 +149,11 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
     };
   }, [root, docId, tabKey, editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // While another device's edits wait for the writer's pick, nothing more is typed.
+  // While another device's edits wait for the writer's pick, nothing more is
+  // typed; a chapter the writer locked (완료 회차 잠금) is only read.
   const conflict = useApp((s) => !!s.conflicts[docId]);
-  const editable = !locked && !conflict;
+  const docLocked = useApp((s) => !!findDoc(s.overview!, docId)?.doc.locked);
+  const editable = !locked && !conflict && !docLocked;
   useEffect(() => {
     if (editor.isEditable !== editable) editor.setEditable(editable, false);
   }, [editor, editable]);
@@ -226,10 +230,11 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   return (
     <>
       <DocBanners docId={docId} />
+      {docLocked && <LockedBanner docId={docId} planning={isPlanning} />}
       <div className="doc-scroll">
         {showRuler && <Ruler editor={editor} planning={isPlanning} />}
         <article className="page">
-          <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked} />
+          <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked || docLocked} />
           <EditorContent editor={editor} />
         </article>
         <FormatBubble editor={editor} />
@@ -237,6 +242,27 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       </div>
       {toolbar && <EditToolbar editor={editor} />}
     </>
+  );
+}
+
+/** Over a locked chapter (완료 회차 잠금): why it cannot be changed, and the way out. */
+function LockedBanner({ docId, planning }: { docId: string; planning: boolean }) {
+  const kind = useApp((s) => s.overview!.project.kind);
+  return (
+    <div className="doc-banners">
+      <div className="doc-banner locked" role="status">
+        <Icon name="lock" size={15} />
+        <div className="doc-banner-text">
+          <strong>잠근 {planning ? '문서' : docNoun(kind)}입니다</strong>
+          <span>다 쓴 글을 그대로 두려고 잠갔습니다. 모두 바꾸기와 교정 반영도 이 글은 건너뜁니다.</span>
+        </div>
+        <div className="doc-banner-actions">
+          <button type="button" className="btn small" onClick={() => void setLocked(docId, false)}>
+            잠금 풀기
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@
 import { api } from '../api';
 import type { Applied, Decisions } from '../api/types';
 import { reloadDoc } from '../editor/shared';
+import { docNoun } from '../lib/labels';
 import { type Choices, NO_CHOICES, appliedText } from '../lib/review';
 import { get, root, set } from './state';
 import { closeDialog, patchSummary, saveEverything, showToast, toastError } from './ui';
@@ -90,7 +91,7 @@ export async function applyReview(exchangeId: string, decisions: Decisions): Pro
   exchangesChanged();
   const first = applied.docs[0];
   showToast({
-    text: appliedText(applied),
+    text: appliedText(applied, docNoun(get().overview!.project.kind)),
     action: first ? { label: '기록 보기', run: () => void showRecords(first) } : undefined,
   });
   return applied;

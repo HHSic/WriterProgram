@@ -148,5 +148,7 @@ export interface Applied {
   skipped: { id: string; reason: string }[];
   /** 메모 made from the editor's notes. */
   memos: string[];
+  /** Locked chapters (완료 회차 잠금) passed by; their changes stay to decide. */
+  locked: string[];
   review: Review;
 }

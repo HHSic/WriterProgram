@@ -1,4 +1,4 @@
-// A chapter's row in the left column: number, title, notes, copies, status and progress to its goal.
+// A chapter's row in the left column: number, title, notes, copies, lock, status and progress to its goal.
 
 import type { DragEvent } from 'react';
 import type { DocSummary, ProjectKind } from '../api/types';
@@ -6,7 +6,7 @@ import { Icon } from '../components/Icon';
 import type { MenuItem, MenuOptions } from '../components/Menu';
 import { MoreButton } from '../components/MoreButton';
 import { num } from '../lib/format';
-import { STATUS_LABEL, UNTITLED } from '../lib/labels';
+import { STATUS_LABEL, UNTITLED, docNoun } from '../lib/labels';
 import { pressMenu, type TouchDrag } from '../lib/press';
 import { openDocInNewTab, selectDoc } from '../store';
 import { CopyBadge } from './Copies';
@@ -57,7 +57,7 @@ export function DocItem({
         draggable
         className={`doc-item${active ? ' active' : ''}${drop ? ` drop-${drop}` : ''}`}
         title={doc.synopsis || undefined}
-        aria-label={`${title}, ${STATUS_LABEL[doc.status]}, ${num(chars)}자${memos ? `, 열린 메모 ${memos}개` : ''}`}
+        aria-label={`${title}, ${STATUS_LABEL[doc.status]}${doc.locked ? ', 잠금' : ''}, ${num(chars)}자${memos ? `, 열린 메모 ${memos}개` : ''}`}
         aria-current={active ? 'true' : undefined}
         onClick={(e) => void selectDoc(doc.id, e.ctrlKey || e.metaKey)}
         onDoubleClick={() => void openDocInNewTab(doc.id)}
@@ -77,6 +77,11 @@ export function DocItem({
             </span>
           )}
           <CopyBadge count={copies} />
+          {doc.locked && (
+            <span className="doc-lock" title={`잠근 ${docNoun(kind)}: 고치지 않게 잠가 둠`} aria-hidden="true">
+              <Icon name="lock" size={11} />
+            </span>
+          )}
           <span className={`chip status-${doc.status}`} data-kind={kind}>
             {STATUS_LABEL[doc.status]}
           </span>

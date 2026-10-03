@@ -77,7 +77,7 @@ export const cardMethods = {
       chars: c.description.length,
     };
     const holder: MockDoc & { card?: Card } = {
-      meta: { id: cardId, title: c.name, synopsis: '', status: 'draft', target: null, created: c.created },
+      meta: { id: cardId, title: c.name, synopsis: '', status: 'draft', target: null, locked: false, created: c.created },
       body: { type: 'doc' },
       section: 'cards',
       card: c,

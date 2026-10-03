@@ -190,11 +190,15 @@ describe('words', () => {
       rejected: ['c'],
       skipped: [{ id: 'e', reason: '…' }],
       memos: ['m'],
+      locked: [],
       review: { exchange: 'x', file: 'f', stored: 's', at: '', chapters: [] },
     };
     expect(appliedText(applied)).toBe(
       '바뀐 곳 2군데를 받아들이고 1군데는 원래대로 두었습니다. 편집자 메모 1개를 메모로 남겼습니다. 1군데는 반영하지 못해 직접 고쳐야 합니다. 고치기 전 원고는 기록에 ‘교정 반영 전’으로 남았습니다.',
     );
     expect(appliedText({ ...applied, docs: [], accepted: [], rejected: [], skipped: [], memos: [] })).toBe('반영할 것이 없었습니다.');
+    expect(appliedText({ ...applied, docs: [], accepted: [], rejected: [], skipped: [], memos: [], locked: ['d'] }, '장')).toBe(
+      '잠근 장 1개는 건너뛰었습니다. 잠금을 풀면 반영할 수 있습니다.',
+    );
   });
 });

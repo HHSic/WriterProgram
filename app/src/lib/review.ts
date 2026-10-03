@@ -146,7 +146,7 @@ export function decisionsOf(choices: Choices): Decisions {
 }
 
 /** What 반영하기 did, in sentences for a toast. */
-export function appliedText(a: Applied): string {
+export function appliedText(a: Applied, noun = '회차'): string {
   const parts: string[] = [];
   if (a.accepted.length && a.rejected.length) {
     parts.push(`바뀐 곳 ${num(a.accepted.length)}군데를 받아들이고 ${num(a.rejected.length)}군데는 원래대로 두었습니다.`);
@@ -157,6 +157,7 @@ export function appliedText(a: Applied): string {
   }
   if (a.memos.length) parts.push(`편집자 메모 ${num(a.memos.length)}개를 메모로 남겼습니다.`);
   if (a.skipped.length) parts.push(`${num(a.skipped.length)}군데는 반영하지 못해 직접 고쳐야 합니다.`);
+  if (a.locked.length) parts.push(`잠근 ${noun} ${num(a.locked.length)}개는 건너뛰었습니다. 잠금을 풀면 반영할 수 있습니다.`);
   if (a.docs.length) parts.push('고치기 전 원고는 기록에 ‘교정 반영 전’으로 남았습니다.');
   return parts.join(' ') || '반영할 것이 없었습니다.';
 }

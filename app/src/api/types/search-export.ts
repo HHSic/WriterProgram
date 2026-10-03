@@ -35,6 +35,8 @@ export interface SearchResult {
 export interface ReplaceOutcome {
   replaced: number;
   docs: { docId: string; count: number; snapshot: SnapshotInfo }[];
+  /** Locked chapters (완료 회차 잠금) with matches, left as they were. */
+  locked: string[];
 }
 
 export interface DocOptions {
