@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { indentKinds } from '../editor/indent';
+import { indentKindAt } from '../editor/indent';
 import { MAX_FIRST_LINE, MAX_MARGIN } from '../editor/paragraph';
 import { useApp } from '../store';
 
@@ -56,7 +56,7 @@ export function Ruler({ editor, planning }: { editor: Editor; planning: boolean 
       const node = $from.parent;
       if (node.type.name !== 'paragraph' || $from.depth < 1) return null;
       const own = node.attrs.indent === null || node.attrs.indent === undefined ? null : Number(node.attrs.indent);
-      const kind = own === null && !planning ? (indentKinds(e.state.doc, rules ?? null).get($from.before(1)) ?? null) : null;
+      const kind = own === null && !planning ? indentKindAt(e.state.doc, rules ?? null, $from.index(0)) : null;
       return {
         left: Number(node.attrs.left) || 0,
         right: Number(node.attrs.right) || 0,
