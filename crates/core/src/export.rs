@@ -65,8 +65,28 @@ pub fn body_text(blocks: &[Block], opts: &TextOptions) -> String {
     out
 }
 
+/// A chapter to export. When it cannot be read, the error names it, so the
+/// writer knows which one to mend (docs/safety-design.md S4).
+pub(crate) fn load_item(root: &Path, item: &ExportItem) -> Result<doc::DocFile> {
+    doc::load(root, &item.doc_id).map_err(|e| {
+        let name = item.heading.trim();
+        let name = if name.is_empty() {
+            "고른 회차"
+        } else {
+            name
+        };
+        let reason = match &e {
+            Error::Format { message, .. } => message.clone(),
+            other => other.user_message(),
+        };
+        Error::Invalid(format!(
+            "읽을 수 없는 회차가 있어 내보내지 못함 · ‘{name}’ ({reason})"
+        ))
+    })
+}
+
 fn item_text(root: &Path, item: &ExportItem, opts: &TextOptions) -> Result<String> {
-    let file = doc::load(root, &item.doc_id)?;
+    let file = load_item(root, item)?;
     let body = body_text(&file.body, opts);
     Ok(if opts.include_titles && !item.heading.trim().is_empty() {
         format!("{}\n\n{body}", item.heading.trim())
@@ -255,7 +275,7 @@ pub fn export_file(
     format.validate()?;
     let bodies = items
         .iter()
-        .map(|item| Ok(doc::load(root, &item.doc_id)?.body))
+        .map(|item| Ok(load_item(root, item)?.body))
         .collect::<Result<Vec<_>>>()?;
     export_bodies(root, items, &bodies, opts, format, kind, dest, per_doc)
 }

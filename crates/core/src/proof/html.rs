@@ -256,6 +256,23 @@ impl Page<'_> {
             );
         }
         h.push_str("</tbody></table>\n<p class=\"small\">고친 비율은 남아 있는 가장 오래된 기록(초고)과 지금 글을 글자 단위로 견주어, 달라진 글자의 비율을 낸 값입니다. 바깥 붙여넣기는 100자 이상을 이 앱 밖에서 가져와 붙여 넣은 것입니다.</p>\n");
+        if !f.missing.is_empty() {
+            h.push_str("<h3>빠진 회차</h3>\n<p class=\"small\">증명서를 만들 때 파일이 없거나 열 수 없어 위 표와 지문 목록에 넣지 못한 회차입니다.</p>\n<ul>\n");
+            for m in &f.missing {
+                let title = if m.title.trim().is_empty() {
+                    String::new()
+                } else {
+                    format!(" {}", esc(m.title.trim()))
+                };
+                let _ = writeln!(
+                    h,
+                    "<li>{}{title} · {}</li>",
+                    self.label(m.number),
+                    esc(&m.reason)
+                );
+            }
+            h.push_str("</ul>\n");
+        }
     }
 
     fn excerpts(&self, h: &mut String) {

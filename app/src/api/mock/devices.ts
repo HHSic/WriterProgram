@@ -94,7 +94,9 @@ export const deviceMethods = {
 /**
  * Stand-in for another device, to try the screens in a browser:
  * `__otherDevice.edit(docId, ['문단', ...])` changes a chapter as a sync
- * program would, `__otherDevice.copy(docId, [...])` leaves a copy of it.
+ * program would, `__otherDevice.copy(docId, [...])` leaves a copy of it,
+ * `__otherDevice.break(docId)` makes its file one that cannot be read (as if
+ * saved as ANSI in Notepad) for 고쳐 열기; open the project again to see it.
  */
 export const otherDevice = {
   edit(docId: string, paragraphs: string[]) {
@@ -115,5 +117,9 @@ export const otherDevice = {
       doc: copyDoc,
     });
     watcher.onChange([{ kind: 'doc', id: `${docId}-${device}`, rev: revOf(copyDoc.body) }]);
+  },
+  break(docId: string, reason = '다른 글자 방식(EUC-KR 등)으로 저장된 파일') {
+    if (!watcher) return;
+    doc(project(watcher.root), docId).broken = reason;
   },
 };

@@ -20,6 +20,7 @@ import type {
   SnapshotInfo,
   SnapshotKind,
   TrashItem,
+  UnreadableDoc,
 } from '../types';
 import { SUBMISSION, WEBNOVEL, mockPages } from './presets';
 
@@ -28,6 +29,8 @@ export interface MockDoc {
   body: JSONContent;
   section: Section;
   modified?: string;
+  /** Why its file "cannot be read" (고쳐 열기 clears it); see `__breakDoc`. */
+  broken?: string;
 }
 
 interface MockProject {
@@ -139,7 +142,20 @@ export function revOf(body: JSONContent): string {
 export function overview(root: string): Overview {
   const p = project(root);
   const format = p.info.manuscriptFormat;
-  const parts = p.parts.map((part) => ({ id: part.id, title: part.title, docs: part.docs.map((i) => summary(doc(p, i), format)) }));
+  const unreadable: UnreadableDoc[] = [];
+  // Like listed_docs on the Rust side: unreadable ones out of the list, at their place in `unreadable`.
+  const readable = (ids: string[], section: Section, part: string | null) =>
+    ids.filter((i, index) => {
+      const d = doc(p, i);
+      if (!d.broken) return true;
+      unreadable.push({ id: i, section, part, index, titleGuess: d.meta.title, reason: d.broken, repairable: true });
+      return false;
+    });
+  const parts = p.parts.map((part) => ({
+    id: part.id,
+    title: part.title,
+    docs: readable(part.docs, 'manuscript', part.id).map((i) => summary(doc(p, i), format)),
+  }));
   const total = parts
     .flatMap((part) => part.docs)
     .reduce(
@@ -155,13 +171,14 @@ export function overview(root: string): Overview {
     root,
     project: clone(p.info),
     parts,
-    planning: p.planning.map((i) => summary(doc(p, i))),
+    planning: readable(p.planning, 'planning', null).map((i) => summary(doc(p, i))),
     trashCount: p.trash.length,
     total,
     totalPages: mockPages(total.withSpaces, format),
     cardTypes: clone(p.cardTypes),
     cards: [...p.cards.values()].sort((a, b) => a.name.localeCompare(b.name)).map(cardSummary),
     copies: p.copies.map((c) => clone(c.info)),
+    unreadable,
   };
 }
 

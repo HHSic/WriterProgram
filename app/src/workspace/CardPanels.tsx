@@ -4,11 +4,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { api } from '../api';
-import type { Appearance, Card } from '../api/types';
+import type { Appearances as Found, Card } from '../api/types';
 import { castOf, nameIndex, nameKey, type NameIndex } from '../editor/cards';
 import { Icon } from '../components/Icon';
 import { errorText, num } from '../lib/format';
 import { UNTITLED, docNoun, docNumber } from '../lib/labels';
+import { skippedText } from '../lib/unreadable';
 import { findDoc, jumpTo, openCard, previewCard, toastError, useApp } from '../store';
 
 /** Names to highlight, rebuilt only when a highlighted name changes. */
@@ -82,12 +83,12 @@ export function Appearances({ cardId, compact = false }: { cardId: string; compa
     const card = s.overview!.cards.find((c) => c.id === cardId);
     return card ? [card.name, ...card.aliases].join('	') : '';
   });
-  const [list, setList] = useState<Appearance[] | null>(null);
+  const [found, setFound] = useState<Found | null>(null);
 
   useEffect(() => {
     let alive = true;
     api.cardAppearances(ov.root, cardId).then(
-      (l) => alive && setList(l),
+      (l) => alive && setFound(l),
       (e) => alive && toastError('등장 위치를 찾지 못함', e),
     );
     return () => {
@@ -95,14 +96,23 @@ export function Appearances({ cardId, compact = false }: { cardId: string; compa
     };
   }, [ov.root, cardId, names]);
 
-  if (!list) return null;
+  if (!found) return null;
+  const list = found.places;
   const noun = docNoun(ov.project.kind);
-  if (list.length === 0) return <p className="empty-note">아직 원고에 나오지 않습니다.</p>;
+  const skipped = found.skipped > 0 && <p className="empty-note">{skippedText(found.skipped, noun)}</p>;
+  if (list.length === 0)
+    return (
+      <>
+        <p className="empty-note">아직 원고에 나오지 않습니다.</p>
+        {skipped}
+      </>
+    );
   return (
     <div className="appearances">
       <h3 className="section-label">
         {num(list.length)}개 {noun}에 나옴
       </h3>
+      {skipped}
       {list.map((a) => {
         const place = findDoc(ov, a.docId);
         const label = place

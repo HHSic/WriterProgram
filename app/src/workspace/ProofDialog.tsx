@@ -7,7 +7,7 @@ import { api } from '../api';
 import type { ProofOptions } from '../api/types';
 import { Modal } from '../components/Modal';
 import { useChanged } from '../lib/useChanged';
-import { docNumber } from '../lib/labels';
+import { UNTITLED, docNumber } from '../lib/labels';
 import { allManuscript, closeDialog, saveEverything, showToast, toastError, useApp } from '../store';
 
 type Range = 'all' | 'chapters' | 'period';
@@ -45,6 +45,8 @@ export function ProofDialog() {
   );
   const ready = range !== 'chapters' || picked.length > 0;
   const covered = range === 'chapters' ? chapters.filter((c) => picked.includes(c.id)) : chapters;
+  // Chapters that cannot be read are left out and listed as 빠진 회차; say so before making.
+  const leftOut = range === 'chapters' ? [] : ov.unreadable.filter((u) => u.section === 'manuscript');
 
   useEffect(() => {
     if (!ready) {
@@ -180,6 +182,13 @@ export function ProofDialog() {
             몇 시에 썼는지는 생활 습관을 드러낼 수 있습니다. 증명 자료 파일에는 검증을 위해 정확한 시각이 그대로 들어갑니다.
           </small>
         </fieldset>
+
+        {leftOut.length > 0 && (
+          <p className="warn-text">
+            열 수 없는 회차 {leftOut.length}개({leftOut.map((u) => `‘${u.titleGuess.trim() || UNTITLED}’`).join(', ')})는 증명서에
+            담지 못하고 ‘빠진 회차’로 적힙니다. 왼쪽 목록에서 먼저 고쳐 열면 함께 담깁니다.
+          </p>
+        )}
 
         <div className="field">
           <span className="field-label">증명서 첫 문장</span>

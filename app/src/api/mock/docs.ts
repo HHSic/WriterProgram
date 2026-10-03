@@ -89,9 +89,37 @@ export const docMethods = {
     p.trash.unshift({ item, doc: d });
     return clone(item);
   },
+  async docMendPreview(root, docId) {
+    await wait();
+    const d = doc(project(root), docId);
+    if (!d.broken) throw '이미 열 수 있는 회차입니다';
+    const text = (d.body.content ?? [])
+      .map((n) => (n.content ?? []).map((i) => i.text ?? '').join(''))
+      .join('\n');
+    return {
+      id: docId,
+      section: d.section,
+      title: d.meta.title,
+      reason: d.broken,
+      encoding: 'euc-kr',
+      newFront: false,
+      text: text.slice(0, 1500),
+      chars: counts(d.body).withSpaces,
+    };
+  },
+  async docMend(root, docId) {
+    await wait();
+    const d = doc(project(root), docId);
+    if (!d.broken) throw '이미 열 수 있는 회차입니다';
+    delete d.broken;
+    d.modified = now();
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').replace('.', '-').slice(0, 19);
+    return { id: docId, kept: `${docId}.md.broken-${stamp}` };
+  },
   async docLoad(root, docId) {
     await wait();
     const d = doc(project(root), docId);
+    if (d.broken) throw `파일을 읽을 수 없음 · ${docId}.md (${d.broken})`;
     return { meta: clone(d.meta), body: clone(d.body), counts: counts(d.body), rev: revOf(d.body) };
   },
   async docSave(root, docId, b, base, force) {

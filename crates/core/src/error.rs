@@ -18,7 +18,16 @@ pub enum Error {
     /// A request that cannot be carried out. The message is written for the screen.
     #[error("{0}")]
     Invalid(String),
+    /// `project.json` is there but is not a project any more (cut short,
+    /// empty, other JSON). The details are for logs; the screen offers
+    /// recovery (project/recover.rs, docs/safety-design.md S5).
+    #[error("{}: damaged project file: {detail}", path.display())]
+    ProjectDamaged { path: PathBuf, detail: String },
 }
+
+/// What the screen says when `project.json` is damaged.
+pub const PROJECT_DAMAGED: &str =
+    "작품 구조 파일(project.json)이 손상되어 열 수 없습니다. 원고 파일은 그대로 있습니다.";
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -59,6 +68,7 @@ impl Error {
                 format!("파일을 읽을 수 없음 · {name} ({message})")
             }
             Error::NotFound(message) | Error::Invalid(message) => message.clone(),
+            Error::ProjectDamaged { .. } => PROJECT_DAMAGED.into(),
         }
     }
 }

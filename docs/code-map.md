@@ -10,8 +10,9 @@
 
 | 모듈 | 하는 일 |
 |---|---|
-| `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간) |
+| `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간), `backup.rs`(project.json 하루 백업), `recover.rs`(깨진 project.json 되살리기, 화면 `screens/RecoverDialog.tsx`) |
 | `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기·지우기 재시도, 정리 결과(`Cleanup`) |
+| `mend.rs` | 읽을 수 없는 회차(빈 파일, 다른 글자 방식, 깨진 앞머리) 알아보기와 고쳐 열기. 화면 `workspace/MendDialog.tsx`, `UnreadableItem.tsx`, 명령 `commands/mend.rs` |
 | `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수, 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝) |
 | `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |

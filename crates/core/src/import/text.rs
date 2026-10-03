@@ -25,7 +25,9 @@ pub(super) fn is_scene(text: &str) -> bool {
     SCENE.is_match(text)
 }
 
-fn decode(bytes: &[u8], wanted: Option<&str>) -> (String, &'static str) {
+/// Reads text in UTF-8, UTF-16 (with its mark) or EUC-KR, the one `wanted`
+/// or else the one that fits. Also used to mend unreadable chapters (mend.rs).
+pub(crate) fn decode(bytes: &[u8], wanted: Option<&str>) -> (String, &'static str) {
     let (bytes, bom) = match bytes {
         [0xEF, 0xBB, 0xBF, rest @ ..] => (rest, true),
         _ => (bytes, false),

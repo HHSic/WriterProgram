@@ -2,7 +2,7 @@
 
 import type { Editor } from '@tiptap/core';
 import { create } from 'zustand';
-import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, RescueFile, SnapshotInfo } from '../api/types';
+import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, Recovery, RescueFile, SnapshotInfo } from '../api/types';
 import type { Pane, SplitDir, Target } from '../lib/tabs';
 import { type ViewSettings, loadView } from '../lib/view';
 
@@ -97,7 +97,11 @@ export type Dialog =
   /** 창작 과정 증명서 만들기. */
   | { kind: 'proof' }
   /** Many files removed at once on one side: remove them on the other too? (`heldRemovals`) */
-  | { kind: 'removals' };
+  | { kind: 'removals' }
+  /** 고쳐 열기: a document whose file is there but cannot be read. */
+  | { kind: 'mend'; docId: string }
+  /** The project's project.json is damaged: the ways to bring it back. */
+  | { kind: 'recover'; path: string; recovery: Recovery };
 
 /** A document whose text another device changed while it was being edited here. */
 export interface DocConflict {

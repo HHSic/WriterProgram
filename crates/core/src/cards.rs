@@ -386,17 +386,34 @@ pub struct Appearance {
     pub samples: Vec<Match>,
 }
 
+/// Where a card's names appear.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Appearances {
+    /// Chapters in manuscript order.
+    pub places: Vec<Appearance>,
+    /// Chapters whose file is there but cannot be read (mend.rs), left out.
+    pub skipped: usize,
+}
+
 /// Chapters where a card's names appear, in manuscript order.
-pub fn appearances(root: &Path, card_id: &str) -> Result<Vec<Appearance>> {
+pub fn appearances(root: &Path, card_id: &str) -> Result<Appearances> {
     let card = load(root, card_id)?;
     let Some(re) = names_regex(&card.names()) else {
-        return Ok(Vec::new());
+        return Ok(Appearances::default());
     };
     let project = project::load(root)?;
     let mut out = Vec::new();
+    let mut skipped = 0;
     for id in project.parts.iter().flat_map(|p| &p.docs) {
-        let Ok(file) = doc::load(root, id) else {
-            continue;
+        let file = match doc::load(root, id) {
+            Ok(file) => file,
+            // Missing: maybe still on its way from another device.
+            Err(Error::NotFound(_)) => continue,
+            Err(_) => {
+                skipped += 1;
+                continue;
+            }
         };
         let matches = find_in_blocks_by(&file.body, usize::MAX, |text| find_names(&re, text));
         if !matches.is_empty() {
@@ -407,7 +424,10 @@ pub fn appearances(root: &Path, card_id: &str) -> Result<Vec<Appearance>> {
             });
         }
     }
-    Ok(out)
+    Ok(Appearances {
+        places: out,
+        skipped,
+    })
 }
 
 /// For each card, in how many chapters it appears.

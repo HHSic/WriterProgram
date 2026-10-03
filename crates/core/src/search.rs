@@ -5,7 +5,7 @@
 //! UTF-16 code units, the way ProseMirror counts text.
 
 use std::ops::Range;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
@@ -62,6 +62,9 @@ pub struct SearchResult {
     pub total: usize,
     /// More matches exist than were returned.
     pub truncated: bool,
+    /// Documents in scope whose file is there but cannot be read (mend.rs),
+    /// left out: "열 수 없는 회차 2개는 빼고 찾았습니다".
+    pub skipped: usize,
 }
 
 pub fn matcher(q: &SearchQuery) -> Result<Regex> {
@@ -164,8 +167,9 @@ pub fn search(root: &Path, q: &SearchQuery) -> Result<SearchResult> {
     let mut docs = Vec::new();
     let mut total = 0;
     let mut truncated = false;
+    let mut skipped = 0;
     for id in scope(root, q)? {
-        let Ok(file) = doc::load(root, &id) else {
+        let Some((_, file)) = readable(root, &id, &mut skipped) else {
             continue;
         };
         let left = MAX_MATCHES.saturating_sub(total);
@@ -189,7 +193,21 @@ pub fn search(root: &Path, q: &SearchQuery) -> Result<SearchResult> {
         docs,
         total,
         truncated,
+        skipped,
     })
+}
+
+/// A document in scope: none when its file is missing (it may be on its way
+/// from another device) or cannot be read, which `skipped` counts.
+fn readable(root: &Path, id: &str, skipped: &mut usize) -> Option<(PathBuf, DocFile)> {
+    let (_, path) = doc::locate(root, id).ok()?;
+    match doc::read_doc(&path) {
+        Ok(file) => Some((path, file)),
+        Err(_) => {
+            *skipped += 1;
+            None
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +227,8 @@ pub struct ReplacedDoc {
 pub struct ReplaceOutcome {
     pub replaced: usize,
     pub docs: Vec<ReplacedDoc>,
+    /// Documents in scope that cannot be read, left as they are.
+    pub skipped: usize,
 }
 
 #[derive(Clone)]
@@ -327,11 +347,11 @@ pub fn replace_all(root: &Path, q: &SearchQuery, replacement: &str) -> Result<Re
     let re = matcher(q)?;
     let mut docs = Vec::new();
     let mut replaced = 0;
+    let mut skipped = 0;
     for id in scope(root, q)? {
-        let Ok((_, path)) = doc::locate(root, &id) else {
+        let Some((path, file)) = readable(root, &id, &mut skipped) else {
             continue;
         };
-        let file = doc::read_doc(&path)?;
         let (body, count) = replace_in_blocks(&file.body, &re, replacement, q.regex);
         if count == 0 {
             continue;
@@ -351,7 +371,11 @@ pub fn replace_all(root: &Path, q: &SearchQuery, replacement: &str) -> Result<Re
             snapshot,
         });
     }
-    Ok(ReplaceOutcome { replaced, docs })
+    Ok(ReplaceOutcome {
+        replaced,
+        docs,
+        skipped,
+    })
 }
 
 #[cfg(test)]

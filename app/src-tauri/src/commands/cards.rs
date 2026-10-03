@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use tauri::State;
-use writer_core::cards::{self, Appearance, Card, CardSummary, CardType};
+use writer_core::cards::{self, Appearances, Card, CardSummary, CardType};
 use writer_core::trash::{self, TrashItem};
 
 use crate::error::{Res, fail};
@@ -43,7 +43,7 @@ pub async fn card_trash(
 
 /// Chapters where a card's names appear.
 #[tauri::command]
-pub async fn card_appearances(root: String, card_id: String) -> Res<Vec<Appearance>> {
+pub async fn card_appearances(root: String, card_id: String) -> Res<Appearances> {
     cards::appearances(Path::new(&root), &card_id).map_err(fail)
 }
 

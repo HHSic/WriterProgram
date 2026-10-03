@@ -27,6 +27,7 @@ mod scan;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use merge::project_copies;
 pub use merge::{merge_project, merge_project_copies, reconcile, restore_project_file};
 pub(crate) use scan::scan;
 pub use scan::{device_of, is_id};

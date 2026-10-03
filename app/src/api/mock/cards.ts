@@ -90,9 +90,14 @@ export const cardMethods = {
     const c = p.cards.get(cardId);
     if (!c) throw '카드를 찾을 수 없음';
     const re = namesRegex(cardNames(c));
-    if (!re) return [];
+    if (!re) return { places: [], skipped: 0 };
     const out: Appearance[] = [];
+    let skipped = 0;
     for (const docId of p.parts.flatMap((x) => x.docs)) {
+      if (doc(p, docId).broken) {
+        skipped += 1;
+        continue;
+      }
       const samples: SearchMatch[] = [];
       let count = 0;
       for (const { block, text } of paragraphTexts(doc(p, docId).body)) {
@@ -112,7 +117,7 @@ export const cardMethods = {
       }
       if (count) out.push({ docId, count, samples });
     }
-    return out;
+    return { places: out, skipped };
   },
   async cardCounts(root) {
     const p = project(root);

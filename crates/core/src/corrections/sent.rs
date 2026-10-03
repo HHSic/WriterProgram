@@ -116,7 +116,7 @@ pub fn send(
 ) -> Result<Exchange> {
     let docs = items
         .iter()
-        .map(|item| doc::load(root, &item.doc_id))
+        .map(|item| export::load_item(root, item))
         .collect::<Result<Vec<_>>>()?;
     let bodies: Vec<Vec<Block>> = docs.iter().map(|d| d.body.clone()).collect();
     let paths = export::export_bodies(root, items, &bodies, opts, format, kind, dest, per_doc)?;

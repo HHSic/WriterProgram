@@ -35,3 +35,9 @@ export interface Appearance {
   count: number;
   samples: SearchMatch[];
 }
+
+/** Where a card's names appear, and how many chapters could not be read. */
+export interface Appearances {
+  places: Appearance[];
+  skipped: number;
+}

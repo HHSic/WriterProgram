@@ -25,7 +25,7 @@ use crate::count::{Counts, count_blocks};
 use crate::layout::PageMetrics;
 use crate::markup::{Block, parse_body, write_body};
 use crate::project::{MANUSCRIPT_DIR, PLANNING_DIR};
-use crate::store::{atomic_write, now_iso, read_text, rev_of};
+use crate::store::{atomic_write, now_iso, rev_of};
 use crate::{Error, Result, journal, project, snapshot};
 
 /// Status values. Common ones first, then web novel, then print.
@@ -237,12 +237,69 @@ pub fn locate(root: &Path, id: &str) -> Result<(Section, PathBuf)> {
     Err(Error::NotFound("문서를 찾을 수 없음".into()))
 }
 
+/// Why a document file that is there cannot be read as it is
+/// (docs/safety-design.md S4). 고쳐 열기 (mend.rs) mends each of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Damage {
+    /// Not UTF-8: saved as ANSI (EUC-KR) by Notepad, or as UTF-16.
+    Encoding,
+    /// Nothing in it, or only blank lines.
+    Empty,
+    /// The front matter is opened (`---` and `key: value` lines) but never closed.
+    FrontMatter,
+}
+
+impl Damage {
+    /// The reason in the writer's words.
+    pub fn message(self) -> &'static str {
+        match self {
+            Damage::Encoding => "다른 글자 방식(EUC-KR 등)으로 저장된 파일",
+            Damage::Empty => "내용이 없는 빈 파일",
+            Damage::FrontMatter => "제목 등 회차 정보 부분이 깨진 파일",
+        }
+    }
+}
+
+/// Whether a line looks like a front matter entry (`title: "…"`).
+pub(crate) fn is_front_line(line: &str) -> bool {
+    let Some((key, _)) = line.split_once(':') else {
+        return false;
+    };
+    let mut chars = key.chars();
+    chars.next().is_some_and(|c| c.is_ascii_alphabetic())
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// A document file's text (byte order mark dropped, LF line ends), or why
+/// it cannot be read as it is.
+pub fn check_bytes(bytes: &[u8]) -> std::result::Result<String, Damage> {
+    let text = std::str::from_utf8(bytes).map_err(|_| Damage::Encoding)?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let text = text.replace("\r\n", "\n");
+    if text.trim().is_empty() {
+        return Err(Damage::Empty);
+    }
+    if let Some(rest) = text.strip_prefix("---\n")
+        && rest.lines().next().is_some_and(is_front_line)
+        && split_front_matter(&text).0.is_none()
+    {
+        return Err(Damage::FrontMatter);
+    }
+    Ok(text)
+}
+
+/// Reads a document file. One that is empty, in another encoding or with a
+/// broken front matter is an error naming the damage (`Damage`), so it is
+/// never taken for an empty chapter.
 pub fn read_doc(path: &Path) -> Result<DocFile> {
     let fallback = path
         .file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_default();
-    Ok(parse_doc(&read_text(path)?, &fallback))
+    let bytes = std::fs::read(path).map_err(|e| Error::io(path, e))?;
+    let text = check_bytes(&bytes).map_err(|d| Error::format(path, d.message()))?;
+    Ok(parse_doc(&text, &fallback))
 }
 
 pub fn write_doc_file(path: &Path, doc: &DocFile) -> Result<()> {

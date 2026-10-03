@@ -12,9 +12,14 @@ export const searchMethods = {
     const ids = query.docIds ?? [...p.parts.flatMap((x) => x.docs), ...p.planning];
     const docs: { docId: string; matches: SearchMatch[] }[] = [];
     let total = 0;
+    let skipped = 0;
     for (const docId of ids) {
       const d = p.docs.get(docId);
       if (!d) continue;
+      if (d.broken) {
+        skipped += 1;
+        continue;
+      }
       const matches: SearchMatch[] = [];
       (d.body.content ?? []).forEach((node, block) => {
         if (node.type !== 'paragraph') return;
@@ -36,7 +41,7 @@ export const searchMethods = {
         total += matches.length;
       }
     }
-    return { docs, total, truncated: false };
+    return { docs, total, truncated: false, skipped };
   },
   async replaceAll(root, query, replacement) {
     const p = project(root);
@@ -45,9 +50,14 @@ export const searchMethods = {
     const ids = query.docIds ?? [...p.parts.flatMap((x) => x.docs), ...p.planning];
     const out: { docId: string; count: number; snapshot: SnapshotInfo }[] = [];
     let replaced = 0;
+    let skipped = 0;
     for (const docId of ids) {
       const d = p.docs.get(docId);
       if (!d) continue;
+      if (d.broken) {
+        skipped += 1;
+        continue;
+      }
       let count = 0;
       const next = clone(d.body);
       for (const node of next.content ?? []) {
@@ -65,6 +75,6 @@ export const searchMethods = {
       replaced += count;
       out.push({ docId, count, snapshot });
     }
-    return { replaced, docs: out };
+    return { replaced, docs: out, skipped };
   },
 } satisfies Partial<Backend>;

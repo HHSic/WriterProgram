@@ -7,19 +7,26 @@
 //!   planning/<id>.md    planning documents (기획)
 //!   .snapshots/<id>/    records (기록) per document
 //!   .trash/             deleted documents, kept 30 days
+//!   .backup/            project.json of each of the last 7 days (backup.rs)
 //! ```
 //!
 //! Parts (부) exist only in `project.json`: moving a chapter between parts
 //! never moves its file, which keeps folder sync simple.
 
+mod backup;
 mod create;
 mod overview;
+mod recover;
 mod relocate;
 mod size;
 mod structure;
 
+pub use backup::{BACKUP_DAYS, BACKUP_DIR, Backup, latest_backup};
 pub use create::{NewProject, create};
-pub use overview::{DocSummary, Overview, PartView, ProjectInfo, estimate_pages, open, overview};
+pub use overview::{
+    DocSummary, Overview, PartView, ProjectInfo, UnreadableDoc, estimate_pages, open, overview,
+};
+pub use recover::{Choice, Recovery, Way, recover, recovery};
 pub use relocate::{Moved, relocate};
 pub use size::{JOURNAL_DIR, Sizes, disk_free, sizes, tidy_records};
 pub(crate) use structure::place_docs;
@@ -34,7 +41,7 @@ use serde_json::{Map, Value};
 
 use crate::cards::{self, CardType};
 use crate::format::{self, ManuscriptFormat};
-use crate::store::{atomic_write, new_id, read_text};
+use crate::store::{atomic_write, new_id};
 use crate::{Error, Result};
 
 pub const PROJECT_FILE: &str = "project.json";
@@ -182,6 +189,13 @@ fn new_part(title: &str) -> Part {
     }
 }
 
+/// Reads a project file's content; the reason (for logs) when it is not one.
+pub(crate) fn parse(bytes: &[u8]) -> std::result::Result<Project, String> {
+    let text = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    serde_json::from_str(text).map_err(|e| e.to_string())
+}
+
 pub fn load(root: &Path) -> Result<Project> {
     let path = root.join(PROJECT_FILE);
     if !path.is_file() {
@@ -189,9 +203,14 @@ pub fn load(root: &Path) -> Result<Project> {
             "작품 폴더가 아님 (project.json이 없음)".into(),
         ));
     }
-    let text = read_text(&path)?;
-    let project: Project =
-        serde_json::from_str(&text).map_err(|e| Error::format(&path, e.to_string()))?;
+    let bytes = std::fs::read(&path).map_err(|e| Error::io(&path, e))?;
+    let project = parse(&bytes).map_err(|detail| {
+        eprintln!("project.json is damaged ({}): {detail}", path.display());
+        Error::ProjectDamaged {
+            path: path.clone(),
+            detail,
+        }
+    })?;
     if project.format > FORMAT_VERSION {
         return Err(Error::Invalid(
             "더 새로운 버전에서 만든 작품이라 열 수 없음. 앱을 업데이트해 주세요.".into(),
@@ -200,10 +219,16 @@ pub fn load(root: &Path) -> Result<Project> {
     Ok(project)
 }
 
+/// Writes `project.json`, and the same content as today's backup
+/// (backup.rs). A backup that cannot be written does not fail the save.
 pub fn save(root: &Path, project: &Project) -> Result<()> {
     let mut text = serde_json::to_string_pretty(project).expect("project serializes");
     text.push('\n');
-    atomic_write(&root.join(PROJECT_FILE), text.as_bytes())
+    atomic_write(&root.join(PROJECT_FILE), text.as_bytes())?;
+    if let Err(e) = backup::keep(root, text.as_bytes()) {
+        eprintln!("project.json backup not written: {e}");
+    }
+    Ok(())
 }
 
 /// `name` inside `parent`, or `name (2)`, `name (3)` … when it is taken.

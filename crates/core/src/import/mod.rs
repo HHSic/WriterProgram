@@ -22,6 +22,7 @@ mod word;
 mod xml;
 
 pub use page::PageSetup;
+pub(crate) use text::decode;
 
 use std::fs;
 use std::path::{Path, PathBuf};
