@@ -33,6 +33,7 @@ import type { Applied, Decisions, Exchange, ExchangeInfo, Review } from './excha
 import type { FormatCatalog, ManuscriptFormat, UserPreset } from './format';
 import type { ImportOptions, ImportPreview, ImportSpec, Imported } from './import';
 import type {
+  AnchorOccasion,
   AnchorResult,
   JournalEvent,
   JournalReport,
@@ -157,7 +158,13 @@ export interface Backend {
   /** This device's creation journal settings (its id is made the first time). */
   journalSettings(): Promise<JournalSettings>;
   /** Turns the journal on or off on this device, notes the first-use notice as seen, or allows daily time stamps. */
-  journalSet(patch: { enabled?: boolean; noticed?: boolean; anchor?: boolean }): Promise<JournalSettings>;
+  journalSet(patch: {
+    enabled?: boolean;
+    noticed?: boolean;
+    anchor?: boolean;
+    anchorAsk?: boolean;
+    anchorNotify?: boolean;
+  }): Promise<JournalSettings>;
   /** A writing session or paste for the journal; ignored while it is off. */
   journalEvent(root: string, event: JournalEvent): Promise<void>;
   journalSummary(root: string): Promise<JournalSummary>;
@@ -166,7 +173,7 @@ export interface Backend {
   /** Writes the journal's saves still gathering: for one project, or for all (null) when the window closes. */
   journalFlush(root: string | null): Promise<void>;
   /** Sends the day's fingerprint to the time-stamping authorities when due (or now, `force`). */
-  journalAnchor(root: string, force: boolean): Promise<AnchorResult>;
+  journalAnchor(root: string, occasion: AnchorOccasion): Promise<AnchorResult>;
   /** The summary sentence a certificate would open with. */
   proofPreview(root: string, options: ProofOptions): Promise<string>;
   /** Makes 창작 과정 증명서 and 증명자료.json in a new folder inside `folder`. */

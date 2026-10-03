@@ -30,8 +30,12 @@ export function anchorResultText(r: AnchorResult): string {
       return `${r.signed.join(', ')}에서 날짜 증명을 받았습니다.`;
     case 'unchanged':
       return '지난 날짜 증명 뒤로 바뀐 것이 없어 새로 받지 않았습니다.';
-    case 'doneToday':
-      return '오늘은 이미 날짜 증명을 받았습니다.';
+    case 'notYet':
+      return '오늘 받은 날짜 증명 뒤로 쓴 양이 적어 아직 받지 않았습니다.';
+    case 'enough':
+      return '오늘은 날짜 증명을 충분히 받았습니다. 내일 다시 받습니다.';
+    case 'ask':
+      return '날짜 증명을 받을 때가 되었습니다.';
     case 'noJournal':
       return '아직 기록이 없어 증명할 것이 없습니다.';
     case 'journalOff':

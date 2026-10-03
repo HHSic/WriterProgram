@@ -9,7 +9,7 @@ import { refreshCardCounts } from './cards';
 import { loadNotes } from './notes';
 import { startWatching, stopWatching } from './devices';
 import { loadLink, stopAutoSync } from './drives';
-import { loadJournal } from './journal';
+import { loadJournal, stampOnClosing } from './journal';
 import { loadAi } from './ai';
 import { offerRescues } from './rescue';
 
@@ -112,7 +112,10 @@ export async function leaveProject() {
   if (!(await saveEverything(true))) return;
   // The creation journal's saves still gathering go in as the project closes.
   const root = get().overview?.root;
-  if (root) await api.journalFlush(root).catch(() => {});
+  if (root) {
+    await api.journalFlush(root).catch(() => {});
+    await stampOnClosing(root);
+  }
   stopWatching();
   stopAutoSync();
   set({

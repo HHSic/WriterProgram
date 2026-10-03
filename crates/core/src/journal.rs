@@ -174,10 +174,16 @@ pub struct Settings {
     /// The writer has been told the journal is kept (spec §7).
     #[serde(default)]
     pub noticed: bool,
-    /// Whether a fingerprint may go to the time-stamping authorities once a
-    /// day (시각 고정, `anchor` module); none until the writer is asked.
+    /// Whether a fingerprint may go to the time-stamping authorities
+    /// (시각 고정, `anchor` module); none until the writer is asked.
     #[serde(default)]
     pub anchor: Option<bool>,
+    /// Ask the writer each time a stamp is due instead of taking it.
+    #[serde(default)]
+    pub anchor_ask: bool,
+    /// Say so (a small note in the corner) when a stamp came.
+    #[serde(default = "on")]
+    pub anchor_notify: bool,
 }
 
 fn on() -> bool {
@@ -207,6 +213,8 @@ pub fn load_settings(path: &Path) -> Result<Settings> {
         enabled: true,
         noticed: false,
         anchor: None,
+        anchor_ask: false,
+        anchor_notify: true,
     };
     save_settings(path, &settings)?;
     Ok(settings)

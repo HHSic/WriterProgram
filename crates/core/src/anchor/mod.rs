@@ -207,26 +207,69 @@ pub enum Skip {
     NoJournal,
     /// Nothing changed since the last stamp.
     Unchanged,
-    /// This device already stamped today.
-    DoneToday,
+    /// A regular check, and too little written since today's last stamp.
+    NotYet,
+    /// This device has stamped `MOST_A_DAY` times today.
+    Enough,
 }
 
-/// What to send for `root` now, or why nothing. `force` (the writer asked)
-/// skips the once-a-day rule but not "nothing changed".
+/// What sets off a stamp (docs/creation-proof.md §4.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Occasion {
+    /// The regular look while a project is open: the first change of a new
+    /// day, or `WRITTEN_ENOUGH` characters since the last stamp.
+    Check,
+    /// A moment worth a stamp of its own: a chapter marked finished or
+    /// published, a manuscript sent or exported, the project or app closing.
+    Moment,
+    /// The writer asked for one now: no daily limit.
+    Now,
+}
+
+/// Characters written since the last stamp that make a regular check stamp.
+pub const WRITTEN_ENOUGH: u64 = 3_000;
+
+/// Stamps a device takes in one day, besides the ones the writer asks for:
+/// the public authorities are not to be asked too often.
+pub const MOST_A_DAY: usize = 4;
+
+/// What to send for `root` now, or why nothing. Nothing is sent when
+/// nothing changed since the last stamp, whatever the occasion.
 pub fn prepare(
     root: &Path,
     device: &str,
-    force: bool,
+    occasion: Occasion,
 ) -> Result<std::result::Result<Pending, Skip>> {
     // Saves still gathering go in first, so the journal leaf covers them.
     journal::flush(root);
-    prepare_at(root, device, force, Utc::now())
+    prepare_at(root, device, occasion, Utc::now())
+}
+
+/// Characters this device added in saves after `since` (the journal's save
+/// lines: never the text, only how much it grew).
+fn written_since(root: &Path, device: &str, since: &str) -> Result<u64> {
+    let since = parse_iso(since);
+    let journals = journal::read_all(root)?;
+    let Some((_, lines)) = journals.iter().find(|(d, _)| d == device) else {
+        return Ok(0);
+    };
+    Ok(lines
+        .iter()
+        .filter_map(|l| serde_json::from_slice::<Value>(l).ok())
+        .filter(|v| v.get("kind").and_then(Value::as_str) == Some("save"))
+        .filter(|v| {
+            let time = v.get("time").and_then(Value::as_str).and_then(parse_iso);
+            matches!((time, since), (Some(t), Some(s)) if t > s)
+        })
+        .filter_map(|v| v.get("added").and_then(Value::as_u64))
+        .sum())
 }
 
 fn prepare_at(
     root: &Path,
     device: &str,
-    force: bool,
+    occasion: Occasion,
     now: DateTime<Utc>,
 ) -> Result<std::result::Result<Pending, Skip>> {
     let leaves = leaves(root)?;
@@ -239,12 +282,18 @@ fn prepare_at(
         return Ok(Err(Skip::Unchanged));
     }
     let today = now.with_timezone(&Local).date_naive();
-    let done_today = past.iter().any(|r| {
-        r.device == device
-            && parse_iso(&r.time).is_some_and(|t| t.with_timezone(&Local).date_naive() == today)
-    });
-    if done_today && !force {
-        return Ok(Err(Skip::DoneToday));
+    let local_day = |r: &Record| parse_iso(&r.time).map(|t| t.with_timezone(&Local).date_naive());
+    let mine: Vec<&Record> = past.iter().filter(|r| r.device == device).collect();
+    let today_count = mine.iter().filter(|r| local_day(r) == Some(today)).count();
+    if occasion != Occasion::Now && today_count >= MOST_A_DAY {
+        return Ok(Err(Skip::Enough));
+    }
+    if occasion == Occasion::Check
+        && let Some(last) = mine.iter().max_by(|a, b| a.time.cmp(&b.time))
+        && local_day(last) == Some(today)
+        && written_since(root, device, &last.time)? < WRITTEN_ENOUGH
+    {
+        return Ok(Err(Skip::NotYet));
     }
     let time = to_iso(now);
     let seed = sha256(format!("{}{time}{}", hex(&merkle), crate::store::new_id()).as_bytes());

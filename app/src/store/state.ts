@@ -121,6 +121,18 @@ export interface Toast {
   action?: { label: string; run: () => void };
 }
 
+/** A small note in the bottom-right corner (components/CornerNote.tsx). */
+export interface CornerNote {
+  text: string;
+  actions?: { label: string; run: () => void }[];
+  /** Stays until answered or closed (a question). */
+  stay?: boolean;
+  /** How long it shows when it does not stay; 2.5 seconds by default. */
+  ms?: number;
+  /** Closed with ✕ rather than answered. */
+  onClose?: () => void;
+}
+
 interface AppState {
   overview: Overview | null;
   /** The middle column: one pane of tabs, or two side by side (분할). */
@@ -147,6 +159,7 @@ interface AppState {
   view: ViewSettings;
   dialog: Dialog | null;
   toast: Toast | null;
+  cornerNote: CornerNote | null;
   /** Bumped to reload the open document from disk (after going back to a record). */
   docVersion: number;
   /** Bumped when the records of the open document change. */
@@ -225,6 +238,7 @@ export const useApp = create<AppState>(() => ({
   view: loadView(),
   dialog: null,
   toast: null,
+  cornerNote: null,
   docVersion: 0,
   recordsVersion: 0,
   exchangesVersion: 0,

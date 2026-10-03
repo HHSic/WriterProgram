@@ -4,7 +4,17 @@
 import type { Backend, JournalSettings, JournalSummary } from '../types';
 import { now, project, wait } from './state';
 
-const settings: JournalSettings = { device: 'mockdevice01', enabled: true, noticed: false, anchor: null };
+/** Stamps taken today per project, for the daily limit. */
+const anchorsToday = new Map<string, { day: string; count: number }>();
+
+const settings: JournalSettings = {
+  device: 'mockdevice01',
+  enabled: true,
+  noticed: false,
+  anchor: null,
+  anchorAsk: false,
+  anchorNotify: true,
+};
 const journals = new Map<string, JournalSummary>();
 
 function journal(root: string): JournalSummary {
@@ -60,6 +70,8 @@ export const journalMethods = {
     if (patch.enabled !== undefined) settings.enabled = patch.enabled;
     if (patch.noticed !== undefined) settings.noticed = patch.noticed;
     if (patch.anchor !== undefined) settings.anchor = patch.anchor;
+    if (patch.anchorAsk !== undefined) settings.anchorAsk = patch.anchorAsk;
+    if (patch.anchorNotify !== undefined) settings.anchorNotify = patch.anchorNotify;
     return { ...settings };
   },
   async journalEvent(root, event) {
@@ -74,15 +86,19 @@ export const journalMethods = {
     return { ok: true, files: j.devices ? [{ device: settings.device, lines: j.thisDevice, firstBad: null }] : [] };
   },
   async journalFlush() {},
-  async journalAnchor(root, force) {
+  // Like writer_core::anchor: a regular check stamps once on a new day (the
+  // stand-in keeps no written-amount), at most four a day unless asked now.
+  async journalAnchor(root, occasion) {
     if (settings.anchor !== true) return { state: 'notAllowed', signed: [] };
     if (!settings.enabled) return { state: 'journalOff', signed: [] };
     const j = journal(root);
     if (!j.devices) return { state: 'noJournal', signed: [] };
     const today = new Date().toDateString();
-    if (!force && j.lastAnchor && new Date(j.lastAnchor).toDateString() === today) {
-      return { state: 'doneToday', signed: [] };
-    }
+    const stampedToday = (anchorsToday.get(root)?.day === today && anchorsToday.get(root)?.count) || 0;
+    if (occasion !== 'now' && stampedToday >= 4) return { state: 'enough', signed: [] };
+    if (occasion === 'check' && stampedToday > 0) return { state: 'notYet', signed: [] };
+    if (settings.anchorAsk && occasion !== 'now') return { state: 'ask', signed: [] };
+    anchorsToday.set(root, { day: today, count: stampedToday + 1 });
     await wait();
     j.anchors += 3;
     j.lastAnchor = now();

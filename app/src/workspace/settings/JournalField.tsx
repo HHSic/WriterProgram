@@ -1,13 +1,21 @@
 // 창작 일지 in 작품 설정: this device's on/off switch, what the journal holds
-// so far, a check that nothing in it was changed, the daily time stamp
-// (날짜 증명), keeping each day's last state (창작 과정 보관) and the way to
+// so far, a check that nothing in it was changed, the time stamps (날짜
+// 증명: 자동 / 물어보고 받기 / 받지 않기, and a word when one came), keeping each day's last state (창작 과정 보관) and the way to
 // the certificate (docs/creation-proof.md).
 
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
 import type { JournalSettings, JournalSummary } from '../../api/types';
 import { anchorResultText, anchorText, journalCheckText, journalSummaryText } from '../../lib/journalText';
-import { anchorNow, openDialog, setAnchorAllowed, setJournalEnabled, toastError } from '../../store';
+import { anchorNow, openDialog, setAnchorWay, setJournalEnabled, toastError } from '../../store';
+
+type AnchorWay = 'auto' | 'ask' | 'off';
+
+const ANCHOR_WAYS: { id: AnchorWay; label: string }[] = [
+  { id: 'auto', label: '자동으로 받기' },
+  { id: 'ask', label: '받을 때마다 묻기' },
+  { id: 'off', label: '받지 않기' },
+];
 
 export function JournalField({
   root,
@@ -52,10 +60,13 @@ export function JournalField({
     if (next) setSettings(next);
   };
 
-  const allowAnchor = async (allowed: boolean) => {
-    const next = await setAnchorAllowed(allowed);
+  const way: AnchorWay = settings?.anchor !== true ? 'off' : settings.anchorAsk ? 'ask' : 'auto';
+  const changeAnchor = async (patch: { anchor?: boolean; anchorAsk?: boolean; anchorNotify?: boolean }) => {
+    const next = await setAnchorWay(patch);
     if (next) setSettings(next);
   };
+  const pickWay = (picked: AnchorWay) =>
+    void changeAnchor(picked === 'off' ? { anchor: false } : { anchor: true, anchorAsk: picked === 'ask' });
 
   const verify = async () => {
     if (!settings || checking) return;
@@ -73,7 +84,7 @@ export function JournalField({
   const anchor = async () => {
     if (anchoring) return;
     setAnchoring(true);
-    const result = await anchorNow(root, true);
+    const result = await anchorNow(root, 'now');
     setAnchoring(false);
     setAnchorNote(result ? anchorResultText(result) : '날짜 증명을 받지 못했습니다. 나중에 다시 시도합니다.');
     void loadSummary();
@@ -103,19 +114,28 @@ export function JournalField({
       )}
       {check && <small className={check.ok ? 'hint' : 'warn-text'}>{check.text}</small>}
 
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={settings.anchor === true}
-          disabled={!settings.enabled}
-          onChange={(e) => void allowAnchor(e.target.checked)}
-        />
-        하루 한 번 날짜 증명 받기
-      </label>
-      <small className="hint">
-        그날까지 쓴 기록의 지문(32바이트)만 공개 시각 인증 기관에 보내, 그날 이 원고가 있었다는 증명을 받습니다. 원고 내용은 보내지
-        않습니다. 이 기기에만 적용됩니다.
-      </small>
+      <fieldset className="field" disabled={!settings.enabled}>
+        <legend className="field-label">날짜 증명</legend>
+        <div className="segmented">
+          {ANCHOR_WAYS.map((w) => (
+            <label key={w.id} className={way === w.id ? 'on' : ''}>
+              <input type="radio" name="anchor-way" checked={way === w.id} onChange={() => pickWay(w.id)} />
+              {w.label}
+            </label>
+          ))}
+        </div>
+        <small className="hint">
+          지금까지 쓴 기록의 지문(32바이트)만 공개 시각 인증 기관에 보내, 그때 이 원고가 있었다는 증명을 받습니다. 원고 내용은 보내지
+          않습니다. 하루가 바뀐 뒤 처음 쓸 때, 지난 증명 뒤로 3,000자 넘게 썼을 때, 회차를 완료·연재됨으로 바꿀 때, 편집자에게 보내거나
+          내보낼 때, 작품을 닫을 때 받고, 하루 네 번까지만 받습니다. 이 기기에만 적용됩니다.
+        </small>
+        {way !== 'off' && (
+          <label className="check">
+            <input type="checkbox" checked={settings.anchorNotify} onChange={(e) => void changeAnchor({ anchorNotify: e.target.checked })} />
+            받으면 오른쪽 아래에 잠깐 알리기
+          </label>
+        )}
+      </fieldset>
       {settings.anchor === true && summary && (
         <div className="row wrap">
           <span className="grow">{anchorNote ?? anchorText(summary)}</span>

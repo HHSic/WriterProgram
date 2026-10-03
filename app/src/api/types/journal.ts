@@ -7,9 +7,16 @@ export interface JournalSettings {
   enabled: boolean;
   /** The writer has seen the first-use notice. */
   noticed: boolean;
-  /** Daily time stamps (시각 고정) allowed on this device; null until asked. */
+  /** Time stamps (시각 고정, 날짜 증명) allowed on this device; null until asked. */
   anchor: boolean | null;
+  /** 물어보고 받기: ask each time one is due instead of taking it. */
+  anchorAsk: boolean;
+  /** Say so (a small note in the corner) when one came. */
+  anchorNotify: boolean;
 }
+
+/** What sets off a time stamp (writer_core::anchor::Occasion; `closing` waits only a few seconds). */
+export type AnchorOccasion = 'check' | 'moment' | 'closing' | 'now';
 
 /** What the editor reports. Counts only, never text. */
 export type JournalEvent =
@@ -51,7 +58,7 @@ export interface JournalReport {
 
 /** What a time stamp request came to (시각 고정, commands/anchor.rs). */
 export interface AnchorResult {
-  state: 'signed' | 'notAllowed' | 'journalOff' | 'noJournal' | 'unchanged' | 'doneToday' | 'offline';
+  state: 'signed' | 'ask' | 'notAllowed' | 'journalOff' | 'noJournal' | 'unchanged' | 'notYet' | 'enough' | 'offline';
   /** Authorities that signed. */
   signed: string[];
 }

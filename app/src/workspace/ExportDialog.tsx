@@ -15,7 +15,7 @@ import { fileSafe, num } from '../lib/format';
 import { loadPaste, previewLines, savePaste, writeClipboard } from '../lib/paste';
 import { PLATFORMS, defaultPaste, platformOf, presetOf, type PasteHtml } from '../lib/platforms';
 import { UNTITLED, docNoun, docNumber, formatName, withObject } from '../lib/labels';
-import { allManuscript, closeDialog, noteSent, openDialog, saveEverything, showToast, toastError, useApp } from '../store';
+import { allManuscript, closeDialog, noteManuscriptOut, noteSent, openDialog, saveEverything, showToast, toastError, useApp } from '../store';
 
 type Scope = 'current' | 'all' | 'pick';
 type Target = FileKind | 'txt' | 'clipboard';
@@ -143,6 +143,7 @@ export function ExportDialog({ toEditor = false, docIds }: { toEditor?: boolean;
       if (sending) {
         const ex = await api.exchangeSend(ov.root, items, { includeTitles, sceneBreak }, formatFor(formatChoice), target, dest, many);
         noteSent();
+        noteManuscriptOut();
         closeDialog();
         showToast({
           text: `편집자에게 보낼 파일을 만들었습니다${ex.files.length > 1 ? ` (${ex.files.length}개)` : ''}. 교정본을 받으면 ‘교정본 주고받기’에서 가져오세요.`,
@@ -154,6 +155,7 @@ export function ExportDialog({ toEditor = false, docIds }: { toEditor?: boolean;
         target === 'txt'
           ? await api.exportTxt(ov.root, items, { includeTitles, blankLineBetween: blankLine, sceneBreak }, dest, many)
           : await api.exportFile(ov.root, items, { includeTitles, sceneBreak }, formatFor(formatChoice), target, dest, many);
+      noteManuscriptOut();
       closeDialog();
       showToast({
         text: files.length > 1 ? `내보냄 · 파일 ${files.length}개` : '내보냄',

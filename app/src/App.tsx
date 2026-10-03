@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { api } from './api';
 import { MenuHost } from './components/Menu';
+import { CornerNote } from './components/CornerNote';
 import { ToastHost } from './components/ToastHost';
 import { installJournal } from './editor/journal';
 import { applyColors } from './lib/colors';
 import { StartScreen } from './screens/StartScreen';
-import { checkForUpdateDaily, confirmClose, useApp } from './store';
+import { checkForUpdateDaily, confirmClose, stampOnClosing, useApp } from './store';
 import { CloseAskDialog } from './workspace/CloseAskDialog';
 import { DialogHost } from './workspace/dialogs';
 import { Workspace } from './workspace/Workspace';
@@ -58,6 +59,9 @@ export function App() {
     api.onCloseRequested(async () => {
       if (!(await confirmClose())) return false;
       await api.journalFlush(null).catch(() => {});
+      // The day's last writing gets its date proof before the app goes.
+      const root = useApp.getState().overview?.root;
+      if (root) await stampOnClosing(root);
       return true;
     });
     installJournal();
@@ -73,6 +77,7 @@ export function App() {
       <CloseAskDialog />
       <MenuHost />
       <ToastHost />
+      <CornerNote />
       {busy && (
         <div className="busy-cover" role="status" aria-live="polite">
           <div className="busy-box">{busy}</div>

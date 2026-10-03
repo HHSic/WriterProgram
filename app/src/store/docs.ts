@@ -6,6 +6,7 @@ import { get, root } from './state';
 import { allManuscript, findDoc, patchSummary, saveEverything, showToast, toastError } from './ui';
 import { dropEverywhere, openTarget } from './tabs';
 import { refreshOverview } from './project';
+import { noteStatusChange } from './journal';
 
 // ---------------------------------------------------------------------------
 // Documents
@@ -44,6 +45,7 @@ export async function setStatus(id: string, status: DocStatus) {
   try {
     await api.docUpdateMeta(root(), id, { status });
     patchSummary(id, { status });
+    noteStatusChange(status);
   } catch (e) {
     toastError('상태를 바꾸지 못함', e);
   }

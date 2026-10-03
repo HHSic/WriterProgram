@@ -20,8 +20,12 @@ pub struct JournalSettings {
     device: String,
     enabled: bool,
     noticed: bool,
-    /// Daily time stamps allowed; null until the writer has been asked.
+    /// Time stamps allowed; null until the writer has been asked.
     anchor: Option<bool>,
+    /// Ask before each stamp instead of taking it.
+    anchor_ask: bool,
+    /// Say so when a stamp came.
+    anchor_notify: bool,
 }
 
 impl From<&Settings> for JournalSettings {
@@ -31,6 +35,8 @@ impl From<&Settings> for JournalSettings {
             enabled: s.enabled,
             noticed: s.noticed,
             anchor: s.anchor,
+            anchor_ask: s.anchor_ask,
+            anchor_notify: s.anchor_notify,
         }
     }
 }
@@ -80,6 +86,8 @@ pub async fn journal_set(
     enabled: Option<bool>,
     noticed: Option<bool>,
     anchor: Option<bool>,
+    anchor_ask: Option<bool>,
+    anchor_notify: Option<bool>,
 ) -> Res<JournalSettings> {
     let _write = state.write();
     let path = journal_file(&app)?;
@@ -92,6 +100,12 @@ pub async fn journal_set(
     }
     if anchor.is_some() {
         settings.anchor = anchor;
+    }
+    if let Some(ask) = anchor_ask {
+        settings.anchor_ask = ask;
+    }
+    if let Some(notify) = anchor_notify {
+        settings.anchor_notify = notify;
     }
     journal::save_settings(&path, &settings).map_err(fail)?;
     journal::set_device(settings.active_device());

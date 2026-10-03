@@ -345,46 +345,141 @@ fn finishing_keeps_good_replies_and_journals_them() {
 
     // Anchor lines alone change nothing: no new stamp is needed.
     assert_eq!(
-        prepare(&root, DEV1, true).unwrap().unwrap_err(),
+        prepare(&root, DEV1, Occasion::Now).unwrap().unwrap_err(),
         Skip::Unchanged
     );
     assert!(token_bytes(&root, "../project.json").is_err());
 }
 
 #[test]
-fn nothing_is_sent_without_a_journal_or_twice_a_day() {
+fn nothing_is_sent_without_a_journal() {
     let dir = tempfile::tempdir().unwrap();
     let root = sample(dir.path());
     fs::remove_dir_all(root.join(".journal")).unwrap();
     assert_eq!(
-        prepare(&root, DEV1, false).unwrap().unwrap_err(),
+        prepare(&root, DEV1, Occasion::Now).unwrap().unwrap_err(),
         Skip::NoJournal
     );
+}
 
-    let root = anchored(&dir.path().join("b"));
-    // A new save after the stamp: due again, but not on the same day.
-    append_at(
-        &root,
-        DEV1,
-        &Entry::Paste(Paste {
-            doc: DOCS[0].into(),
-            chars: 100,
-            outside: false,
-        }),
-        "2026-09-05T04:00:00.000Z",
-    )
-    .unwrap();
+/// A save line for chapter 1 that grew it by `added` characters.
+fn grew(root: &Path, added: u32, time: &str) {
+    let save = Entry::Save(Save {
+        doc: DOCS[0].into(),
+        body: crate::anchor::tests::body_print(TEXTS[0]),
+        chars: 100 + added,
+        added,
+        removed: 0,
+        saves: None,
+        since: None,
+    });
+    append_at(root, DEV1, &save, time).unwrap();
+}
+
+#[test]
+fn regular_checks_wait_for_enough_writing_or_a_new_day() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = anchored(dir.path());
     let asked: DateTime<Utc> = parse_iso(ASKED).unwrap();
     let later = asked + chrono::Duration::hours(1);
+    // A little written after today's stamp: a regular check waits…
+    grew(&root, 1_200, "2026-09-05T03:20:00.000Z");
     assert_eq!(
-        prepare_at(&root, DEV1, false, later).unwrap().unwrap_err(),
-        Skip::DoneToday
+        prepare_at(&root, DEV1, Occasion::Check, later)
+            .unwrap()
+            .unwrap_err(),
+        Skip::NotYet
     );
-    assert!(prepare_at(&root, DEV1, true, later).unwrap().is_ok());
+    // …but a moment (a chapter finished, a manuscript sent) or the writer
+    // asking does not.
+    assert!(
+        prepare_at(&root, DEV1, Occasion::Moment, later)
+            .unwrap()
+            .is_ok()
+    );
+    assert!(
+        prepare_at(&root, DEV1, Occasion::Now, later)
+            .unwrap()
+            .is_ok()
+    );
     // Another device has not stamped today.
-    assert!(prepare_at(&root, DEV2, false, later).unwrap().is_ok());
+    assert!(
+        prepare_at(&root, DEV2, Occasion::Check, later)
+            .unwrap()
+            .is_ok()
+    );
+    // Enough written since the stamp: the check goes ahead.
+    grew(&root, 1_900, "2026-09-05T03:40:00.000Z");
+    assert!(
+        prepare_at(&root, DEV1, Occasion::Check, later)
+            .unwrap()
+            .is_ok()
+    );
+    // Saves from before the stamp do not count toward the next one.
+    let dir2 = tempfile::tempdir().unwrap();
+    let root2 = anchored(dir2.path());
+    grew(&root2, 900, "2026-09-05T03:30:00.000Z");
+    assert_eq!(
+        prepare_at(&root2, DEV1, Occasion::Check, later)
+            .unwrap()
+            .unwrap_err(),
+        Skip::NotYet
+    );
+    // The next day, any change is enough.
     let next_day = asked + chrono::Duration::days(1);
-    let p = prepare_at(&root, DEV1, false, next_day).unwrap().unwrap();
+    let p = prepare_at(&root2, DEV1, Occasion::Check, next_day)
+        .unwrap()
+        .unwrap();
     assert_ne!(hex(&p.root), SAMPLE_ROOT);
     assert_eq!(p.request().len(), 69);
+}
+
+#[test]
+fn at_most_four_stamps_a_day_unless_the_writer_asks() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = anchored(dir.path());
+    let asked: DateTime<Utc> = parse_iso(ASKED).unwrap();
+    // Three more records today besides the anchored one: four in all.
+    for (i, minute) in ["10", "20", "30"].iter().enumerate() {
+        let record = Record {
+            format: RECORD_FORMAT,
+            time: format!("2026-09-05T03:{minute}:00.000Z"),
+            device: DEV1.into(),
+            root: format!("{i:064}"),
+            leaves: Vec::new(),
+            tokens: Vec::new(),
+        };
+        let path = dir_of(&root).join(format!("extra-{i}.json"));
+        fs::write(path, serde_json::to_vec(&record).unwrap()).unwrap();
+    }
+    grew(&root, 5_000, "2026-09-05T03:45:00.000Z");
+    let later = asked + chrono::Duration::hours(1);
+    assert_eq!(
+        prepare_at(&root, DEV1, Occasion::Moment, later)
+            .unwrap()
+            .unwrap_err(),
+        Skip::Enough
+    );
+    assert_eq!(
+        prepare_at(&root, DEV1, Occasion::Check, later)
+            .unwrap()
+            .unwrap_err(),
+        Skip::Enough
+    );
+    assert!(
+        prepare_at(&root, DEV1, Occasion::Now, later)
+            .unwrap()
+            .is_ok()
+    );
+    let next_day = asked + chrono::Duration::days(1);
+    assert!(
+        prepare_at(&root, DEV1, Occasion::Moment, next_day)
+            .unwrap()
+            .is_ok()
+    );
+}
+
+/// The records folder (`dir` in the module).
+fn dir_of(root: &Path) -> PathBuf {
+    dir(root)
 }

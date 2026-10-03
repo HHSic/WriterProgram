@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, State};
-use writer_core::anchor::{self, Pending, Skip, TSAS, Tsa};
+use writer_core::anchor::{self, Occasion, Pending, Skip, TSAS, Tsa};
 use writer_core::journal;
 
 use crate::error::{Res, fail};
@@ -21,9 +21,11 @@ const MAX_REPLY: u64 = 256 * 1024;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnchorResult {
-    /// `signed`, `notAllowed` (the writer has not allowed it), `journalOff`,
-    /// `noJournal`, `unchanged` (nothing new since the last stamp),
-    /// `doneToday` or `offline` (no authority answered: try again later).
+    /// `signed`, `ask` (one is due and the writer wants to be asked),
+    /// `notAllowed` (the writer has not allowed it), `journalOff`,
+    /// `noJournal`, `unchanged` (nothing new since the last stamp), `notYet`
+    /// (too little written since today's), `enough` (today's limit reached)
+    /// or `offline` (no authority answered: try again later).
     state: &'static str,
     /// Authorities that signed.
     signed: Vec<String>,
@@ -61,34 +63,64 @@ fn ask(agent: &ureq::Agent, tsa: &Tsa, request: &[u8]) -> Result<Vec<u8>, String
 type Replies = Vec<(Tsa, Result<Vec<u8>, String>)>;
 
 /// Works out what to send and asks every authority (off the screen's thread).
-fn send(root: PathBuf, device: String, force: bool) -> Res<Result<(Pending, Replies), Skip>> {
-    let pending = match anchor::prepare(&root, &device, force).map_err(fail)? {
+fn send(
+    root: PathBuf,
+    device: String,
+    occasion: Occasion,
+    ask_first: bool,
+    wait: Duration,
+) -> Res<Sent> {
+    let pending = match anchor::prepare(&root, &device, occasion).map_err(fail)? {
         Ok(pending) => pending,
-        Err(skip) => return Ok(Err(skip)),
+        Err(skip) => return Ok(Sent::Skipped(skip)),
     };
+    if ask_first {
+        return Ok(Sent::Ask);
+    }
     let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(20)))
+        .timeout_global(Some(wait))
         .http_status_as_error(false)
         .user_agent("WriterProgram")
         .build()
         .into();
     let request = pending.request();
-    let replies = TSAS
-        .iter()
-        .map(|tsa| (*tsa, ask(&agent, tsa, &request)))
-        .collect();
-    Ok(Ok((pending, replies)))
+    // All authorities at once, so waiting is as long as the slowest one, not
+    // the sum (it matters when the app is closing).
+    let replies = std::thread::scope(|scope| {
+        let asks: Vec<_> = TSAS
+            .iter()
+            .map(|tsa| {
+                let (agent, request) = (&agent, &request);
+                scope.spawn(move || (*tsa, ask(agent, tsa, request)))
+            })
+            .collect();
+        asks.into_iter()
+            .map(|a| a.join().expect("asking an authority does not panic"))
+            .collect()
+    });
+    Ok(Sent::Replies(pending, replies))
 }
 
-/// Stamps `root` if due: once a day when allowed, or now when the writer
-/// asks (`force`). Failing to reach the authorities is not an error; the
-/// screen tries again later. Writing never waits for this.
+/// What working out a stamp came to, before it is kept.
+enum Sent {
+    Skipped(Skip),
+    /// One is due, and the writer wants to be asked first.
+    Ask,
+    Replies(Pending, Replies),
+}
+
+/// Stamps `root` when one is due for `occasion` (`check`, `moment`,
+/// `closing` or `now`; see `anchor::Occasion`). With 물어보고 받기 on, a due
+/// stamp comes back as `ask` unless the writer asked (`now`). When closing
+/// the authorities get a few seconds only, so the window is not held up.
+/// Failing to reach them is not an error; the screen tries again later.
+/// Writing never waits for this.
 #[tauri::command]
 pub async fn journal_anchor(
     app: AppHandle,
     state: State<'_, AppState>,
     root: String,
-    force: bool,
+    occasion: String,
 ) -> Res<AnchorResult> {
     let settings = journal::load_settings(&journal_file(&app)?).map_err(fail)?;
     if settings.anchor != Some(true) {
@@ -97,15 +129,25 @@ pub async fn journal_anchor(
     let Some(device) = journal::device() else {
         return Ok(AnchorResult::only("journalOff"));
     };
+    let (occasion, wait) = match occasion.as_str() {
+        "now" => (Occasion::Now, Duration::from_secs(20)),
+        "moment" => (Occasion::Moment, Duration::from_secs(20)),
+        "closing" => (Occasion::Moment, Duration::from_secs(5)),
+        _ => (Occasion::Check, Duration::from_secs(20)),
+    };
+    let ask_first = settings.anchor_ask && occasion != Occasion::Now;
     let path = PathBuf::from(&root);
-    let sent = tauri::async_runtime::spawn_blocking(move || send(path, device, force))
-        .await
-        .map_err(|e| e.to_string())??;
+    let sent =
+        tauri::async_runtime::spawn_blocking(move || send(path, device, occasion, ask_first, wait))
+            .await
+            .map_err(|e| e.to_string())??;
     let (pending, replies) = match sent {
-        Ok(sent) => sent,
-        Err(Skip::NoJournal) => return Ok(AnchorResult::only("noJournal")),
-        Err(Skip::Unchanged) => return Ok(AnchorResult::only("unchanged")),
-        Err(Skip::DoneToday) => return Ok(AnchorResult::only("doneToday")),
+        Sent::Replies(pending, replies) => (pending, replies),
+        Sent::Ask => return Ok(AnchorResult::only("ask")),
+        Sent::Skipped(Skip::NoJournal) => return Ok(AnchorResult::only("noJournal")),
+        Sent::Skipped(Skip::Unchanged) => return Ok(AnchorResult::only("unchanged")),
+        Sent::Skipped(Skip::NotYet) => return Ok(AnchorResult::only("notYet")),
+        Sent::Skipped(Skip::Enough) => return Ok(AnchorResult::only("enough")),
     };
     let outcome = {
         let _write = state.write();
