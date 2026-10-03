@@ -5,7 +5,8 @@ import type { Editor, JSONContent } from '@tiptap/core';
 import type { Transaction } from '@tiptap/pm/state';
 import type { SaveOutcome } from '../api/types';
 import { clearConflict } from '../store';
-import { noteEdit } from './journal';
+import { afterComposition, compositionEnded } from './composition';
+import { noteComposed, noteEdit } from './journal';
 import { SaveSession } from './session';
 
 /** Marks a transaction passed on from the other editor. */
@@ -33,11 +34,22 @@ function replaceDoc(editor: Editor, json: JSONContent) {
 /**
  * Shows the text on disk (another device's) in every editor of a document,
  * without an undo step and without saving it again. The cursor stays near
- * where it was.
+ * where it was. While the writer is composing a syllable it waits for the
+ * composition to end (docs/safety-design.md K1).
  */
 export function reloadDoc(docId: string, json: JSONContent, rev: string) {
   const entry = open.get(docId);
   if (!entry) return;
+  const composing = [...entry.editors].find((e) => !e.isDestroyed && e.view.composing);
+  if (composing) {
+    afterComposition(composing.view, () => {
+      // Text typed while waiting is not thrown away: its save meets the newer
+      // text on disk as a conflict, and both are kept.
+      if (open.get(docId) !== entry || entry.session.pending) return;
+      reloadDoc(docId, json, rev);
+    });
+    return;
+  }
   for (const editor of entry.editors) {
     if (editor.isDestroyed) continue;
     // Replace only the part that differs, so the cursor, the scroll position
@@ -113,6 +125,7 @@ export function attach(
   entry.editors.add(editor);
 
   const pass = ({ transaction }: { transaction: Transaction }) => {
+    if (compositionEnded(transaction)) noteComposed(root, docId);
     if (!transaction.docChanged || transaction.getMeta(FROM_PEER)) return;
     // The writer's own edit (passed-on and reloaded text is marked FROM_PEER).
     noteEdit(root, docId, transaction, editor.view.composing);

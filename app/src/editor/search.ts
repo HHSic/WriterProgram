@@ -5,6 +5,7 @@ import { Extension, type Editor } from '@tiptap/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { decorateAll, follow, redecorateSpans, type BlockDecorator, type Deferred } from './decorate';
 
 export interface FindOptions {
   text: string;
@@ -58,30 +59,54 @@ export function rangeInBlock(doc: PmNode, block: number, start: number, end: num
 
 export const searchKey = new PluginKey<SearchState>('search');
 
-interface SearchState {
+interface SearchState extends Deferred {
   regex: RegExp | null;
   /** Document position of the match to show as current. */
   current: number | null;
-  decorations: DecorationSet;
 }
 
-function decorate(doc: PmNode, regex: RegExp | null, current: number | null): DecorationSet {
-  if (!regex) return DecorationSet.empty;
-  const decorations: Decoration[] = [];
-  let pos = 0;
-  doc.forEach((block) => {
-    if (block.isTextblock) {
-      const { text, positions } = blockText(block, pos);
-      for (const m of text.matchAll(regex)) {
-        if (!m[0] || m[0].includes('\n') || m.index === undefined) continue;
-        const from = positions[m.index];
-        const to = positions[m.index + m[0].length - 1] + 1;
-        decorations.push(Decoration.inline(from, to, { class: from === current ? 'search-hit current' : 'search-hit' }));
-      }
+function hitsIn(regex: RegExp, current: number | null): BlockDecorator {
+  return (block, pos, out) => {
+    const { text, positions } = blockText(block, pos);
+    for (const m of text.matchAll(regex)) {
+      if (!m[0] || m[0].includes('\n') || m.index === undefined) continue;
+      const from = positions[m.index];
+      const to = positions[m.index + m[0].length - 1] + 1;
+      out.push(Decoration.inline(from, to, { class: from === current ? 'search-hit current' : 'search-hit' }));
     }
-    pos += block.nodeSize;
+  };
+}
+
+/** The plugin behind SearchHighlight. */
+export function searchPlugin(): Plugin<SearchState> {
+  return new Plugin<SearchState>({
+    key: searchKey,
+    state: {
+      init: () => ({ regex: null, current: null, decorations: DecorationSet.empty, stale: [] }),
+      apply(tr, prev, _old, state) {
+        const meta = tr.getMeta(searchKey) as Partial<SearchState> | undefined;
+        if (!meta) {
+          const { regex, current } = prev;
+          if (!regex) return prev;
+          // Only the blocks an edit touched are searched again.
+          return follow(tr, prev, (doc, set, spans) => redecorateSpans(doc, set, spans, hitsIn(regex, current)));
+        }
+        const regex = 'regex' in meta ? (meta.regex ?? null) : prev.regex;
+        // Changing to another search drops the marked match unless one is given.
+        const current =
+          'current' in meta
+            ? (meta.current ?? null)
+            : prev.regex && meta.regex?.source !== prev.regex.source
+              ? null
+              : prev.current;
+        const decorations = regex ? decorateAll(state.doc, hitsIn(regex, current)) : DecorationSet.empty;
+        return { regex, current, decorations, stale: [] };
+      },
+    },
+    props: {
+      decorations: (state) => searchKey.getState(state)?.decorations,
+    },
   });
-  return DecorationSet.create(doc, decorations);
 }
 
 /** Highlights matches of the find panel in the open document. */
@@ -89,30 +114,7 @@ export const SearchHighlight = Extension.create({
   name: 'searchHighlight',
 
   addProseMirrorPlugins() {
-    return [
-      new Plugin<SearchState>({
-        key: searchKey,
-        state: {
-          init: () => ({ regex: null, current: null, decorations: DecorationSet.empty }),
-          apply(tr, prev, _old, state) {
-            const meta = tr.getMeta(searchKey) as Partial<SearchState> | undefined;
-            if (!meta && !tr.docChanged) return prev;
-            const regex = meta && 'regex' in meta ? (meta.regex ?? null) : prev.regex;
-            // Changing to another search drops the marked match unless one is given.
-            const current =
-              meta && 'current' in meta
-                ? (meta.current ?? null)
-                : meta && prev.regex && meta.regex?.source !== prev.regex.source
-                  ? null
-                  : prev.current;
-            return { regex, current, decorations: decorate(state.doc, regex, current) };
-          },
-        },
-        props: {
-          decorations: (state) => searchKey.getState(state)?.decorations,
-        },
-      }),
-    ];
+    return [searchPlugin()];
   },
 });
 

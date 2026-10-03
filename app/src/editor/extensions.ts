@@ -6,6 +6,7 @@ import { Plugin } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import StarterKit from '@tiptap/starter-kit';
 import { CardHighlight } from './cards';
+import { Composition } from './composition';
 import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
@@ -187,6 +188,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
       horizontalRule: false,
       link: false,
     }),
+    Composition,
     SceneBreak.configure({ symbol: sceneSymbol }),
     Dot,
     Memo.configure({ onOpen: hooks.onNoteOpen, onAdd: hooks.onNoteAdd }),

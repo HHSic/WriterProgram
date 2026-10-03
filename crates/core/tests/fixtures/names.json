@@ -1,0 +1,15 @@
+{
+  "endings": "은는이가을를의에엔와과도만로으랑한께처보부까마조야아여씨님네요다라란든나들뿐밖더같대쯤였예",
+  "cases": [
+    { "name": "a name inside a longer word is not one", "names": ["서하"], "text": "서하늘이 맑았다.", "found": [] },
+    { "name": "particles after a name", "names": ["서하"], "text": "서하가 웃자 서하는 서하의 서하에게 서하를", "found": [[0, "서하"], [7, "서하"], [11, "서하"], [15, "서하"], [20, "서하"]] },
+    { "name": "more particles and endings", "names": ["서하"], "text": "서하와 서하랑 서하처럼 서하씨 서하야 서하였다", "found": [[0, "서하"], [4, "서하"], [8, "서하"], [13, "서하"], [17, "서하"], [21, "서하"]] },
+    { "name": "punctuation, quotes and the end of the text", "names": ["서하"], "text": "“서하!” 그가 불렀다. ‘서하’, 서하… 서하", "found": [[1, "서하"], [15, "서하"], [20, "서하"], [24, "서하"]] },
+    { "name": "spaces, line breaks and Latin letters", "names": ["서하"], "text": "서하 서하\n서하A", "found": [[0, "서하"], [3, "서하"], [6, "서하"]] },
+    { "name": "the longest name first", "names": ["윤서하", "서하"], "text": "윤서하와 서하는", "found": [[0, "윤서하"], [5, "서하"]] },
+    { "name": "a longer name running into a word lets the next one start later", "names": ["윤서하", "서하"], "text": "윤서하늘", "found": [] },
+    { "name": "a name after a skipped one in the same run", "names": ["하늘", "서하"], "text": "서하늘에", "found": [[1, "하늘"]] },
+    { "name": "names with a space", "names": ["달빛 서점"], "text": "달빛 서점에서 달빛 서점주인", "found": [[0, "달빛 서점"]] },
+    { "name": "a jamo after a name (still composing) is not a syllable", "names": ["서하"], "text": "서하ㄱ", "found": [[0, "서하"]] }
+  ]
+}

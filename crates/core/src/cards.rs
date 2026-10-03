@@ -18,6 +18,7 @@
 //!
 //! Kinds (분류) and their default fields live in `project.json`.
 
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use regex::{Regex, RegexBuilder};
@@ -26,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use crate::doc::Section;
 use crate::doc::{decode_value, encode, split_front_matter};
 use crate::markup::{Block, parse_body, write_body};
-use crate::search::{Match, find_in_blocks};
+use crate::search::{Match, find_in_blocks_by};
 use crate::store::{atomic_write, new_id, now_iso, read_text};
 use crate::{Error, Result, copies, doc, project};
 
@@ -326,6 +327,43 @@ pub fn create(root: &Path, type_id: &str, name: &str) -> Result<Card> {
 // ---------------------------------------------------------------------------
 // Where cards appear
 
+/// First syllables of the particles and endings a name may run into
+/// (서하가, 서하에게, 서하처럼, 서하씨 …). Same list as `NAME_ENDINGS` in
+/// `app/src/editor/names.ts`; both are checked against
+/// `tests/fixtures/names.json`.
+pub const NAME_ENDINGS: &str =
+    "은는이가을를의에엔와과도만로으랑한께처보부까마조야아여씨님네요다라란든나들뿐밖더같대쯤였예";
+
+/// Whether a name ending at byte `end` of `text` stands as a word: what
+/// follows is not a Hangul syllable, or starts a particle. "서하" stands in
+/// "서하가" and "서하." but not in "서하늘".
+pub fn name_ends_word(text: &str, end: usize) -> bool {
+    match text[end..].chars().next() {
+        Some(c @ '\u{AC00}'..='\u{D7A3}') => NAME_ENDINGS.contains(c),
+        _ => true,
+    }
+}
+
+/// Byte ranges of the names found by `re` (from `names_regex`) that stand
+/// as words. A name running into a longer word is skipped and the search
+/// goes on from the next character, as in the editor's highlighting.
+pub fn find_names(re: &Regex, text: &str) -> Vec<Range<usize>> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while at < text.len() {
+        let Some(m) = re.find_at(text, at) else {
+            break;
+        };
+        if !m.is_empty() && name_ends_word(text, m.end()) {
+            out.push(m.range());
+            at = m.end();
+        } else {
+            at = m.start() + text[m.start()..].chars().next().map_or(1, char::len_utf8);
+        }
+    }
+    out
+}
+
 /// One pattern for a list of names, longest first so "윤서하" wins over "서하".
 pub fn names_regex(names: &[String]) -> Option<Regex> {
     if names.is_empty() {
@@ -360,7 +398,7 @@ pub fn appearances(root: &Path, card_id: &str) -> Result<Vec<Appearance>> {
         let Ok(file) = doc::load(root, id) else {
             continue;
         };
-        let matches = find_in_blocks(&file.body, &re, usize::MAX);
+        let matches = find_in_blocks_by(&file.body, usize::MAX, |text| find_names(&re, text));
         if !matches.is_empty() {
             out.push(Appearance {
                 doc_id: id.clone(),
@@ -387,7 +425,7 @@ pub fn appearance_counts(root: &Path) -> Result<Vec<(String, usize)>> {
         };
         let text = crate::markup::plain_text(&file.body);
         for (card_id, re) in &patterns {
-            if re.is_match(&text)
+            if !find_names(re, &text).is_empty()
                 && let Some(entry) = counts.iter_mut().find(|(id, _)| id == card_id)
             {
                 entry.1 += 1;
@@ -497,6 +535,34 @@ mod tests {
             .map(|m| m.as_str())
             .collect();
         assert_eq!(found, vec!["윤서하", "서하"]);
+    }
+
+    #[test]
+    fn names_stand_as_words_as_in_the_editor() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("../tests/fixtures/names.json")).unwrap();
+        assert_eq!(fixture["endings"].as_str().unwrap(), NAME_ENDINGS);
+        for case in fixture["cases"].as_array().unwrap() {
+            let names: Vec<String> = case["names"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|n| n.as_str().unwrap().to_string())
+                .collect();
+            let text = case["text"].as_str().unwrap();
+            let re = names_regex(&names).unwrap();
+            let found: Vec<(usize, &str)> = find_names(&re, text)
+                .into_iter()
+                .map(|r| (text[..r.start].chars().count(), &text[r]))
+                .collect();
+            let expected: Vec<(usize, &str)> = case["found"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|f| (f[0].as_u64().unwrap() as usize, f[1].as_str().unwrap()))
+                .collect();
+            assert_eq!(found, expected, "{}", case["name"]);
+        }
     }
 
     #[test]

@@ -5,7 +5,7 @@
 import { Extension, type Editor } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { decorateAll, redecorate, type BlockDecorator } from './decorate';
+import { decorateAll, follow, redecorateSpans, type BlockDecorator, type Deferred } from './decorate';
 import { blockText } from './search';
 
 const CLASSES: Record<string, string> = {
@@ -26,9 +26,8 @@ const spaces: BlockDecorator = (block, pos, out) => {
   }
 };
 
-interface MarksState {
+interface MarksState extends Deferred {
   on: boolean;
-  decorations: DecorationSet;
 }
 
 const marksKey = new PluginKey<MarksState>('whitespaceMarks');
@@ -41,12 +40,12 @@ export const WhitespaceMarks = Extension.create({
       new Plugin<MarksState>({
         key: marksKey,
         state: {
-          init: () => ({ on: false, decorations: DecorationSet.empty }),
+          init: () => ({ on: false, decorations: DecorationSet.empty, stale: [] }),
           apply(tr, prev, _old, state) {
             const meta = tr.getMeta(marksKey) as { on: boolean } | undefined;
-            if (meta) return { on: meta.on, decorations: meta.on ? decorateAll(state.doc, spaces) : DecorationSet.empty };
-            if (!prev.on || !tr.docChanged) return prev;
-            return { on: true, decorations: redecorate(tr, prev.decorations, spaces) };
+            if (meta) return { on: meta.on, decorations: meta.on ? decorateAll(state.doc, spaces) : DecorationSet.empty, stale: [] };
+            if (!prev.on) return prev;
+            return follow(tr, prev, (doc, set, spans) => redecorateSpans(doc, set, spans, spaces));
           },
         },
         props: {
