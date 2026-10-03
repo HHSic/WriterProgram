@@ -13,7 +13,7 @@
 | `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간) |
 | `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기·지우기 재시도, 정리 결과(`Cleanup`) |
 | `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
-| `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수, 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝) |
+| `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수·연재 플랫폼 기준 글자 수(`CountRule`, `Counts::by_rule`), 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝, 시험 `tests/fixtures/counts.json`·`platform-counts.json`). 플랫폼 표와 붙여넣기는 [platforms.md](platforms.md) |
 | `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |
 | `export.rs`, `docx/`, `hwpx/`, `xml.rs` | 내보내기. docx는 `layout.rs`(머리글·꼬리글), `styles.rs`, `body.rs`. HWPX는 `header.rs`(글자·문단 모양, 스타일), `section.rs`(본문, 머리말·꼬리말 조판 부호). `xml.rs`는 둘이 함께 쓰는 이스케이프·zip 묶기·시각 |
 | `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모), `marked/`(교정본 읽기: 글자 모양·변경 추적·편집자 메모) |
@@ -44,10 +44,10 @@
 | `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange, ai …), 화면은 `store/index.ts`에서 가져다 씀 |
 | AI 점검 | `workspace/AiTab.tsx`(오른쪽 탭: 보낼 내용 보기 → 보내기 → 결과), `workspace/AiDialog.tsx`(AI 연결 설정), `store/ai.ts`(설정, `askAi`, 시놉시스에 넣기), `lib/aiText.ts`(보낼 양·쓴 양 문장), `api/mock/ai.ts`(흉내 답) |
 | `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조(이름 낱말 경계는 `names.ts`), 꾸밈 다시 계산(`decorate.ts`: 바뀐 문단만, 한글 조합 중에는 옮기기만), 한글 조합 끝 알림(`composition.ts`), 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
-| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`, 창작 일지·날짜 증명·창작 과정 보관은 `JournalField.tsx`), 창작 과정 증명서는 `ProofDialog.tsx`. 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
+| `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`, 창작 일지·날짜 증명·창작 과정 보관은 `JournalField.tsx`, 연재 플랫폼은 `PlatformField.tsx`), 가져오기 `ImportDialog.tsx`(시작 화면에서는 `newProject`로 새 작품을 만듦, 새 작품 칸은 `screens/NewProjectDialog.tsx`의 `KindOptions`·`PlaceField`), 창작 과정 증명서는 `ProofDialog.tsx`. 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
 | 저장 상태 | `store/saves.ts`(대상별 상태 `doc:`·`meta:`·`card:`·`note:`, 다시 시도 간격, 비상 보관, 닫기 전 확인할 것), 상단 표시 `workspace/SaveStatus.tsx`, 닫기 확인 `workspace/CloseAskDialog.tsx`, 원인 문장 `lib/saveReason.ts` |
 | `components/Modal.tsx` | 모든 대화상자의 틀: 한글 조합 중 Esc 무시, `dismissOnBackdrop`(작은 확인 창만), `dirty`(버릴까요? 묻기, 값은 `lib/useChanged.ts`), 포커스 가두기와 돌려주기 |
-| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`, 드라이브 맞추기 문장 `syncText.ts`) |
+| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`, 드라이브 맞추기 문장 `syncText.ts`, 연재 플랫폼 표·목표 셈 `platforms.ts`, 클립보드 붙여넣기 서식 `paste.ts`) |
 | `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
 
 ## 자주 하는 작업
@@ -96,7 +96,7 @@ npm --prefix app test
 | `import/xml.rs` 문자 참조 | quick-xml은 `&#X41;`(대문자 X) 같은 참조를 거부해, 한글 파일의 글이 빠질 수 있다 |
 | `store::new_id` | 12자 id가 파일 이름이라 형식을 바꿀 수 없다 |
 | 문서 앞머리 읽기·쓰기 | 모르는 키를 순서 그대로 남겨야 한다(YAML 라이브러리는 파일을 다시 씀) |
-| `count.rs` 빈칸 목록, `editor/counts.ts` | Rust와 화면 글자 수가 같아야 해서 같은 목록을 둔다 |
+| `count.rs` 빈칸 목록, `editor/counts.ts` | Rust와 화면 글자 수가 같아야 해서 같은 목록을 둔다. 연재 플랫폼 셈(곧은 문장부호, 이모지, `< > &`)도 같다 |
 | `cards.rs` `NAME_ENDINGS`, `editor/names.ts` | 설정집 이름 뒤 조사 목록. 등장 위치와 화면 강조가 같아야 해서 같은 목록을 두고 `tests/fixtures/names.json`으로 맞춘다 |
 | `sync/oauth.rs` | 140줄로 작고 RFC 시험값으로 검사한다. oauth2 crate는 의존성이 늘고 ureq 3을 따로 붙여야 한다 |
 | keyring 나눠 담기 (`drives/keyring.rs`) | Windows 자격 증명 2560바이트 한도를 넘는 토큰을 나누는 crate가 없다 |
