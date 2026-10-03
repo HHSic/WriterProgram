@@ -39,6 +39,8 @@ export interface ReplaceOutcome {
   docs: { docId: string; count: number; snapshot: SnapshotInfo }[];
   /** Documents in scope that cannot be read, left as they are. */
   skipped: number;
+  /** Locked chapters (완료 회차 잠금) with matches, left as they were. */
+  locked: string[];
 }
 
 export interface DocOptions {

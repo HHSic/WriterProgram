@@ -63,6 +63,8 @@ pub struct DocSummary {
     pub synopsis: String,
     pub status: String,
     pub target: Option<u32>,
+    /// 완료 회차 잠금 (see `DocMeta::locked`).
+    pub locked: bool,
     pub counts: Counts,
     /// Estimated pages in the manuscript format; none without paper.
     pub pages: Option<u32>,
@@ -78,6 +80,7 @@ impl DocSummary {
             synopsis: doc.meta.synopsis.clone(),
             status: doc.meta.status.clone(),
             target: doc.meta.target,
+            locked: doc.meta.locked,
             counts: count_blocks(&doc.body),
             pages: metrics.map(|m| m.chapter_pages(&doc.body, true)),
             modified: None,

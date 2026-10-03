@@ -123,6 +123,7 @@ const PATHS = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  focus: <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5M9 12h6" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

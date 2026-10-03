@@ -83,7 +83,7 @@ export const noteMethods = {
       chars: n.text.length,
     };
     const holder: MockDoc & { note?: Note } = {
-      meta: { id: noteId, title: item.title, synopsis: '', status: 'draft', target: null, created: n.created },
+      meta: { id: noteId, title: item.title, synopsis: '', status: 'draft', target: null, locked: false, created: n.created },
       body: { type: 'doc' },
       section: 'notes',
       note: n,

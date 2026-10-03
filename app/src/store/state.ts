@@ -62,6 +62,8 @@ export type Dialog =
   | { kind: 'import'; partId?: string; newProject?: boolean }
   | { kind: 'view' }
   | { kind: 'symbols' }
+  /** 단축키: every keyboard shortcut (lib/shortcuts.ts). */
+  | { kind: 'shortcuts' }
   /**
    * 둘 다 보기: this device's text next to another device's, a document next
    * to its copy, or a chapter next to its rescue copy (비상 보관).
@@ -140,6 +142,8 @@ interface AppState {
   selection: { withSpaces: number; withoutSpaces: number } | null;
   rightTab: RightTab;
   rightOpen: boolean;
+  /** 집중 모드: the page alone, without the side columns, tabs and bars. */
+  focusMode: boolean;
   view: ViewSettings;
   dialog: Dialog | null;
   toast: Toast | null;
@@ -217,6 +221,7 @@ export const useApp = create<AppState>(() => ({
   selection: null,
   rightTab: 'outline',
   rightOpen: true,
+  focusMode: false,
   view: loadView(),
   dialog: null,
   toast: null,

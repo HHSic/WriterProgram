@@ -9,6 +9,7 @@ import { Icon } from '../components/Icon';
 import { openMenu, type MenuItem } from '../components/Menu';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { firstLineAt, marginsAt } from '../editor/paragraph';
+import { keysText } from '../lib/shortcuts';
 import { addTextNote, openFind, toggleReading, useApp } from '../store';
 import { openSymbols } from './Symbols';
 
@@ -24,8 +25,8 @@ export function marginMenu(editor: Editor): MenuItem[] {
   };
   return [
     { heading: now.left || now.right ? `지금 문단: 왼쪽 ${now.left}자 · 오른쪽 ${now.right}자` : '지금 문단: 여백 없음' },
-    { label: '왼쪽 한 자 들이기 (Ctrl+])', onSelect: run((c) => c.shiftMargins(1)) },
-    { label: '왼쪽 한 자 내기 (Ctrl+[)', disabled: now.left === 0, onSelect: run((c) => c.shiftMargins(-1)) },
+    { label: `왼쪽 한 자 들이기 (${keysText('marginIn')})`, onSelect: run((c) => c.shiftMargins(1)) },
+    { label: `왼쪽 한 자 내기 (${keysText('marginOut')})`, disabled: now.left === 0, onSelect: run((c) => c.shiftMargins(-1)) },
     { label: '양쪽 한 자씩 들이기', onSelect: run((c) => c.shiftMargins(1, ['left', 'right'])) },
     {
       label: '양쪽 한 자씩 내기',
@@ -87,8 +88,8 @@ export function EditToolbar({ editor }: { editor: Editor }) {
 
   return (
     <div className="edit-toolbar" role="toolbar" aria-label="편집 도구줄">
-      {tool('undo', '되돌리기 (Ctrl+Z)', <Icon name="undo" size={17} />, () => chain().undo().run(), { disabled: !state.undo })}
-      {tool('redo', '다시 하기 (Ctrl+Y)', <Icon name="redo" size={17} />, () => chain().redo().run(), { disabled: !state.redo })}
+      {tool('undo', `되돌리기 (${keysText('undo')})`, <Icon name="undo" size={17} />, () => chain().undo().run(), { disabled: !state.undo })}
+      {tool('redo', `다시 하기 (${keysText('redo')})`, <Icon name="redo" size={17} />, () => chain().redo().run(), { disabled: !state.redo })}
       <span className="tool-sep" aria-hidden="true" />
       {TOOLBAR_MARKS.map((key) => {
         const b = MARK_BUTTONS[key];

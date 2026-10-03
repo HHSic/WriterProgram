@@ -1,6 +1,7 @@
 // Writing screen settings (작성 화면 설정): per device, never written into
 // manuscript files (docs/mvp-scope.md "서식 모델").
 
+import type { QuoteStyle } from '../editor/autoType';
 import type { AccentId, PaletteId } from './colors';
 
 export type Theme = 'system' | 'light' | 'dark';
@@ -38,6 +39,14 @@ export interface ViewSettings {
   readRate: number;
   /** 소리 내어 읽기: voiceURI of the chosen Korean voice; empty takes the first one. */
   readVoice: string;
+  /** 집중 모드: other paragraphs fade. */
+  focusDim: boolean;
+  /** 집중 모드: the line being written stays at the same height (타자기 스크롤). */
+  typewriter: boolean;
+  /** 따옴표·말줄임표 자동 바꾸기 (off by default: platforms differ in what they want). */
+  autoType: boolean;
+  /** The quotes it makes: “ ” ‘ ’, or 「 」 『 』. */
+  quoteStyle: QuoteStyle;
 }
 
 /** Speeds offered for 소리 내어 읽기. */
@@ -74,6 +83,10 @@ export const DEFAULT_VIEW: ViewSettings = {
   ruler: false,
   readRate: 1,
   readVoice: '',
+  focusDim: true,
+  typewriter: true,
+  autoType: false,
+  quoteStyle: 'curly',
 };
 
 const KEY = 'wp.view';

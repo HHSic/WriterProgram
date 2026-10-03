@@ -49,6 +49,21 @@ export async function setStatus(id: string, status: DocStatus) {
   }
 }
 
+/**
+ * 완료 회차 잠금: keeps a finished chapter as it is (read-only editor,
+ * passed by replace-all and corrections), or lets it be changed again.
+ */
+export async function setLocked(id: string, locked: boolean) {
+  try {
+    // What was typed last goes to disk before the chapter turns read-only.
+    if (locked && !(await saveEverything())) return;
+    await api.docUpdateMeta(root(), id, { locked });
+    patchSummary(id, { locked });
+  } catch (e) {
+    toastError(locked ? '잠그지 못함' : '잠금을 풀지 못함', e);
+  }
+}
+
 export async function setTarget(id: string, target: number | null) {
   try {
     await api.docUpdateMeta(root(), id, { target });

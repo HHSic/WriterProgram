@@ -8,7 +8,7 @@ export { findDoc, allManuscript, saveEverything, confirmClose, showToast, toastE
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
 export { enterProject, loadCatalog, updateProject, applyFormat, openProject, recoverProject, leaveProject, refreshOverview } from './project';
-export { selectDoc, mendDoc, addDoc, setStatus, setTarget, renameDoc, moveDoc, trashDoc, addPart, renamePart, removePart } from './docs';
+export { selectDoc, mendDoc, addDoc, setStatus, setLocked, setTarget, renameDoc, moveDoc, trashDoc, addPart, renamePart, removePart } from './docs';
 export { previewCard, openCard, refreshCardCounts, createCard, patchCardSummary, trashCard } from './cards';
 export { loadNotes, focusNote, patchNote, addNote, addTextNote, showNote, trashNote, openNoteCounts } from './notes';
 export { selectPart, newDocPartId, openNotesBoard, openTable } from './places';
@@ -18,6 +18,7 @@ export { webPages, rememberWebPage, openWeb, clipPage } from './web';
 export { loadJournal, setJournalEnabled, setAnchorAllowed, anchorNow } from './journal';
 export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';
 export type { WebPage } from './web';
+export { setFocusMode, toggleFocusMode } from './focus';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
 export { offerRescues, setRescueAside, takeRescue } from './rescue';

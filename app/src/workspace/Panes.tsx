@@ -8,6 +8,7 @@ import { Icon, type IconName } from '../components/Icon';
 import type { MenuItem } from '../components/Menu';
 import { UNTITLED, docNoun, docNumber, withObject } from '../lib/labels';
 import { pressMenu } from '../lib/press';
+import { keysText } from '../lib/shortcuts';
 import type { Tab, Target } from '../lib/tabs';
 import {
   activateTab,
@@ -229,7 +230,7 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
                 type="button"
                 className="ctab-close"
                 aria-label={`${label} 닫기`}
-                title="닫기 (Ctrl+W)"
+                title={`닫기 (${keysText('closeTab')})`}
                 onClick={(e) => {
                   e.stopPropagation();
                   void closeTab(index, tab.key);

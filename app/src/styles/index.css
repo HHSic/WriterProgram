@@ -27,3 +27,6 @@
 @import './import.css'; /* 가져오기 wizard (workspace/ImportDialog.tsx). */
 @import './platforms.css'; /* 연재 플랫폼: counting rule in 작품 설정, paste preview in 내보내기. */
 @import './review.css'; /* 교정본 주고받기: sending, what was sent, the review tab. */
+@import './lock.css'; /* 완료 회차 잠금: tree lock, banner, find results. */
+@import './focus.css'; /* 집중 모드: hidden columns, the page alone, faded paragraphs, the way out. */
+@import './shortcuts.css'; /* 단축키 list; quote choice in 보기 설정. */

@@ -322,7 +322,7 @@ export const exchangeMethods = {
     const keep = new Set(decisions.keepNotes ?? []);
     const drop = new Set(decisions.dropNotes ?? []);
     const classes = new Set(decisions.acceptClasses ?? []);
-    const out = { docs: [] as string[], accepted: [] as string[], rejected: [] as string[], skipped: [] as { id: string; reason: string }[], memos: [] as string[] };
+    const out = { docs: [] as string[], accepted: [] as string[], rejected: [] as string[], skipped: [] as { id: string; reason: string }[], memos: [] as string[], locked: [] as string[] };
     for (const chapter of review.chapters) {
       const d = p.docs.get(chapter.docId);
       for (const c of chapter.changes) {
@@ -340,8 +340,10 @@ export const exchangeMethods = {
         for (const x of [...wanted, ...kept]) out.skipped.push({ id: x.id, reason: '회차가 지워져서 반영할 수 없음' });
         continue;
       }
-      const placeable = wanted.filter((c) => c.now);
-      for (const c of wanted) if (!c.now) out.skipped.push({ id: c.id, reason: OVERLAP });
+      // A locked chapter's text is not touched: its changes stay to decide.
+      if (d.meta.locked) out.locked.push(d.meta.id);
+      const placeable = d.meta.locked ? [] : wanted.filter((c) => c.now);
+      for (const c of d.meta.locked ? [] : wanted) if (!c.now) out.skipped.push({ id: c.id, reason: OVERLAP });
       if (placeable.length) {
         record(p, d, 'before-corrections', `교정 반영 전 · ${review.file}`);
         // Right to left, so earlier places stay right.

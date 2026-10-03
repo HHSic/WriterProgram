@@ -75,7 +75,7 @@ export function body(...paragraphs: string[]): JSONContent {
 
 export function newDoc(p: MockProject, section: Section, title: string, text: JSONContent = body(''), status: DocStatus = 'draft') {
   const doc: MockDoc = {
-    meta: { id: id(), title, synopsis: '', status, target: null, created: now() },
+    meta: { id: id(), title, synopsis: '', status, target: null, locked: false, created: now() },
     body: text,
     section,
   };

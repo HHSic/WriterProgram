@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { Modal } from '../components/Modal';
 import { FIXED_SPACE, FULL_WIDTH_SPACE, NO_BREAK_SPACE } from '../editor/paragraph';
+import { keysText } from '../lib/shortcuts';
 import { closeDialog, openDialog, useApp } from '../store';
 
 const RECENT_KEY = 'wp.recentSymbols';
@@ -26,7 +27,7 @@ interface Space {
 }
 
 const SPACES: Space[] = [
-  { char: NO_BREAK_SPACE, name: '묶음 빈칸', about: '앞뒤 낱말이 줄 끝에서 떨어지지 않습니다 (Ctrl+Shift+Space)' },
+  { char: NO_BREAK_SPACE, name: '묶음 빈칸', about: `앞뒤 낱말이 줄 끝에서 떨어지지 않습니다 (${keysText('noBreakSpace')})` },
   { char: FIXED_SPACE, name: '고정폭 빈칸', about: '양쪽 맞춤에서도 너비가 늘지 않습니다 (Alt+Shift+Space)' },
   { char: FULL_WIDTH_SPACE, name: '전각 빈칸', about: '한 글자만큼 넓은 빈칸' },
 ];

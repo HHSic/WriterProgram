@@ -1,4 +1,4 @@
-# 코드 지도 (2026-10-02, 창작 과정 증명 2026-10-03)
+# 코드 지도 (2026-10-02, 창작 과정 증명·집중 모드·단축키 2026-10-03)
 
 어디를 고치면 되는지, 여럿이 동시에 작업할 때 어디서 나뉘는지 정리한 문서. 파일 형식과 설계 이유는 [architecture.md](architecture.md).
 
@@ -11,7 +11,7 @@
 | 모듈 | 하는 일 |
 |---|---|
 | `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간), `backup.rs`(project.json 하루 백업), `recover.rs`(깨진 project.json 되살리기, 화면 `screens/RecoverDialog.tsx`) |
-| `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기·지우기 재시도, 정리 결과(`Cleanup`) |
+| `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문, 완료 회차 잠금 `locked`), 원자적 저장, id, 시각 문자열, 이름 바꾸기·지우기 재시도, 정리 결과(`Cleanup`) |
 | `mend.rs` | 읽을 수 없는 회차(빈 파일, 다른 글자 방식, 깨진 앞머리) 알아보기와 고쳐 열기. 화면 `workspace/MendDialog.tsx`, `UnreadableItem.tsx`, 명령 `commands/mend.rs` |
 | `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수·연재 플랫폼 기준 글자 수(`CountRule`, `Counts::by_rule`), 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝, 시험 `tests/fixtures/counts.json`·`platform-counts.json`). 플랫폼 표와 붙여넣기는 [platforms.md](platforms.md) |
@@ -44,7 +44,9 @@
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
 | `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange, ai …), 화면은 `store/index.ts`에서 가져다 씀 |
 | AI 점검 | `workspace/AiTab.tsx`(오른쪽 탭: 보낼 내용 보기 → 보내기 → 결과), `workspace/AiDialog.tsx`(AI 연결 설정), `store/ai.ts`(설정, `askAi`, 시놉시스에 넣기), `lib/aiText.ts`(보낼 양·쓴 양 문장), `api/mock/ai.ts`(흉내 답) |
-| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조(이름 낱말 경계는 `names.ts`), 꾸밈 다시 계산(`decorate.ts`: 바뀐 문단만, 한글 조합 중에는 옮기기만), 한글 조합 끝 알림(`composition.ts`), 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
+| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조(이름 낱말 경계는 `names.ts`), 꾸밈 다시 계산(`decorate.ts`: 바뀐 문단만, 한글 조합 중에는 옮기기만), 한글 조합 끝 알림과 조합 중 키인지(`composition.ts`), 서식 버튼(`markButtons.tsx`), 따옴표·말줄임표 자동 바꾸기(`autoType.ts`: 조합 중에는 안 바꿈, Ctrl+Z로 바꾸기만 되돌리기), 집중 모드의 다른 문단 흐리게·타자기 스크롤(`focus.ts`; 켜고 끄기는 `store/focus.ts`, 화면은 `workspace/Workspace.tsx`와 `styles/focus.css`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
+| 단축키 | `lib/shortcuts.ts`의 표 하나(`SHORTCUTS`): 목록 창 `workspace/ShortcutsDialog.tsx`, 창의 키 처리 `workspace/Workspace.tsx`(`WINDOW_KEYS`), 편집기 확장의 `editorKeys`, 툴팁의 `keysText`가 모두 이 표를 읽는다 |
+| 완료 회차 잠금 | 저장은 `doc.rs`(`locked`), 건너뛰기는 `search.rs`·`corrections/apply.rs`. 화면은 `store/docs.ts`(`setLocked`), 트리 자물쇠 `workspace/DocItem.tsx`, 회차 메뉴 `sidebarMenus.ts`, 배너와 읽기 전용 `DocPane.tsx`, 찾기 `SearchTab.tsx`, 스타일 `styles/lock.css` |
 | `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`, 창작 일지·날짜 증명·창작 과정 보관은 `JournalField.tsx`, 연재 플랫폼은 `PlatformField.tsx`), 가져오기 `ImportDialog.tsx`(시작 화면에서는 `newProject`로 새 작품을 만듦, 새 작품 칸은 `screens/NewProjectDialog.tsx`의 `KindOptions`·`PlaceField`), 창작 과정 증명서는 `ProofDialog.tsx`. 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
 | 저장 상태 | `store/saves.ts`(대상별 상태 `doc:`·`meta:`·`card:`·`note:`, 다시 시도 간격, 비상 보관, 닫기 전 확인할 것), 상단 표시 `workspace/SaveStatus.tsx`, 닫기 확인 `workspace/CloseAskDialog.tsx`, 원인 문장 `lib/saveReason.ts` |
 | `components/Modal.tsx` | 모든 대화상자의 틀: 한글 조합 중 Esc 무시, `dismissOnBackdrop`(작은 확인 창만), `dirty`(버릴까요? 묻기, 값은 `lib/useChanged.ts`), 포커스 가두기와 돌려주기 |
@@ -60,6 +62,8 @@
 4. `api/types/backend.ts`에 메서드, `api/tauri.ts`에 호출, `api/mock/<영역>.ts`에 흉내
 
 **화면 동작 하나 추가**: `store/<영역>.ts`에 함수, 화면에서 쓰면 `store/index.ts`에 이름 추가.
+
+**단축키 하나 추가**: `lib/shortcuts.ts`의 `SHORTCUTS`에 한 줄(무리, 화면 이름, 키). 창에서 처리하면 `Workspace.tsx`의 `WINDOW_KEYS`에, 편집기에서 처리하면 확장의 `addKeyboardShortcuts`에서 `editorKeys(id, …)`로. 단축키 목록과 겹침 검사(`lib/shortcuts.test.ts`)는 저절로 따라온다.
 
 **원고 서식 항목 하나 추가**: `format/mod.rs`(값·검사·`#[serde(default)]`) → `hwpx/section.rs`·`docx/layout.rs`(쓰기) → `import/page.rs`(한글 파일에서 읽기, 해당되면) → `api/types/format.ts` → `workspace/settings/`(화면) → `api/mock/presets.ts`.
 

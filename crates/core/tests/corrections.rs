@@ -525,6 +525,44 @@ fn word_corrections_and_one_file_per_chapter() {
         .iter()
         .map(|c| c.id.clone())
         .collect();
+
+    // A locked chapter (완료 회차 잠금) is passed by: the changes stay to
+    // decide, and a kept editor note becomes a note on the whole chapter.
+    let lock = |locked: bool| {
+        doc::update_meta(
+            &root,
+            &first,
+            &doc::MetaPatch {
+                locked: Some(locked),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    };
+    lock(true);
+    let before = lines(&root, &first);
+    let passed = corrections::apply(
+        &root,
+        &ex.id,
+        &Decisions {
+            accept: all.clone(),
+            keep_notes: vec![notes[0].id.clone()],
+            ..Decisions::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(passed.locked, std::slice::from_ref(&first));
+    assert!(passed.docs.is_empty() && passed.accepted.is_empty() && passed.skipped.is_empty());
+    assert_eq!(passed.memos.len(), 1);
+    assert_eq!(lines(&root, &first), before);
+    assert!(
+        passed.review.chapters[0]
+            .changes
+            .iter()
+            .all(|c| c.state == State::Pending)
+    );
+    lock(false);
+
     let applied = corrections::apply(
         &root,
         &ex.id,

@@ -13,6 +13,7 @@ import { useAutoHeight } from '../lib/autoHeight';
 import { errorText, num, timeLabel } from '../lib/format';
 import { UNTITLED, docNoun, docNumber } from '../lib/labels';
 import { useDebouncedSave } from '../lib/useDebouncedSave';
+import { keysText } from '../lib/shortcuts';
 import {
   addNote,
   findDoc,
@@ -308,7 +309,7 @@ export function NotesTab({ on, targetId, editor }: { on: 'doc' | 'card'; targetI
         <p className="empty-note">
           {on === 'card'
             ? '이 카드에 붙은 메모가 없습니다.'
-            : `본문에서 글을 고르고 떠오른 도구줄의 "메모"(또는 Ctrl+Alt+M)를 누르면 그 구간에 메모가 붙습니다. 글을 고쳐도 메모는 구간을 따라갑니다.`}
+            : `본문에서 글을 고르고 떠오른 도구줄의 "메모"(또는 ${keysText('note')})를 누르면 그 구간에 메모가 붙습니다. 글을 고쳐도 메모는 구간을 따라갑니다.`}
         </p>
       )}
       {visible.map((n) => (

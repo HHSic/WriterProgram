@@ -49,6 +49,7 @@ export const searchMethods = {
     if (!re) throw '찾는 식이 올바르지 않음';
     const ids = query.docIds ?? [...p.parts.flatMap((x) => x.docs), ...p.planning];
     const out: { docId: string; count: number; snapshot: SnapshotInfo }[] = [];
+    const locked: string[] = [];
     let replaced = 0;
     let skipped = 0;
     for (const docId of ids) {
@@ -70,11 +71,15 @@ export const searchMethods = {
         }
       }
       if (!count) continue;
+      if (d.meta.locked) {
+        locked.push(docId);
+        continue;
+      }
       const snapshot = record(p, d, 'before-replace', '');
       d.body = next;
       replaced += count;
       out.push({ docId, count, snapshot });
     }
-    return { replaced, docs: out, skipped };
+    return { replaced, docs: out, skipped, locked };
   },
 } satisfies Partial<Backend>;

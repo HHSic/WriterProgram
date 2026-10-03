@@ -61,6 +61,8 @@ export interface DocSummary {
   synopsis: string;
   status: DocStatus;
   target: number | null;
+  /** 완료 회차 잠금: kept as it is (read-only, passed by replace-all and corrections). */
+  locked: boolean;
   counts: Counts;
   /** Estimated pages in the manuscript format; null without paper. */
   pages: number | null;
@@ -74,6 +76,7 @@ export interface DocMeta {
   synopsis: string;
   status: DocStatus;
   target: number | null;
+  locked: boolean;
   created: string;
 }
 
@@ -154,4 +157,6 @@ export interface MetaPatch {
   status?: DocStatus;
   /** `null` clears the target; leave out to keep it. */
   target?: number | null;
+  /** 잠금 / 잠금 풀기. */
+  locked?: boolean;
 }

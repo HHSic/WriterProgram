@@ -961,6 +961,27 @@ fn find_and_replace_across_chapters() {
         doc::load(&root, &first).unwrap().body,
         body(&["서하는 우산을 폈다.", "서하가 웃었다."])
     );
+
+    // A locked chapter (완료 회차 잠금) is still found but never replaced.
+    doc::update_meta(
+        &root,
+        &first,
+        &MetaPatch {
+            locked: Some(true),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(project::overview(&root).unwrap().parts[0].docs[0].locked);
+    assert_eq!(search::search(&root, &query).unwrap().total, 2);
+    let outcome = search::replace_all(&root, &query, "하윤").unwrap();
+    assert_eq!(outcome.replaced, 0);
+    assert!(outcome.docs.is_empty());
+    assert_eq!(outcome.locked, std::slice::from_ref(&first));
+    assert_eq!(
+        doc::load(&root, &first).unwrap().body,
+        body(&["서하는 우산을 폈다.", "서하가 웃었다."])
+    );
 }
 
 #[test]
