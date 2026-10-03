@@ -32,6 +32,7 @@ v0.1 구현의 뼈대. 화면 설계는 [screens.md](screens.md), 영역별 데�
   .journal/<기기 id>.jsonl         창작 일지 (기기마다 한 파일, 덧붙이기만 함)
   .journal/anchors/                시각 고정: <시각>-<기기 id>.json (잎·루트) + <시각>-<기기 id>-<기관>.tsr
   .exchanges/<기록 id>/            편집자에게 보낸 원고와 받은 교정본 (corrections.md)
+  .backup/project-<YYYY-MM-DD>.json   project.json 하루 백업 (최근 7일)
 ```
 
 - **부는 `project.json`에만 있다.** 회차를 다른 부로 옮겨도 파일은 움직이지 않는다. 폴더 동기화에서 이동·이름 바꾸기 충돌을 줄이기 위해서다 (layout-data.md의 "폴더 + 순서"를 이렇게 정함).
@@ -62,6 +63,15 @@ v0.1 구현의 뼈대. 화면 설계는 [screens.md](screens.md), 영역별 데�
 - `sceneBreak`: 화면과 내보내기에 쓰는 장면 나눔 기호. 파일 안에서는 늘 `***`.
 - `keepDaily`: 창작 과정 보관(위 기록 정리 참고). 켰을 때만 `true`로 쓰고, 없으면 꺼짐.
 - 이 버전이 모르는 키는 그대로 남긴다. `format`이 앱보다 새로우면 열지 않고 업데이트를 안내한다.
+
+## 읽을 수 없는 회차와 project.json 복구 ([safety-design.md](safety-design.md) S4·S5)
+
+- **없는 파일과 읽을 수 없는 파일을 나눈다.** 구조에 있는데 파일이 없으면(다른 기기에서 오는 중일 수 있음) 지금처럼 트리에서만 뺀다. 파일은 있는데 비었거나, UTF-8이 아니거나(메모장 ANSI = EUC-KR, UTF-16), 앞머리가 `---`와 `키: 값`으로 시작했는데 닫히지 않았으면 `doc::read_doc`이 그 까닭(`doc::Damage`)을 담은 오류를 내고, `Overview.unreadable`(`UnreadableDoc`: id, 자리(부·순서), 짐작한 제목, 까닭, 고칠 수 있는지)에 들어간다. 앞머리 없이 손으로 쓴 글은 지금처럼 읽는다.
+- **고쳐 열기** (`crates/core/src/mend.rs`, 명령 `commands/mend.rs`): 가져오기의 글자 판별(`import::decode`: UTF-8, UTF-16, EUC-KR)로 읽어 미리 보이고, 작가가 맞다고 하면 원본을 `<폴더>/<id>.md.broken-<시각>`으로 복사해 두고 UTF-8로 다시 쓴다. 깨진 앞머리는 남은 `키: 값` 줄(제목 등)만 살리고 나머지를 본문으로 둔다. 원본은 지우지 않는다. `.md.broken-…`은 `.md`로 끝나지 않아 문서·사본으로 잡히지 않는다.
+- 찾기·바꾸기(`skipped`), 설정 카드 등장 위치(`Appearances.skipped`)는 읽을 수 없는 문서를 빼고 그 수를 돌려준다. 증명서는 범위 안의 그런 회차와 파일이 없는 회차를 "빠진 회차"로 적는다(`proof::facts::Missing`). 내보내기는 실패하면 회차 이름을 말한다(`export::load_item`). 손으로 넣은 id 아닌 이름의 파일도 글자 판별로 읽어 받아들인다(`copies::reconcile`).
+- **project.json 백업** (`project/backup.rs`): `project::save`가 쓰기에 성공하면 같은 내용을 `.backup/project-<이 기기 날짜>.json`에도 원자적으로 쓴다. 하루 한 파일(같은 날은 덮어씀), 최근 7일 치. 백업을 못 써도 저장은 실패하지 않는다(로그만). `.backup/`은 드라이브 맞추기 대상이다(`engine.rs` `HIDDEN_KEPT`).
+- **깨짐 알아보기**: `project::load`가 JSON(또는 UTF-8) 오류면 `Error::ProjectDamaged`를 낸다. 화면 문장은 "작품 구조 파일(project.json)이 손상되어 열 수 없습니다. 원고 파일은 그대로 있습니다."(`error::PROJECT_DAMAGED`), serde의 영어 원문은 로그(`eprintln`)에만.
+- **복구** (`project/recover.rs`, 명령 `commands/recover.rs`): `recovery`가 고를 수 있는 길을 돌려준다: 다른 기기 사본(`project (1).json` 등, 가장 새것), 가장 최근에 읽히는 백업(날짜, 부·회차 수), 다시 만들 때 들어갈 회차 파일 수. `recover`는 깨진 파일을 `project.json.damaged-<시각>`으로 옮겨 두고, 사본이나 백업을 project.json으로 삼거나, 파일에서 다시 만든다(모든 회차를 앞머리의 만든 시각 순으로 "1부" 하나에, 기획 문서도 같은 식으로, 설정 카드의 분류는 카드에서 다시 모음, 서식·목표는 기본값, 제목·종류·id는 깨진 파일에 남은 글에서 읽을 수 있으면 살림). 그 뒤 `repair`가 구조에 없는 회차 파일(백업 뒤에 생긴 회차)을 마지막 부 끝에 붙인다.
 
 ## 문서 파일 (.md)
 
