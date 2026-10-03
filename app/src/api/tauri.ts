@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import type { Backend, Change, PageEvent } from './types';
+import type { Backend, Change, PageEvent, UpdateProgress } from './types';
 
 const FILE_TYPE_NAMES: Record<string, string> = {
   txt: '텍스트 파일',
@@ -127,6 +127,13 @@ export const tauriBackend: Backend = {
   browserClip: (label) => invoke('browser_clip', { label }),
   onBrowserPage: (handler) => {
     const unlisten = listen<PageEvent>('browser-page', (event) => handler(event.payload));
+    return () => void unlisten.then((stop) => stop());
+  },
+  appVersion: () => invoke('app_version'),
+  updateCheck: () => invoke('update_check'),
+  updateInstall: () => invoke('update_install'),
+  onUpdateProgress: (handler) => {
+    const unlisten = listen<UpdateProgress>('update-progress', (event) => handler(event.payload));
     return () => void unlisten.then((stop) => stop());
   },
   reveal: (path) => invoke('reveal', { path }),

@@ -31,6 +31,7 @@ import type {
 import type { NewNote, Note } from './notes';
 import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem } from './project';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
+import type { UpdateInfo, UpdateProgress } from './update';
 
 export interface Backend {
   /** True in the desktop app, false in the browser preview. */
@@ -199,4 +200,11 @@ export interface Backend {
    */
   onCloseRequested(handler: () => Promise<boolean>): void;
   setWindowTitle(title: string): void;
+  /** The app's version (tauri.conf.json). */
+  appVersion(): Promise<string>;
+  /** Asks GitHub Releases whether a newer version is out; null when not. */
+  updateCheck(): Promise<UpdateInfo | null>;
+  /** Fetches, checks and installs the version the last check found; on Windows the app closes and the new one opens. */
+  updateInstall(): Promise<void>;
+  onUpdateProgress(handler: (progress: UpdateProgress) => void): () => void;
 }

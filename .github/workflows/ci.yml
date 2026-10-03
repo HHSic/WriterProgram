@@ -1,0 +1,36 @@
+# Checks every push and pull request: Rust tests, lints and formatting, and
+# the screen's type check and tests (docs/code-map.md "검사").
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: swatinem/rust-cache@v2
+
+      - run: npm --prefix app ci
+      # The app crate embeds the built screens, so they must exist first.
+      - run: npm --prefix app run build
+      - run: cargo fmt -p writer-core -p writer-sync -p writer-app -p writer-ai --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: npm --prefix app run typecheck
+      - run: npm --prefix app test

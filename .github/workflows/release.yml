@@ -1,0 +1,58 @@
+# Builds the Windows installer when a version tag is pushed (v0.1.0,
+# v0.1.0-beta.1, …) and puts it in a draft GitHub release together with
+# latest.json, which the app's updater reads. Publishing the draft makes it
+# the "latest" release the installed apps see (docs/release.md).
+#
+# Secrets: TAURI_SIGNING_PRIVATE_KEY (the updater key, minisign) and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD. The public half is in tauri.conf.json.
+
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+
+      - name: Install the app's packages
+        run: npm --prefix app ci
+
+      - name: Check before building
+        run: |
+          npm --prefix app run build
+          cargo test --workspace
+          npm --prefix app run typecheck
+          npm --prefix app test
+
+      - name: Build, sign and draft the release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          tagName: ${{ github.ref_name }}
+          releaseName: WriterProgram ${{ github.ref_name }}
+          releaseBody: '바뀐 것을 여기에 적어 주세요. 이 글이 앱의 새 버전 안내에 그대로 보입니다.'
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true

@@ -65,6 +65,10 @@
 - 함께 고치는 곳은 목록 파일뿐이다: `lib.rs`의 명령 목록, `store/index.ts`, `api/types/index.ts`, `api/types/backend.ts`, `styles/index.css`. 한 줄씩 더하는 곳이라 충돌이 나도 풀기 쉽다.
 - 큰 일은 브랜치나 git worktree를 따로 써서 하고, 합친 뒤 아래 검사를 다 돌린다.
 
+## 배포
+
+설치 파일, 자동 업데이트, 서명 키, 새 버전 내는 순서는 [release.md](release.md). 업데이트 명령은 `commands/update.rs`, 화면은 `store/update.ts`와 보기 설정의 버전 칸.
+
 ## 검사
 
 ```bash

@@ -20,3 +20,4 @@ export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, 
 export type { WebPage } from './web';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
+export { autoUpdateCheck, setAutoUpdateCheck, checkForUpdateDaily, checkForUpdateNow } from './update';

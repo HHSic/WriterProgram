@@ -15,13 +15,18 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state)
         .manage(drives::connect::DriveState::default())
+        .manage(commands::update::PendingUpdate::default())
         .setup(|app| {
             commands::journal::init(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::update::app_version,
+            commands::update::update_check,
+            commands::update::update_install,
             commands::ai::ai_settings,
             commands::ai::ai_settings_set,
             commands::ai::ai_key_set,

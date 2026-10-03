@@ -5,7 +5,7 @@ import { ToastHost } from './components/ToastHost';
 import { installJournal } from './editor/journal';
 import { applyColors } from './lib/colors';
 import { StartScreen } from './screens/StartScreen';
-import { saveEverything, useApp } from './store';
+import { checkForUpdateDaily, saveEverything, useApp } from './store';
 import { DialogHost } from './workspace/dialogs';
 import { Workspace } from './workspace/Workspace';
 
@@ -53,6 +53,9 @@ export function App() {
     // Finish the last save before the window closes; keep it open if saving fails.
     api.onCloseRequested(() => saveEverything(true));
     installJournal();
+    // A new version, looked for once a day a little after start.
+    const timer = window.setTimeout(() => void checkForUpdateDaily(), 8000);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (

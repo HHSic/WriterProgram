@@ -1,11 +1,13 @@
-// 보기 설정: how the writing screen looks on this device (font, spacing, colours).
+// 보기 설정: how the writing screen looks on this device (font, spacing, colours),
+// and the app's version with a check for a new one.
 
 import { useEffect, useState } from 'react';
+import { api } from '../api';
 import { Modal } from '../components/Modal';
 import { koreanVoices, loadVoices, pickVoice, sayOnce, speechAvailable } from '../editor/readAloud';
 import { ACCENTS, PALETTES, previewColors } from '../lib/colors';
 import { FONT_LABEL, READ_RATES, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
-import { closeDialog, setView, useApp } from '../store';
+import { autoUpdateCheck, checkForUpdateNow, closeDialog, setAutoUpdateCheck, setView, useApp } from '../store';
 import { NO_VOICE_HELP, rateLabel } from './ReadingBar';
 
 const THEMES: { id: Theme; label: string }[] = [
@@ -89,6 +91,7 @@ export function ViewDialog() {
         </fieldset>
         <ColorFields view={view} />
         <ReadAloudFields view={view} />
+        <VersionField />
       </div>
     </Modal>
   );
@@ -262,5 +265,55 @@ function Slider({
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     </label>
+  );
+}
+
+/** The app's version, and looking for a new one. */
+function VersionField() {
+  const [version, setVersion] = useState<string | null>(null);
+  const [auto, setAuto] = useState(autoUpdateCheck);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api.appVersion().then(
+      (v) => alive && setVersion(v),
+      () => {},
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!api.isDesktop) return null;
+  return (
+    <fieldset className="field">
+      <legend className="field-label">버전</legend>
+      <div className="row wrap">
+        <span className="grow">WriterProgram {version ?? ''}</span>
+        <button
+          type="button"
+          className="btn small"
+          disabled={checking}
+          onClick={async () => {
+            setChecking(true);
+            await checkForUpdateNow();
+            setChecking(false);
+          }}
+        >
+          {checking ? '확인하는 중…' : '새 버전 확인'}
+        </button>
+      </div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={auto}
+          onChange={(e) => {
+            setAutoUpdateCheck(e.target.checked);
+            setAuto(e.target.checked);
+          }}
+        />
+        하루 한 번 새 버전이 있는지 알아보기
+      </label>
+      <small className="hint">새 버전이 있는지만 GitHub에 묻습니다. 원고나 작품 정보는 보내지 않습니다.</small>
+    </fieldset>
   );
 }

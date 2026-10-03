@@ -29,6 +29,8 @@ writer-ai = { path = "../../crates/ai" }
 ureq = "3"
 writer-core = { path = "../../crates/core" }
 writer-sync = { path = "../../crates/sync" }
+tauri-plugin-updater = "2"
+time = { version = "0.3", features = ["formatting"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = { version = "1", default-features = false }
