@@ -55,7 +55,8 @@ const importPreview: Backend['importPreview'] = async (paths, opts) => {
   files.forEach((f, file) => {
     if (f.error) return;
     const list: [string, number, SkipTotalsLike][] =
-      opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), 9800, none]] : f.kind === 'docx' || f.kind === 'hwpx' ? sample : [['외전 · 그날의 서하', 3120, none]];
+      // A whole 한글 file as one chapter is very long: the preview suggests cutting it.
+      opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), f.kind === 'hwpx' ? 186400 : 9800, none]] : f.kind === 'docx' || f.kind === 'hwpx' ? sample : [['외전 · 그날의 서하', 3120, none]];
     for (const [title, chars, skipped] of list) {
       chapters.push({ index: chapters.length, file, title, chars, paragraphs: Math.round(chars / 60), snippet: '서하는 매일 밤 열한 시에 서점 문을 닫았다. 할머니가 그랬고, 할머니의 어머니도 그랬다고 했다.', skipped });
     }

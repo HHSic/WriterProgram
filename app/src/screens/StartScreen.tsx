@@ -36,6 +36,8 @@ export function StartScreen() {
   };
 
   const newProject = () => openDialog({ kind: 'newProject' });
+  // 기존 원고 가져오기: files from 한글, Word or Notepad become a new project.
+  const importFiles = () => openDialog({ kind: 'import', newProject: true });
 
   return (
     <div className="start">
@@ -66,6 +68,13 @@ export function StartScreen() {
               <small>웹소설 연재나 출판 장편을 새로 시작합니다</small>
             </span>
           </button>
+          <button type="button" className="start-big" onClick={importFiles}>
+            <Icon name="download" size={22} />
+            <span>
+              <strong>기존 원고 가져오기</strong>
+              <small>한글·Word·메모장에서 쓰던 원고로 새 작품을 만듭니다</small>
+            </span>
+          </button>
           <button type="button" className="start-big" onClick={openFolder}>
             <Icon name="folder" size={22} />
             <span>
@@ -84,6 +93,10 @@ export function StartScreen() {
               <button type="button" className="btn" onClick={openFolder}>
                 <Icon name="folder" />
                 폴더에서 열기
+              </button>
+              <button type="button" className="btn" onClick={importFiles}>
+                <Icon name="download" />
+                원고 가져오기…
               </button>
               <button type="button" className="btn primary" onClick={newProject}>
                 <Icon name="plus" />새 작품

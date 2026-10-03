@@ -2,15 +2,31 @@
 // pick files, see how they are cut into chapters, confirm where they go.
 // Tables, pictures and footnotes are never imported; the last step says so
 // and asks whether to leave them out or cancel.
+//
+// From the start screen (`newProject`) there is no project yet: the last step
+// asks for a title, kind and place like 새 작품, and the chapters go into the
+// first part of the project made then.
 
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import type { ImportChapter, ImportOptions, ImportPreview, LineMode, SkipTotals, SplitRule } from '../api/types';
+import type { ImportChapter, ImportOptions, ImportPreview, LineMode, ProjectKind, SkipTotals, SplitRule } from '../api/types';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import { num } from '../lib/format';
-import { docNoun } from '../lib/labels';
-import { closeDialog, loadNotes, newDocPartId, refreshOverview, saveEverything, selectDoc, showToast, toastError, useApp } from '../store';
+import { docNoun, withSubject } from '../lib/labels';
+import { KindOptions, PlaceField, useNewPlace } from '../screens/NewProjectDialog';
+import {
+  closeDialog,
+  enterProject,
+  loadNotes,
+  newDocPartId,
+  refreshOverview,
+  saveEverything,
+  selectDoc,
+  showToast,
+  toastError,
+  useApp,
+} from '../store';
 
 type Step = 'files' | 'preview' | 'confirm';
 
@@ -67,16 +83,31 @@ function hasSkips(s: SkipTotals): boolean {
   return s.tables + s.images + s.footnotes > 0;
 }
 
-export function ImportDialog({ partId }: { partId?: string }) {
-  const ov = useApp((s) => s.overview)!;
-  const noun = docNoun(ov.project.kind);
+/**
+ * A chapter this long makes typing slow (docs/feature-gap-report.md §3.3:
+ * 1.4 million characters took seconds a keystroke), so the preview suggests
+ * cutting it.
+ */
+export const BIG_CHAPTER = 50_000;
+
+/** A file name without its folder and extension, as a first title. */
+export function titleFromPath(path: string): string {
+  return fileName(path).replace(/\.[^.]+$/, '').trim();
+}
+
+export function ImportDialog({ partId, newProject = false }: { partId?: string; newProject?: boolean }) {
+  const ov = useApp((s) => s.overview);
+  const [kind, setKind] = useState<ProjectKind>(ov?.project.kind ?? 'webnovel');
+  const [title, setTitle] = useState('');
+  const place = useNewPlace(newProject);
+  const noun = docNoun(newProject || !ov ? kind : ov.project.kind);
   const [step, setStep] = useState<Step>('files');
   const [paths, setPaths] = useState<string[]>([]);
   const [opts, setOpts] = useState<ImportOptions>({ rule: 'auto', pattern: '', lineMode: 'auto', encoding: null });
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
-  const [target, setTarget] = useState(() => partId ?? newDocPartId() ?? ov.parts[ov.parts.length - 1]?.id ?? '');
+  const [target, setTarget] = useState(() => partId ?? newDocPartId() ?? ov?.parts[ov.parts.length - 1]?.id ?? '');
   const [leaveNotes, setLeaveNotes] = useState(true);
   const [followPage, setFollowPage] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -113,6 +144,7 @@ export function ImportDialog({ partId }: { partId?: string }) {
       const picked = await api.pickFiles('가져올 원고 파일');
       if (!picked.length) return;
       setPaths((old) => [...old, ...picked.filter((p) => !old.includes(p))]);
+      if (newProject && !title.trim()) setTitle(titleFromPath(picked[0]));
     } catch (e) {
       toastError('파일을 고르지 못함', e);
     }
@@ -133,27 +165,65 @@ export function ImportDialog({ partId }: { partId?: string }) {
   // A 한글 file's paper, margins, 머리말, 꼬리말 and page numbers.
   const paged = preview?.files.find((f) => !f.error && f.page) ?? null;
 
+  const big = chosen.filter((c) => c.chars > BIG_CHAPTER);
+  const biggest = big.reduce<ImportChapter | null>((b, c) => (!b || c.chars > b.chars ? c : b), null);
+  const bigTitle = biggest ? rows.find((r) => r.index === biggest.index)?.title.trim() || '제목 없음' : '';
+  const particle = withSubject(bigTitle).slice(bigTitle.length);
+
+  const commitSpec = (partId: string | null) => ({
+    partId,
+    after: null,
+    picks: rows.filter((r) => r.on).map((r) => ({ index: r.index, title: r.title.trim() })),
+    leaveNotes: leaving && leaveNotes,
+    pageSetup: !!paged && followPage,
+  });
+
+  const done = (count: number, notes: number, format: boolean) =>
+    showToast({
+      text: `${noun} ${count}개를 가져왔습니다${notes > 0 ? ` · 빠진 자리에 메모 ${notes}개` : ''}${format ? ' · 원고 서식도 맞췄습니다' : ''}`,
+    });
+
+  // 시작 화면: make the project, then bring the chapters into its first part.
+  const runNew = async () => {
+    const made = await api.projectCreate({
+      parent: place.parent,
+      title: title.trim(),
+      kind,
+      perDocGoal: kind === 'webnovel' ? 5000 : null,
+      countSpaces: true,
+      firstChapter: false,
+    });
+    try {
+      const result = await api.importCommit(made.root, paths, opts, commitSpec(made.parts[0]?.id ?? null));
+      enterProject(await api.projectOverview(made.root));
+      closeDialog();
+      done(result.docs.length, result.notes, result.format);
+      if (result.docs[0]) await selectDoc(result.docs[0]);
+    } catch (e) {
+      // The project is there, only empty: open it so nothing is left hidden.
+      enterProject(made);
+      closeDialog();
+      toastError(`작품은 만들었지만 원고를 가져오지 못했습니다. ‘원고 가져오기’로 다시 해 보세요`, e);
+    }
+  };
+
   const run = async () => {
     if (busy || !preview) return;
     setBusy(true);
     try {
-      if (!(await saveEverything())) return;
-      const result = await api.importCommit(ov.root, paths, opts, {
-        partId: target || null,
-        after: null,
-        picks: rows.filter((r) => r.on).map((r) => ({ index: r.index, title: r.title.trim() })),
-        leaveNotes: leaving && leaveNotes,
-        pageSetup: !!paged && followPage,
-      });
+      if (newProject) {
+        await runNew();
+        return;
+      }
+      if (!ov || !(await saveEverything())) return;
+      const result = await api.importCommit(ov.root, paths, opts, commitSpec(target || null));
       await refreshOverview();
       if (result.notes > 0) await loadNotes();
       closeDialog();
-      showToast({
-        text: `${noun} ${result.docs.length}개를 가져왔습니다${result.notes > 0 ? ` · 빠진 자리에 메모 ${result.notes}개` : ''}${result.format ? ' · 원고 서식도 맞췄습니다' : ''}`,
-      });
+      done(result.docs.length, result.notes, result.format);
       if (result.docs[0]) await selectDoc(result.docs[0]);
     } catch (e) {
-      toastError('가져오지 못함', e);
+      toastError(newProject ? '작품을 만들지 못함' : '가져오지 못함', e);
     } finally {
       setBusy(false);
     }
@@ -181,15 +251,26 @@ export function ImportDialog({ partId }: { partId?: string }) {
         </button>
       )}
       {step === 'confirm' && (
-        <button type="button" className="btn primary" disabled={busy || !chosen.length} onClick={() => void run()}>
-          {leaving ? '제외하고 가져오기' : '가져오기'}
+        <button
+          type="button"
+          className="btn primary"
+          disabled={busy || !chosen.length || (newProject && (!title.trim() || !place.parent))}
+          onClick={() => void run()}
+        >
+          {newProject ? (leaving ? '제외하고 새 작품 만들기' : '새 작품 만들기') : leaving ? '제외하고 가져오기' : '가져오기'}
         </button>
       )}
     </>
   );
 
   return (
-    <Modal title="원고 가져오기" onClose={closeDialog} width={640} footer={footer} dirty={paths.length > 0}>
+    <Modal
+      title={newProject ? '기존 원고 가져오기' : '원고 가져오기'}
+      onClose={closeDialog}
+      width={640}
+      footer={footer}
+      dirty={paths.length > 0}
+    >
       <ol className="steps" aria-label="진행 단계">
         {STEPS.map((s, i) => (
           <li key={s.id} className={s.id === step ? 'on' : STEPS.findIndex((x) => x.id === step) > i ? 'done' : ''} aria-current={s.id === step ? 'step' : undefined}>
@@ -220,6 +301,9 @@ export function ImportDialog({ partId }: { partId?: string }) {
                 </li>
               ))}
             </ul>
+          )}
+          {newProject && (
+            <p className="hint">한글이나 Word, 메모장에서 쓰던 원고로 새 작품을 만듭니다. 원래 파일은 그대로 둡니다.</p>
           )}
           <p className="hint">
             표, 그림, 각주는 가져오지 않습니다. 옛 한글 파일(.hwp)은 한글에서 한글 문서(.hwpx)로 저장한 뒤 골라 주세요.
@@ -299,6 +383,36 @@ export function ImportDialog({ partId }: { partId?: string }) {
                 ))}
               </ul>
 
+              {biggest && !loading && (
+                <div className="import-warn import-big" role="status">
+                  <p>
+                    {opts.rule === 'auto' ? (
+                      <>
+                        ‘{bigTitle}’{particle} 공백 포함 {num(biggest.chars)}자입니다. 자동으로 찾을 제목 줄이 없어 더 나누지
+                        못했습니다. {noun} 하나가 이렇게 길면 쓰는 동안 화면이 느려질 수 있으니, 제목 줄의 모양을 패턴으로 알려 주면 나눠 드립니다.
+                      </>
+                    ) : (
+                      <>
+                        ‘{bigTitle}’{particle} 공백 포함 {num(biggest.chars)}자로 아주 깁니다. {noun} 하나가 이렇게 길면 쓰는 동안 화면이
+                        느려질 수 있습니다. “3화”, “제3장” 같은 제목 줄에서 나누는 것을 권합니다.
+                      </>
+                    )}
+                    {big.length > 1 && ` (아주 긴 ${noun} ${big.length}개)`}
+                  </p>
+                  <div className="row">
+                    {opts.rule === 'auto' ? (
+                      <button type="button" className="btn" onClick={() => setOpts({ ...opts, rule: 'regex' })}>
+                        패턴 쓰기
+                      </button>
+                    ) : (
+                      <button type="button" className="btn" onClick={() => setOpts({ ...opts, rule: 'auto' })}>
+                        자동으로 나누기
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {readable === 0 ? (
                 <p className="empty-note">읽을 수 있는 파일이 없습니다. 이전으로 돌아가 다른 파일을 골라 주세요.</p>
               ) : (
@@ -356,19 +470,36 @@ export function ImportDialog({ partId }: { partId?: string }) {
 
       {step === 'confirm' && (
         <div className="form">
-          <label className="field">
-            <span className="field-label">넣을 곳</span>
-            <select value={target} onChange={(e) => setTarget(e.target.value)}>
-              {ov.parts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title} (맨 끝에 이어서)
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="dialog-text">
-            {noun} <strong>{chosen.length}개</strong> · 공백 포함 <strong>{num(totalChars)}자</strong>를 가져옵니다. 이미 있는 {noun}는 그대로입니다.
-          </p>
+          {newProject || !ov ? (
+            <>
+              <label className="field">
+                <span className="field-label">작품 제목</span>
+                <input data-autofocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 달빛 서점의 마지막 손님" maxLength={100} />
+              </label>
+              <KindOptions kind={kind} onPick={setKind} />
+              <PlaceField places={place.places} parent={place.parent} onParent={place.setParent} title={title} />
+              <p className="dialog-text">
+                {noun} <strong>{chosen.length}개</strong> · 공백 포함 <strong>{num(totalChars)}자</strong>로 새 작품을 만듭니다. 목표 분량과 원고 서식은
+                작품 설정에서 바꿀 수 있습니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <label className="field">
+                <span className="field-label">넣을 곳</span>
+                <select value={target} onChange={(e) => setTarget(e.target.value)}>
+                  {ov.parts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} (맨 끝에 이어서)
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="dialog-text">
+                {noun} <strong>{chosen.length}개</strong> · 공백 포함 <strong>{num(totalChars)}자</strong>를 가져옵니다. 이미 있는 {noun}는 그대로입니다.
+              </p>
+            </>
+          )}
           {paged?.page && (
             <div className="import-page">
               <label className="check">
