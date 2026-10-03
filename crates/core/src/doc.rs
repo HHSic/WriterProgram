@@ -8,6 +8,7 @@
 //! synopsis: "폐점 직전 찾아온 손님이 대여 카드를 내민다."
 //! status: "draft"
 //! target: 5000
+//! locked: true
 //! created: "2026-09-27T01:00:00.000Z"
 //! ---
 //!
@@ -53,6 +54,11 @@ pub struct DocMeta {
     pub status: String,
     #[serde(default)]
     pub target: Option<u32>,
+    /// 완료 회차 잠금: the writer finished this chapter and keeps it as it
+    /// is. The editor opens it read-only, and replacing in the whole project
+    /// or applying corrections passes it by. Written only when set.
+    #[serde(default)]
+    pub locked: bool,
     #[serde(default)]
     pub created: String,
     /// Front matter lines this version does not know, as `(key, raw value)`.
@@ -72,6 +78,7 @@ impl DocMeta {
             synopsis: String::new(),
             status: default_status(),
             target: None,
+            locked: false,
             created: now_iso(),
             extra: Vec::new(),
         }
@@ -143,6 +150,7 @@ pub fn parse_doc(src: &str, fallback_id: &str) -> DocFile {
                 "synopsis" => meta.synopsis = decode_value(raw),
                 "status" => meta.status = decode_value(raw),
                 "target" => meta.target = decode_value(raw).parse().ok(),
+                "locked" => meta.locked = decode_value(raw) == "true",
                 "created" => meta.created = decode_value(raw),
                 _ => meta.extra.push((key.to_string(), raw.to_string())),
             }
@@ -182,6 +190,9 @@ pub fn write_doc(doc: &DocFile) -> String {
     out.push_str(&format!("status: {}\n", encode(&m.status)));
     if let Some(target) = m.target {
         out.push_str(&format!("target: {target}\n"));
+    }
+    if m.locked {
+        out.push_str("locked: true\n");
     }
     out.push_str(&format!("created: {}\n", encode(&m.created)));
     for (key, raw) in &m.extra {
@@ -395,6 +406,8 @@ pub struct MetaPatch {
     pub status: Option<String>,
     #[serde(default, with = "double_option")]
     pub target: Option<Option<u32>>,
+    /// 잠금 / 잠금 풀기.
+    pub locked: Option<bool>,
 }
 
 mod double_option {
@@ -427,6 +440,9 @@ pub fn update_meta(root: &Path, id: &str, patch: &MetaPatch) -> Result<DocMeta> 
     if let Some(target) = patch.target {
         doc.meta.target = target.filter(|t| *t > 0);
     }
+    if let Some(locked) = patch.locked {
+        doc.meta.locked = locked;
+    }
     write_doc_file(&path, &doc)?;
     Ok(doc.meta)
 }
@@ -448,6 +464,58 @@ mod tests {
         let text = write_doc(&doc);
         assert!(text.starts_with("---\nid: \"abc\"\n"));
         assert_eq!(parse_doc(&text, "zzz"), doc);
+    }
+
+    #[test]
+    fn lock_round_trips_and_is_left_out_when_off() {
+        let mut doc = DocFile {
+            meta: DocMeta::new("abc", "끝난 회차"),
+            body: vec![Block::text("본문")],
+        };
+        let open = write_doc(&doc);
+        assert!(!open.contains("locked"));
+        assert!(!parse_doc(&open, "abc").meta.locked);
+
+        doc.meta.locked = true;
+        let text = write_doc(&doc);
+        assert!(text.contains("\nlocked: true\n"));
+        let back = parse_doc(&text, "abc");
+        assert!(back.meta.locked);
+        assert_eq!(back, doc);
+        // Hand-written files may quote it.
+        let quoted = text.replace("locked: true", "locked: \"true\"");
+        assert!(parse_doc(&quoted, "abc").meta.locked);
+    }
+
+    #[test]
+    fn update_meta_locks_and_unlocks() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let path = root.join(MANUSCRIPT_DIR).join(file_name("abc"));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let doc = DocFile {
+            meta: DocMeta::new("abc", "t"),
+            body: vec![Block::text("본문")],
+        };
+        write_doc_file(&path, &doc).unwrap();
+        let patch = MetaPatch {
+            locked: Some(true),
+            ..Default::default()
+        };
+        assert!(update_meta(root, "abc", &patch).unwrap().locked);
+        assert!(load(root, "abc").unwrap().meta.locked);
+        // Other changes keep the lock.
+        let patch = MetaPatch {
+            status: Some("done".into()),
+            ..Default::default()
+        };
+        assert!(update_meta(root, "abc", &patch).unwrap().locked);
+        let patch = MetaPatch {
+            locked: Some(false),
+            ..Default::default()
+        };
+        assert!(!update_meta(root, "abc", &patch).unwrap().locked);
+        assert!(!read_text(&path).unwrap().contains("locked"));
     }
 
     #[test]

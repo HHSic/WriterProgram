@@ -209,6 +209,8 @@ pub struct ReplacedDoc {
 pub struct ReplaceOutcome {
     pub replaced: usize,
     pub docs: Vec<ReplacedDoc>,
+    /// Locked chapters (완료 회차 잠금) that had matches, left as they were.
+    pub locked: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -322,10 +324,12 @@ pub fn replace_in_blocks(
 }
 
 /// Replaces every match in scope. Each changed document first gets a
-/// "before-replace" record, so the change can be taken back.
+/// "before-replace" record, so the change can be taken back. Locked
+/// chapters are left as they are and listed in `locked`.
 pub fn replace_all(root: &Path, q: &SearchQuery, replacement: &str) -> Result<ReplaceOutcome> {
     let re = matcher(q)?;
     let mut docs = Vec::new();
+    let mut locked = Vec::new();
     let mut replaced = 0;
     for id in scope(root, q)? {
         let Ok((_, path)) = doc::locate(root, &id) else {
@@ -334,6 +338,10 @@ pub fn replace_all(root: &Path, q: &SearchQuery, replacement: &str) -> Result<Re
         let file = doc::read_doc(&path)?;
         let (body, count) = replace_in_blocks(&file.body, &re, replacement, q.regex);
         if count == 0 {
+            continue;
+        }
+        if file.meta.locked {
+            locked.push(id);
             continue;
         }
         let snapshot = snapshot::create(root, &file, "before-replace", "")?;
@@ -351,7 +359,11 @@ pub fn replace_all(root: &Path, q: &SearchQuery, replacement: &str) -> Result<Re
             snapshot,
         });
     }
-    Ok(ReplaceOutcome { replaced, docs })
+    Ok(ReplaceOutcome {
+        replaced,
+        docs,
+        locked,
+    })
 }
 
 #[cfg(test)]

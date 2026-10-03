@@ -53,6 +53,9 @@ pub struct Applied {
     pub skipped: Vec<Skipped>,
     /// 메모 made from the editor's notes.
     pub memos: Vec<String>,
+    /// Locked chapters (완료 회차 잠금) passed by: their changes stay to
+    /// decide, and editor notes kept become notes on the whole chapter.
+    pub locked: Vec<String>,
     /// The review with the decisions recorded.
     pub review: Review,
 }
@@ -76,6 +79,7 @@ pub fn apply(root: &Path, exchange_id: &str, decisions: &Decisions) -> Result<Ap
         rejected: Vec::new(),
         skipped: Vec::new(),
         memos: Vec::new(),
+        locked: Vec::new(),
         review: review.clone(),
     };
     // Chapters written, for the creation journal.
@@ -142,10 +146,15 @@ pub fn apply(root: &Path, exchange_id: &str, decisions: &Decisions) -> Result<Ap
             .collect();
         let mut now = Flat::of(&current.body);
         let mapper = Mapper::new(&sent_chars, &accepted, &now.chars());
+        // A locked chapter's text is not touched: its changes stay pending.
+        let locked = current.meta.locked;
+        if locked {
+            out.locked.push(chapter.doc_id.clone());
+        }
 
         // Where each accepted change goes now.
         let mut splices: Vec<(Range<usize>, Vec<char>)> = Vec::new();
-        for &i in &wanted {
+        for &i in wanted.iter().filter(|_| !locked) {
             let c = &mut chapter.changes[i];
             match mapper.map(sent.range_of(c.at)) {
                 Some(r) => {
@@ -168,7 +177,8 @@ pub fn apply(root: &Path, exchange_id: &str, decisions: &Decisions) -> Result<Ap
             let n = &chapter.notes[i];
             let id = new_id();
             let place =
-                n.at.and_then(|at| mapper.map(sent.range_of(at)))
+                n.at.filter(|_| !locked)
+                    .and_then(|at| mapper.map(sent.range_of(at)))
                     .filter(|r| !r.is_empty());
             let anchor = match place {
                 Some(r) => {
