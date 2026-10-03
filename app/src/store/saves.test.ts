@@ -152,6 +152,17 @@ describe('edited values are never dropped', () => {
   });
 });
 
+describe('a target opened again', () => {
+  it('still sends what the closed screen could not save', () => {
+    const old = { retry: vi.fn(async () => {}), pending: () => true };
+    registerSave('card:z', old)();
+    markFailed('card:z', '디스크 공간 부족');
+    registerSave('card:z', { retry: async () => {}, pending: () => false });
+    markSaved('card:z');
+    expect(old.retry).toHaveBeenCalled();
+  });
+});
+
 describe('rescue copy', () => {
   it('writes what could not be saved once saving has failed for over a minute', async () => {
     api.docSave.mockRejectedValue('디스크 공간 부족');

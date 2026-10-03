@@ -114,6 +114,10 @@ export function markSaved(key: string) {
   }
   put(key, { state: 'saved' });
   tidy(key);
+  // A screen that went away may still hold edits of the same target (the
+  // chapter closed and opened again while failing): send those too.
+  const stale = entry ? [...entry.detached].filter((t) => t.pending()) : [];
+  for (const t of stale) void t.retry();
 }
 
 /** A save failed: show why and try again later. */
@@ -143,9 +147,10 @@ function retryTargets(entry: Entry): Promise<void> {
   return Promise.all([...entry.targets].map((t) => t.retry())).then(() => undefined);
 }
 
-/** 지금 다시: tries every failing target now. */
+/** 지금 다시: tries every failing or waiting target now. */
 export async function retryNow(): Promise<void> {
-  const failing = [...entries.entries()].filter(([key]) => stateOf(key)?.state === 'error');
+  const keys = new Set(unsavedKeys());
+  const failing = [...entries.entries()].filter(([key]) => keys.has(key));
   await Promise.all(
     failing.map(([, entry]) => {
       clearTimeout(entry.timer);
