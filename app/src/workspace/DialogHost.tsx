@@ -1,6 +1,7 @@
 // Shows the one open dialog (store `dialog`).
 
 import { NewProjectDialog } from '../screens/NewProjectDialog';
+import { RecoverDialog } from '../screens/RecoverDialog';
 import { AiDialog } from './AiDialog';
 import { CompareDialog } from './Compare';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -9,6 +10,7 @@ import { DriveImportDialog, DrivesDialog } from './Drives';
 import { ExchangesDialog } from './Exchanges';
 import { ExportDialog } from './ExportDialog';
 import { ImportDialog } from './ImportDialog';
+import { MendDialog } from './MendDialog';
 import { MoveDialog } from './MoveProject';
 import { PromptDialog } from './PromptDialog';
 import { ProofDialog } from './ProofDialog';
@@ -56,5 +58,9 @@ export function DialogHost() {
       return <AiDialog />;
     case 'proof':
       return <ProofDialog />;
+    case 'mend':
+      return <MendDialog key={dialog.docId} docId={dialog.docId} />;
+    case 'recover':
+      return <RecoverDialog path={dialog.path} recovery={dialog.recovery} />;
   }
 }

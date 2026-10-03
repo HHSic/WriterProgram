@@ -30,11 +30,15 @@ export interface SearchResult {
   docs: { docId: string; matches: SearchMatch[] }[];
   total: number;
   truncated: boolean;
+  /** Documents in scope that cannot be read, left out (고쳐 열기). */
+  skipped: number;
 }
 
 export interface ReplaceOutcome {
   replaced: number;
   docs: { docId: string; count: number; snapshot: SnapshotInfo }[];
+  /** Documents in scope that cannot be read, left as they are. */
+  skipped: number;
 }
 
 export interface DocOptions {

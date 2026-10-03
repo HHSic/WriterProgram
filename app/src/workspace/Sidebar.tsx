@@ -10,6 +10,7 @@ import { MoreButton } from '../components/MoreButton';
 import { num } from '../lib/format';
 import { KIND_LABEL, UNTITLED, docNoun, docNumber, stockCount, withSubject } from '../lib/labels';
 import { pressMenu } from '../lib/press';
+import { unreadableIn, withUnreadable } from '../lib/unreadable';
 import {
   addDoc,
   addPart,
@@ -28,6 +29,7 @@ import {
 import { CardsSection } from './CardsSection';
 import { CopyBadge, countCopies } from './Copies';
 import { DocItem } from './DocItem';
+import { UnreadableItem } from './UnreadableItem';
 import { docMenu, partMenu, type SidebarMenuContext } from './sidebarMenus';
 import { useDocDrag } from './useDocDrag';
 
@@ -159,7 +161,9 @@ export function Sidebar() {
                   <MoreButton items={() => partMenu(menus, part)} opts={partOpts} label={`${part.title} 메뉴`} />
                 </div>
                 {open &&
-                  part.docs.map((doc) => {
+                  withUnreadable(part.docs, unreadableIn(ov.unreadable, part.id)).map((row) => {
+                    if (row.kind === 'unreadable') return <UnreadableItem key={row.item.id} item={row.item} />;
+                    const doc = row.doc;
                     const label = docNumber(kind, numbers.get(doc.id) ?? 0);
                     return (
                       <DocItem
@@ -200,7 +204,9 @@ export function Sidebar() {
               <Icon name="plus" size={13} />
             </button>
           </div>
-          {ov.planning.map((doc) => {
+          {withUnreadable(ov.planning, unreadableIn(ov.unreadable, null)).map((row) => {
+            if (row.kind === 'unreadable') return <UnreadableItem key={row.item.id} item={row.item} planning />;
+            const doc = row.doc;
             const title = doc.title || UNTITLED;
             const opts = (): MenuOptions => ({ title });
             return (

@@ -52,6 +52,13 @@ export const projectMethods = {
   async projectOverview(root) {
     return overview(root);
   },
+  async projectRecovery() {
+    // The stand-in's project files are never damaged.
+    return null;
+  },
+  async projectRecover() {
+    throw '작품 구조 파일(project.json)에 고칠 곳이 없습니다';
+  },
   async projectUpdate(root, patch) {
     const p = project(root);
     Object.assign(p.info, patch);

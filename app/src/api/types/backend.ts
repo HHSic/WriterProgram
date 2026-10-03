@@ -3,7 +3,7 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Bounds, PageClip, PageEvent } from './browser';
 import type { AiCheck, AiPreview, AiProvider, AiSettings, AiSettingsPatch, AiSummary, AiTask } from './ai';
-import type { Appearance, Card, CardSummary, CardType } from './cards';
+import type { Appearances, Card, CardSummary, CardType } from './cards';
 import type {
   Change,
   CopyAction,
@@ -15,7 +15,19 @@ import type {
   Place,
   SyncOutcome,
 } from './devices';
-import type { DocData, DocMeta, MetaPatch, NewDoc, SaveOutcome, Section, SnapshotInfo, SnapshotKind, TrashItem } from './docs';
+import type {
+  DocData,
+  DocMeta,
+  Mended,
+  MendPreview,
+  MetaPatch,
+  NewDoc,
+  SaveOutcome,
+  Section,
+  SnapshotInfo,
+  SnapshotKind,
+  TrashItem,
+} from './docs';
 import type { Applied, Decisions, Exchange, ExchangeInfo, Review } from './exchange';
 import type { FormatCatalog, ManuscriptFormat, UserPreset } from './format';
 import type { ImportOptions, ImportPreview, ImportSpec, Imported } from './import';
@@ -29,7 +41,7 @@ import type {
   ProofWritten,
 } from './journal';
 import type { NewNote, Note } from './notes';
-import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem } from './project';
+import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem, RecoverWay, Recovery } from './project';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
 import type { UpdateInfo, UpdateProgress } from './update';
 
@@ -42,6 +54,10 @@ export interface Backend {
   projectCreate(opts: NewProject): Promise<Overview>;
   projectOpen(path: string): Promise<Overview>;
   projectOverview(root: string): Promise<Overview>;
+  /** What can bring a damaged project.json back; null when it is fine. */
+  projectRecovery(path: string): Promise<Recovery | null>;
+  /** Brings project.json back the chosen way (the damaged one is kept) and opens the project. */
+  projectRecover(path: string, way: RecoverWay): Promise<Overview>;
   projectUpdate(root: string, patch: ProjectPatch): Promise<ProjectInfo>;
   partAdd(root: string, title: string): Promise<string>;
   partRename(root: string, partId: string, title: string): Promise<void>;
@@ -50,6 +66,10 @@ export interface Backend {
   docMove(root: string, docId: string, partId: string | null, index: number): Promise<void>;
   docTrash(root: string, docId: string): Promise<TrashItem>;
   docLoad(root: string, docId: string): Promise<DocData>;
+  /** 고쳐 열기: how a document that cannot be read would read once mended. */
+  docMendPreview(root: string, docId: string): Promise<MendPreview>;
+  /** 고쳐 열기: keeps the original next to it and writes the document again. */
+  docMend(root: string, docId: string): Promise<Mended>;
   /**
    * `base` is the fingerprint of the text the editor started from; when the
    * text on disk changed since, nothing is saved unless `force`.
@@ -104,7 +124,7 @@ export interface Backend {
   cardCreate(root: string, typeId: string, name: string): Promise<Card>;
   cardSave(root: string, card: Card): Promise<CardSummary>;
   cardTrash(root: string, cardId: string): Promise<TrashItem>;
-  cardAppearances(root: string, cardId: string): Promise<Appearance[]>;
+  cardAppearances(root: string, cardId: string): Promise<Appearances>;
   cardCounts(root: string): Promise<[string, number][]>;
   cardTypeAdd(root: string, name: string): Promise<CardType>;
   cardTypeUpdate(root: string, kind: CardType): Promise<void>;

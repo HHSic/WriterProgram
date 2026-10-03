@@ -15,6 +15,20 @@ export function selectDoc(id: string, newTab = false) {
   return openTarget({ kind: 'doc', id }, { newTab });
 }
 
+/** 고쳐 열기: writes a document that cannot be read again (the original kept) and opens it. */
+export async function mendDoc(id: string): Promise<boolean> {
+  try {
+    const mended = await api.docMend(root(), id);
+    await refreshOverview();
+    await selectDoc(id);
+    showToast({ text: `고쳐 열었습니다. 원래 파일은 ‘${mended.kept}’ 이름으로 같은 폴더에 남겨 두었습니다.` });
+    return true;
+  } catch (e) {
+    toastError('고쳐 열지 못함', e);
+    return false;
+  }
+}
+
 export async function addDoc(spec: NewDoc) {
   try {
     if (!(await saveEverything())) return;

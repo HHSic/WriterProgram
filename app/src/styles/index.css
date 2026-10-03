@@ -20,7 +20,7 @@
 @import './paragraphs.css'; /* Format preview head, paragraph margins and first lines, shown marks, 문자표. */
 @import './narrow.css'; /* Narrow middle column, parts in the tree. */
 @import './touch.css'; /* Touch: ⋯ buttons, sheets, long press, editing toolbar. */
-@import './devices.css'; /* Other devices: copies, comparing, where projects are kept, drives. */
+@import './devices.css'; /* Other devices: copies, comparing, where projects are kept, drives; 고쳐 열기 and recovering project.json. */
 @import './browser.css'; /* In-app browser (prototype). */
 @import './ruler.css'; /* Editor ruler (workspace/Ruler.tsx). */
 @import './page-editor.css'; /* Page editor of the manuscript format (workspace/PageEditor.tsx). */

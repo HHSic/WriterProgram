@@ -7,8 +7,8 @@ export type { Reading, SaveState, RightTab, FindScope, FindRequest, Jump, Settin
 export { findDoc, allManuscript, saveEverything, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
-export { enterProject, loadCatalog, updateProject, applyFormat, openProject, leaveProject, refreshOverview } from './project';
-export { selectDoc, addDoc, setStatus, setTarget, renameDoc, moveDoc, trashDoc, addPart, renamePart, removePart } from './docs';
+export { enterProject, loadCatalog, updateProject, applyFormat, openProject, recoverProject, leaveProject, refreshOverview } from './project';
+export { selectDoc, mendDoc, addDoc, setStatus, setTarget, renameDoc, moveDoc, trashDoc, addPart, renamePart, removePart } from './docs';
 export { previewCard, openCard, refreshCardCounts, createCard, patchCardSummary, trashCard } from './cards';
 export { loadNotes, focusNote, patchNote, addNote, addTextNote, showNote, trashNote, openNoteCounts } from './notes';
 export { selectPart, newDocPartId, openNotesBoard, openTable } from './places';

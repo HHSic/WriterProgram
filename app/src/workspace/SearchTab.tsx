@@ -8,6 +8,7 @@ import { buildRegex, replaceMatch, setHighlight } from '../editor/search';
 import { errorText, num } from '../lib/format';
 import { flushAll } from '../lib/flush';
 import { UNTITLED, docNumber } from '../lib/labels';
+import { skippedText, unreadableIn } from '../lib/unreadable';
 import {
   findDoc,
   jumpTo,
@@ -62,7 +63,9 @@ export function SearchTab() {
     if (scope === 'doc') return activeDocId ?? '-';
     const place = activeDocId ? findDoc(ov, activeDocId) : null;
     if (!place) return '-';
-    return (place.part ? place.part.docs : ov.planning).map((d) => d.id).join(',') || '-';
+    // Unreadable ones of the list too, so the search can say it left them out.
+    const unreadable = unreadableIn(ov.unreadable, place.part?.id ?? null).map((u) => u.id);
+    return [...(place.part ? place.part.docs : ov.planning).map((d) => d.id), ...unreadable].join(',') || '-';
   })();
   const docIds = useMemo(() => (scopeKey === '' ? undefined : scopeKey === '-' ? [] : scopeKey.split(',')), [scopeKey]);
 
@@ -156,7 +159,9 @@ export function SearchTab() {
           useApp.setState((s) => ({ docVersion: s.docVersion + 1, recordsVersion: s.recordsVersion + 1 }));
           await refreshOverview();
           showToast({
-            text: `${num(outcome.replaced)}곳 바꿈 · 문서 ${outcome.docs.length}개`,
+            text: `${num(outcome.replaced)}곳 바꿈 · 문서 ${outcome.docs.length}개${
+              outcome.skipped ? ` · 열 수 없는 문서 ${num(outcome.skipped)}개는 그대로 둠` : ''
+            }`,
             action: {
               label: '되돌리기',
               run: () => {
@@ -242,6 +247,7 @@ export function SearchTab() {
 
       {error && <p className="empty-note error-note">{error}</p>}
       {result && result.total === 0 && <p className="empty-note">찾은 곳이 없습니다.</p>}
+      {result && result.skipped > 0 && <p className="empty-note">{skippedText(result.skipped, '문서')}</p>}
       {result && result.total > 0 && (
         <p className="find-summary">
           {num(result.total)}곳 · 문서 {result.docs.length}개{result.truncated ? ' (앞부분만 보여 줌)' : ''}

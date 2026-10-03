@@ -2,7 +2,7 @@
 
 import type { CardSummary, CardType } from './cards';
 import type { CopyInfo } from './devices';
-import type { Counts, DocSummary } from './docs';
+import type { Counts, DocSummary, Section } from './docs';
 import type { ManuscriptFormat } from './format';
 
 export type ProjectKind = 'webnovel' | 'print';
@@ -44,7 +44,46 @@ export interface Overview {
   cards: CardSummary[];
   /** Copies left by sync programs, waiting for the writer to pick. */
   copies: CopyInfo[];
+  /** Listed documents whose file is there but cannot be read (고쳐 열기). */
+  unreadable: UnreadableDoc[];
 }
+
+/** A document whose file is there but cannot be read (writer_core::project::UnreadableDoc). */
+export interface UnreadableDoc {
+  id: string;
+  section: Section;
+  /** The part it is listed in; null for planning documents. */
+  part: string | null;
+  /** Its place among the rows shown in that part (or the planning list). */
+  index: number;
+  /** The title as well as it can be read; empty when unknown. */
+  titleGuess: string;
+  /** Why, in the writer's words. */
+  reason: string;
+  /** 고쳐 열기 can mend it (not when another program holds the file). */
+  repairable: boolean;
+}
+
+/** One way back for a damaged project.json: a backup's day or a copy's file. */
+export interface RecoveryChoice {
+  name: string;
+  /** When the copy was last written; null for a backup. */
+  modified: string | null;
+  parts: number;
+  chapters: number;
+}
+
+/** What can bring a damaged project.json back (writer_core::project::Recovery). */
+export interface Recovery {
+  /** A copy another device left. */
+  copy: RecoveryChoice | null;
+  /** The newest daily backup. */
+  backup: RecoveryChoice | null;
+  /** Chapter files in the folder: what rebuilding would list. */
+  chapterFiles: number;
+}
+
+export type RecoverWay = 'copy' | 'backup' | 'rebuild';
 
 export interface RecentItem {
   path: string;

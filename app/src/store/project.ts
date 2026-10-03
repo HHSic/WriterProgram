@@ -1,9 +1,9 @@
 // Opening, changing and leaving a project.
 
 import { api } from '../api';
-import type { ManuscriptFormat, Overview, ProjectPatch } from '../api/types';
+import type { ManuscriptFormat, Overview, ProjectPatch, RecoverWay } from '../api/types';
 import { get, root, set } from './state';
-import { openDialog, saveEverything, showToast, toastError } from './ui';
+import { closeDialog, openDialog, saveEverything, showToast, toastError } from './ui';
 import { commit, initialLayout, resetTabs } from './tabs';
 import { refreshCardCounts } from './cards';
 import { loadNotes } from './notes';
@@ -83,7 +83,24 @@ export async function openProject(path: string): Promise<boolean> {
     enterProject(await api.projectOpen(path));
     return true;
   } catch (e) {
-    toastError('작품을 열지 못함', e);
+    // A damaged project.json gets the recovery screen instead of an error line.
+    const recovery = await api.projectRecovery(path).catch(() => null);
+    if (recovery) openDialog({ kind: 'recover', path, recovery });
+    else toastError('작품을 열지 못함', e);
+    return false;
+  }
+}
+
+/** Brings a damaged project.json back the chosen way and opens the project. */
+export async function recoverProject(path: string, way: RecoverWay): Promise<boolean> {
+  try {
+    const ov = await api.projectRecover(path, way);
+    closeDialog();
+    enterProject(ov);
+    showToast({ text: '작품 구조를 되살렸습니다. 손상된 파일은 ‘project.json.damaged-…’ 이름으로 남겨 두었습니다.' });
+    return true;
+  } catch (e) {
+    toastError('작품 구조를 되살리지 못함', e);
     return false;
   }
 }

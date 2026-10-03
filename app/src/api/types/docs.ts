@@ -106,6 +106,28 @@ export interface NewDoc {
   title?: string;
 }
 
+/** What 고쳐 열기 would make of a document that cannot be read (writer_core::mend). */
+export interface MendPreview {
+  id: string;
+  section: Section;
+  title: string;
+  /** Why it could not be read. */
+  reason: string;
+  /** How the text was read: `utf-8`, `utf-16` or `euc-kr`. */
+  encoding: string;
+  /** The title and other chapter details are made anew. */
+  newFront: boolean;
+  /** The start of the text as it will read. */
+  text: string;
+  chars: number;
+}
+
+/** What 고쳐 열기 did: the original kept under this name in the same folder. */
+export interface Mended {
+  id: string;
+  kept: string;
+}
+
 export interface MetaPatch {
   title?: string;
   synopsis?: string;
