@@ -1,8 +1,10 @@
-//! Counts shown to writers: characters with and without spaces, and 200-cell
-//! manuscript paper (원고지) lines and sheets.
+//! Counts shown to writers: characters with and without spaces, 200-cell
+//! manuscript paper (원고지) lines and sheets, and what a serial platform's
+//! own counter would show (연재 플랫폼 기준, docs/platforms.md).
 //!
 //! `app/src/editor/counts.ts` implements the same rules for the live status
-//! bar; `tests/fixtures/counts.json` keeps the two in step.
+//! bar; `tests/fixtures/counts.json` and `tests/fixtures/platform-counts.json`
+//! keep the two in step.
 
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +20,17 @@ pub struct Counts {
     /// Sheets of 200-cell 원고지, rounded up. A new chapter starts on a new sheet,
     /// so totals add sheets rather than lines.
     pub manuscript_pages: u32,
+    /// Straight marks some platforms leave out: `. , ! ? ' "` (노벨피아).
+    #[serde(default)]
+    pub plain_marks: u32,
+    /// Characters outside the Basic Multilingual Plane (most emoji). A counter
+    /// that uses JavaScript string length counts each of them twice.
+    #[serde(default)]
+    pub wide: u32,
+    /// What `<`, `>` and `&` add when a counter reads the editor's HTML, where
+    /// they are `&lt;`, `&gt;` (3 more each) and `&amp;` (4 more).
+    #[serde(default)]
+    pub html_extra: u32,
 }
 
 impl Counts {
@@ -26,6 +39,62 @@ impl Counts {
         self.without_spaces += other.without_spaces;
         self.manuscript_lines += other.manuscript_lines;
         self.manuscript_pages += other.manuscript_pages;
+        self.plain_marks += other.plain_marks;
+        self.wide += other.wide;
+        self.html_extra += other.html_extra;
+    }
+
+    /// Characters as a platform with `rule` counts them. Line breaks never count.
+    pub fn by_rule(&self, rule: &CountRule) -> u32 {
+        let mut n = if rule.spaces {
+            self.with_spaces
+        } else {
+            self.without_spaces
+        };
+        if rule.skip_marks {
+            n = n.saturating_sub(self.plain_marks);
+        }
+        if rule.wide_twice {
+            n += self.wide;
+        }
+        if rule.html_escapes {
+            n += self.html_extra;
+        }
+        n
+    }
+}
+
+/// How a serial platform counts characters for its minimums. The presets for
+/// each platform live in `app/src/lib/platforms.ts`; a project keeps its own
+/// copy so the writer can change it (docs/platforms.md).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CountRule {
+    /// Spaces count (공백 포함).
+    #[serde(default)]
+    pub spaces: bool,
+    /// `. , ! ? ' "` do not count.
+    #[serde(default)]
+    pub skip_marks: bool,
+    /// Characters outside the Basic Multilingual Plane count as two.
+    #[serde(default)]
+    pub wide_twice: bool,
+    /// `<`, `>` count as four and `&` as five, as in the editor's HTML.
+    #[serde(default)]
+    pub html_escapes: bool,
+}
+
+/// Straight marks 노벨피아 leaves out of its count.
+pub fn is_plain_mark(c: char) -> bool {
+    matches!(c, '.' | ',' | '!' | '?' | '\'' | '"')
+}
+
+/// What a character adds when written as HTML text.
+fn html_extra(c: char) -> u32 {
+    match c {
+        '<' | '>' => 3,
+        '&' => 4,
+        _ => 0,
     }
 }
 
@@ -66,6 +135,13 @@ pub fn count_blocks(blocks: &[Block]) -> Counts {
                         if !is_space(c) {
                             counts.without_spaces += 1;
                         }
+                        if is_plain_mark(c) {
+                            counts.plain_marks += 1;
+                        }
+                        if u32::from(c) > 0xFFFF {
+                            counts.wide += 1;
+                        }
+                        counts.html_extra += html_extra(c);
                     }
                     lines += paper_lines(line, i == 0);
                 }
@@ -149,6 +225,36 @@ mod tests {
         // A line break is not a character.
         let c = count("첫 줄\n둘째 줄");
         assert_eq!((c.with_spaces, c.without_spaces), (7, 5));
+    }
+
+    #[test]
+    fn platform_rules() {
+        let c = count("“그래.” 그가 말했다! 😀 <a&b>");
+        let rule = |spaces, skip_marks, wide_twice, html_escapes| CountRule {
+            spaces,
+            skip_marks,
+            wide_twice,
+            html_escapes,
+        };
+        assert_eq!(c.by_rule(&rule(true, false, false, false)), c.with_spaces);
+        assert_eq!(
+            c.by_rule(&rule(false, false, false, false)),
+            c.without_spaces
+        );
+        // Curly quotes still count; the period and the exclamation mark do not.
+        assert_eq!(c.plain_marks, 2);
+        assert_eq!(
+            c.by_rule(&rule(false, true, false, false)),
+            c.without_spaces - 2
+        );
+        assert_eq!(
+            c.by_rule(&rule(false, false, true, false)),
+            c.without_spaces + 1
+        );
+        assert_eq!(
+            c.by_rule(&rule(false, false, false, true)),
+            c.without_spaces + 10
+        );
     }
 
     #[test]

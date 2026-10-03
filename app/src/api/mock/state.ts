@@ -1,7 +1,7 @@
 // The stand-in's projects in memory, the helpers every part of it shares, and the sample project.
 
 import type { JSONContent } from '@tiptap/core';
-import { blocksFromJSON, countBlocks } from '../../editor/counts';
+import { ZERO_COUNTS, blocksFromJSON, countBlocks } from '../../editor/counts';
 import type {
   Card,
   CardSummary,
@@ -148,8 +148,11 @@ export function overview(root: string): Overview {
         withoutSpaces: t.withoutSpaces + d.counts.withoutSpaces,
         manuscriptLines: t.manuscriptLines + d.counts.manuscriptLines,
         manuscriptPages: t.manuscriptPages + d.counts.manuscriptPages,
+        plainMarks: t.plainMarks + d.counts.plainMarks,
+        wide: t.wide + d.counts.wide,
+        htmlExtra: t.htmlExtra + d.counts.htmlExtra,
       }),
-      { withSpaces: 0, withoutSpaces: 0, manuscriptLines: 0, manuscriptPages: 0 },
+      { ...ZERO_COUNTS },
     );
   return {
     root,
@@ -196,6 +199,7 @@ export function createProject(parent: string, title: string, kind: ProjectInfo['
       sceneBreak: kind === 'webnovel' ? '◆' : '*',
       manuscriptFormat: defaultFormat(kind),
       keepDaily: false,
+      platform: null,
     },
     parts: [{ id: id(), title: '1부', docs: [] }],
     planning: [],

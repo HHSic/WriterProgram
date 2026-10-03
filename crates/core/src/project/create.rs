@@ -7,8 +7,8 @@ use serde::Deserialize;
 use serde_json::Map;
 
 use super::{
-    APP_NAME, FORMAT_VERSION, Goal, MANUSCRIPT_DIR, PLANNING_DIR, Project, ProjectKind, new_part,
-    save, unique_dir, yes,
+    APP_NAME, FORMAT_VERSION, Goal, MANUSCRIPT_DIR, PLANNING_DIR, Platform, Project, ProjectKind,
+    new_part, save, unique_dir, yes,
 };
 use crate::cards;
 use crate::doc::{self, DocFile, DocMeta, Section};
@@ -30,6 +30,9 @@ pub struct NewProject {
     /// Create "1부" with a first chapter.
     #[serde(default = "yes")]
     pub first_chapter: bool,
+    /// 연재 플랫폼, for web novels.
+    #[serde(default)]
+    pub platform: Option<Platform>,
 }
 
 /// Creates a new project folder inside `opts.parent` and returns its path.
@@ -81,6 +84,10 @@ pub fn create(opts: &NewProject) -> Result<PathBuf> {
         parts: vec![part],
         planning,
         keep_daily: false,
+        platform: opts
+            .platform
+            .clone()
+            .filter(|_| opts.kind == ProjectKind::Webnovel),
         extra: Map::new(),
     };
     save(&root, &project)?;

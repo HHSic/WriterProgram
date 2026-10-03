@@ -17,6 +17,7 @@ fn new_project(dir: &Path, kind: ProjectKind) -> PathBuf {
         per_doc_goal: Some(5000),
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .unwrap()
 }
@@ -440,6 +441,52 @@ fn keeping_daily_states_spares_each_days_last_record() {
 }
 
 #[test]
+fn platform_is_kept_and_taken_away() {
+    use writer_core::count::CountRule;
+
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    assert!(project::overview(&root).unwrap().project.platform.is_none());
+
+    // The way the app sends it: JSON with the rule the writer may have changed.
+    let patch: project::ProjectPatch = serde_json::from_str(
+        r#"{"platform": {"id": "novelpia", "rule": {"spaces": false, "skipMarks": true}}}"#,
+    )
+    .unwrap();
+    let info = project::update(&root, &patch).unwrap();
+    let platform = info.platform.unwrap();
+    assert_eq!(platform.id, "novelpia");
+    assert_eq!(
+        platform.rule,
+        CountRule {
+            skip_marks: true,
+            ..CountRule::default()
+        }
+    );
+    let saved = fs::read_to_string(root.join("project.json")).unwrap();
+    assert!(saved.contains("\"skipMarks\": true"), "{saved}");
+
+    // Leaving the field out keeps it; null takes it away.
+    let info = project::update(
+        &root,
+        &serde_json::from_str(r#"{"title": "새 제목"}"#).unwrap(),
+    )
+    .unwrap();
+    assert!(info.platform.is_some());
+    let info = project::update(
+        &root,
+        &serde_json::from_str(r#"{"platform": null}"#).unwrap(),
+    )
+    .unwrap();
+    assert!(info.platform.is_none());
+    assert!(
+        !fs::read_to_string(root.join("project.json"))
+            .unwrap()
+            .contains("platform")
+    );
+}
+
+#[test]
 fn structure_editing() {
     let dir = tempfile::tempdir().unwrap();
     let root = new_project(dir.path(), ProjectKind::Webnovel);
@@ -820,6 +867,32 @@ fn counts_fixture() {
         assert_eq!(
             count_blocks(&case.body.content),
             case.counts,
+            "{}",
+            case.name
+        );
+    }
+}
+
+/// Same cases as app/src/editor/counts.test.ts: a chapter counted the way a
+/// serial platform counts it (docs/platforms.md).
+#[test]
+fn platform_counts_fixture() {
+    use writer_core::count::CountRule;
+
+    #[derive(serde::Deserialize)]
+    struct Case {
+        name: String,
+        body: Body,
+        rule: CountRule,
+        chars: u32,
+    }
+    let text = include_str!("fixtures/platform-counts.json");
+    let cases: Vec<Case> = serde_json::from_str(text).unwrap();
+    assert!(!cases.is_empty());
+    for case in cases {
+        assert_eq!(
+            count_blocks(&case.body.content).by_rule(&case.rule),
+            case.chars,
             "{}",
             case.name
         );

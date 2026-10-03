@@ -39,6 +39,7 @@ fn saves_records_and_imports_are_journaled_without_text() {
         per_doc_goal: None,
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .unwrap();
     let id = project::overview(&root).unwrap().parts[0].docs[0]

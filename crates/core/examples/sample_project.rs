@@ -23,6 +23,7 @@ fn main() {
         per_doc_goal: Some(5000),
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .expect("create project");
 

@@ -2,7 +2,7 @@
 
 import type { CardSummary, CardType } from './cards';
 import type { CopyInfo } from './devices';
-import type { Counts, DocSummary } from './docs';
+import type { CountRule, Counts, DocSummary } from './docs';
 import type { ManuscriptFormat } from './format';
 
 export type ProjectKind = 'webnovel' | 'print';
@@ -11,6 +11,13 @@ export interface Goal {
   perDoc: number | null;
   countSpaces: boolean;
   daily: number | null;
+}
+
+/** 연재 플랫폼 and how it counts (crates/core/src/project/mod.rs `Platform`). */
+export interface Platform {
+  /** An id from lib/platforms.ts, or `custom`. */
+  id: string;
+  rule: CountRule;
 }
 
 export interface ProjectInfo {
@@ -24,6 +31,8 @@ export interface ProjectInfo {
   manuscriptFormat: ManuscriptFormat;
   /** 창작 과정 보관: each chapter's last record of a day is never cleared. */
   keepDaily: boolean;
+  /** 연재 플랫폼 whose counting chapter counts and goals follow (web novels). */
+  platform: Platform | null;
 }
 
 export interface PartView {
@@ -62,6 +71,7 @@ export interface NewProject {
   perDocGoal: number | null;
   countSpaces: boolean;
   firstChapter: boolean;
+  platform?: Platform | null;
 }
 
 /** 이 작품 크기, in bytes (crates/core/src/project/size.rs). */
@@ -93,4 +103,6 @@ export interface ProjectPatch {
   sceneBreak?: string;
   manuscriptFormat?: ManuscriptFormat;
   keepDaily?: boolean;
+  /** null takes the platform away. */
+  platform?: Platform | null;
 }

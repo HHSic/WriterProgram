@@ -7,8 +7,9 @@ import type { MenuItem, MenuOptions } from '../components/Menu';
 import { MoreButton } from '../components/MoreButton';
 import { num } from '../lib/format';
 import { STATUS_LABEL, UNTITLED } from '../lib/labels';
+import { goalChars } from '../lib/platforms';
 import { pressMenu, type TouchDrag } from '../lib/press';
-import { openDocInNewTab, selectDoc } from '../store';
+import { openDocInNewTab, selectDoc, useApp } from '../store';
 import { CopyBadge } from './Copies';
 
 export function DocItem({
@@ -45,7 +46,9 @@ export function DocItem({
   onDrop: (e: DragEvent) => void;
   onDragEnd: () => void;
 }) {
-  const chars = countSpaces ? doc.counts.withSpaces : doc.counts.withoutSpaces;
+  // Counted the way goals are: by the project's 연재 플랫폼 when it has one.
+  const project = useApp((s) => s.overview?.project);
+  const chars = project ? goalChars(project, doc.counts) : countSpaces ? doc.counts.withSpaces : doc.counts.withoutSpaces;
   const pct = goal ? Math.min(100, Math.round((chars / goal) * 100)) : null;
   const title = `${label} ${doc.title || UNTITLED}`;
   // The synopsis a mouse sees on hover shows at the top of the menu.

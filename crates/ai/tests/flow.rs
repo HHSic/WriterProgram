@@ -25,6 +25,7 @@ fn sample(dir: &Path) -> (PathBuf, String) {
         per_doc_goal: None,
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .unwrap();
     let id = project::load(&root).unwrap().parts[0].docs[0].clone();

@@ -11,6 +11,7 @@ import { MoreButton } from '../components/MoreButton';
 import { pressMenu } from '../lib/press';
 import { num, timeLabel } from '../lib/format';
 import { registerFlusher } from '../lib/flush';
+import { goalChars, platformName, platformOf } from '../lib/platforms';
 import { STATUS_LABEL, UNTITLED, docNoun, docNumber, statusesFor, withObject, withSubject } from '../lib/labels';
 import {
   moveDoc,
@@ -61,7 +62,9 @@ export function OutlineTable({ partId }: { partId: string }) {
   const memos = openNoteCounts(notes);
   const rows = part.docs.filter((d) => !filter || d.status === filter);
   const show = (c: ColumnId) => !hidden.has(c);
-  const chars = (d: DocSummary) => (ov.project.goal.countSpaces ? d.counts.withSpaces : d.counts.withoutSpaces);
+  // Counted the way goals are: by the 연재 플랫폼 when there is one.
+  const chars = (d: DocSummary) => goalChars(ov.project, d.counts);
+  const platform = platformOf(ov.project);
   const byStatus = statusesFor(kind)
     .map((s) => [s, part.docs.filter((d) => d.status === s).length] as const)
     .filter(([, n]) => n > 0);
@@ -151,7 +154,11 @@ export function OutlineTable({ partId }: { partId: string }) {
                   <th className="c-title">제목</th>
                   {show('synopsis') && <th className="c-synopsis">시놉시스</th>}
                   {show('status') && <th className="c-status">상태</th>}
-                  {show('length') && <th className="c-length">분량</th>}
+                  {show('length') && (
+                    <th className="c-length" title={platform ? `${platformName(platform)}에서 세는 법으로 셈` : undefined}>
+                      {platform ? `분량 (${platformName(platform)} 기준)` : '분량'}
+                    </th>
+                  )}
                   {show('notes') && <th className="c-notes">열린 메모</th>}
                   {show('modified') && <th className="c-modified">마지막 수정</th>}
                 </tr>

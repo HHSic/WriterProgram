@@ -2,6 +2,8 @@ import { placeNote, usePlaceOf } from '../components/PlacePicker';
 import { num, timeLabel } from '../lib/format';
 import { writtenToday } from '../lib/today';
 import { paperName } from '../lib/labels';
+import { goalChars, platformName, platformOf, ruleText } from '../lib/platforms';
+import { countByRule } from '../editor/counts';
 import { findDoc, openDialog, syncNow, useApp } from '../store';
 
 export function StatusBar() {
@@ -22,7 +24,9 @@ export function StatusBar() {
   const today = writtenToday(ov.project.id, lengths);
 
   const goal = place?.section === 'manuscript' ? (place.doc.target ?? ov.project.goal.perDoc) : null;
-  const goalChars = counts ? (ov.project.goal.countSpaces ? counts.withSpaces : counts.withoutSpaces) : 0;
+  const goalCount = counts ? goalChars(ov.project, counts) : 0;
+  // 연재 플랫폼: the chapter as the platform's own counter would count it.
+  const platform = place?.section === 'manuscript' ? platformOf(ov.project) : null;
 
   return (
     <footer className="status-bar" aria-label="분량">
@@ -38,6 +42,11 @@ export function StatusBar() {
               <span className="status-item">공백 제외 {num(counts.withoutSpaces)}자</span>
             </>
           )}
+          {platform && (
+            <span className="status-item strong" title={`${platformName(platform)}에서 세는 법: ${ruleText(platform.rule)}`}>
+              {platformName(platform)} 기준 {num(countByRule(counts, platform.rule))}자
+            </span>
+          )}
           <span className="status-item">원고지 {num(counts.manuscriptPages)}매</span>
           {place?.doc.pages != null && (
             <span className="status-item" title="작품 설정의 원고 서식으로 셈">
@@ -46,7 +55,7 @@ export function StatusBar() {
           )}
           {goal ? (
             <span className="status-item">
-              목표 {num(goal)}자의 {Math.floor((goalChars / goal) * 100)}%
+              목표 {num(goal)}자의 {Math.floor((goalCount / goal) * 100)}%
             </span>
           ) : null}
         </>

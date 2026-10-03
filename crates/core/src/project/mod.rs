@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::cards::{self, CardType};
+use crate::count::CountRule;
 use crate::format::{self, ManuscriptFormat};
 use crate::store::{atomic_write, new_id, read_text};
 use crate::{Error, Result};
@@ -70,6 +71,19 @@ pub struct Goal {
 
 fn yes() -> bool {
     true
+}
+
+/// 연재 플랫폼: where a web novel is serialized, and how that platform counts
+/// characters. The rule is kept with the project so the writer can change it
+/// when a platform changes its counter (docs/platforms.md).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Platform {
+    /// `munpia`, `novelpia`, `kakaopage`, `naver`, `ridi` or `custom`
+    /// (app/src/lib/platforms.ts).
+    pub id: String,
+    #[serde(default)]
+    pub rule: CountRule,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -115,6 +129,9 @@ pub struct Project {
     /// Off unless the writer turns it on.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keep_daily: bool,
+    /// 연재 플랫폼 whose counting chapter counts and goals follow. Web novels only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<Platform>,
     /// Keys written by newer versions, kept as they are.
     #[serde(flatten)]
     pub extra: Map<String, Value>,

@@ -397,7 +397,7 @@ pub struct MetaPatch {
     pub target: Option<Option<u32>>,
 }
 
-mod double_option {
+pub(crate) mod double_option {
     use serde::{Deserialize, Deserializer};
 
     pub fn deserialize<'de, D, T>(d: D) -> Result<Option<Option<T>>, D::Error>
