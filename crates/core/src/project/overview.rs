@@ -15,6 +15,7 @@ use crate::doc::{self, DocFile, Section};
 use crate::format::ManuscriptFormat;
 use crate::layout::PageMetrics;
 use crate::markup::Block;
+use crate::mend::{self, Reading};
 use crate::store::modified_iso;
 use crate::{Error, Result, snapshot, trash};
 
@@ -103,6 +104,28 @@ pub struct Overview {
     pub cards: Vec<CardSummary>,
     /// Copies left by sync programs, waiting for the writer to pick (copies/).
     pub copies: Vec<CopyInfo>,
+    /// Listed documents whose file is there but cannot be read (mend.rs).
+    pub unreadable: Vec<UnreadableDoc>,
+}
+
+/// A listed document whose file is there but cannot be read. The tree shows
+/// it dimmed at its place with 고쳐 열기 (docs/safety-design.md S4).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnreadableDoc {
+    pub id: String,
+    pub section: Section,
+    /// The part it is listed in; none for planning documents.
+    pub part: Option<String>,
+    /// Its place among the rows shown in that part (or the planning list),
+    /// counting the other unreadable ones before it.
+    pub index: usize,
+    /// The title as well as it can be read; empty when unknown.
+    pub title_guess: String,
+    /// Why, in the writer's words.
+    pub reason: String,
+    /// 고쳐 열기 can mend it (not when another program holds the file).
+    pub repairable: bool,
 }
 
 /// Opens a project: sorts out what sync programs left (copies/), brings the
@@ -130,22 +153,42 @@ pub fn open(root: &Path) -> Result<Overview> {
 }
 
 /// Reads the documents the structure lists. One whose file is not there
-/// (yet: it may still be on its way from another device) or cannot be read
-/// right now is left out, as is a second mention of the same document.
+/// (yet: it may still be on its way from another device) is left out, as is
+/// a second mention of the same document. One whose file is there but cannot
+/// be read goes to `unreadable` (mend.rs), at its place among the rows shown.
 fn listed_docs<'a>(
     root: &Path,
     section: Section,
+    part: Option<&str>,
     ids: impl IntoIterator<Item = &'a String>,
     seen: &mut HashSet<String>,
+    unreadable: &mut Vec<UnreadableDoc>,
 ) -> Vec<(DocFile, Option<String>)> {
-    ids.into_iter()
-        .filter(|id| seen.insert((*id).clone()))
-        .filter_map(|id| {
-            let path = root.join(section.dir()).join(doc::file_name(id));
-            let file = doc::read_doc(&path).ok()?;
-            Some((file, modified_iso(&path)))
-        })
-        .collect()
+    let mut out = Vec::new();
+    for id in ids.into_iter().filter(|id| seen.insert((*id).clone())) {
+        let path = root.join(section.dir()).join(doc::file_name(id));
+        match mend::read(&path) {
+            Reading::Missing => {}
+            Reading::Read(file) => out.push((*file, modified_iso(&path))),
+            Reading::Unreadable(trouble) => {
+                let index = out.len()
+                    + unreadable
+                        .iter()
+                        .filter(|u| u.section == section && u.part.as_deref() == part)
+                        .count();
+                unreadable.push(UnreadableDoc {
+                    id: id.clone(),
+                    section,
+                    part: part.map(str::to_string),
+                    index,
+                    title_guess: trouble.title_guess,
+                    reason: trouble.reason,
+                    repairable: trouble.repairable,
+                });
+            }
+        }
+    }
+    out
 }
 
 /// Whether a document listed in the structure has its file.
@@ -160,9 +203,18 @@ pub fn overview(root: &Path) -> Result<Overview> {
     let mut total = Counts::default();
     let mut bodies: Vec<Vec<Block>> = Vec::new();
     let mut parts = Vec::with_capacity(project.parts.len());
+    let mut unreadable = Vec::new();
     for part in &project.parts {
         let mut docs = Vec::with_capacity(part.docs.len());
-        for (file, modified) in listed_docs(root, Section::Manuscript, &part.docs, &mut seen) {
+        let listed = listed_docs(
+            root,
+            Section::Manuscript,
+            Some(&part.id),
+            &part.docs,
+            &mut seen,
+            &mut unreadable,
+        );
+        for (file, modified) in listed {
             let mut summary = DocSummary::of(&file, metrics.as_ref());
             summary.modified = modified;
             total.add(&summary.counts);
@@ -175,14 +227,21 @@ pub fn overview(root: &Path) -> Result<Overview> {
             docs,
         });
     }
-    let planning = listed_docs(root, Section::Planning, &project.planning, &mut seen)
-        .into_iter()
-        .map(|(file, modified)| {
-            let mut summary = DocSummary::of(&file, None);
-            summary.modified = modified;
-            summary
-        })
-        .collect();
+    let planning = listed_docs(
+        root,
+        Section::Planning,
+        None,
+        &project.planning,
+        &mut seen,
+        &mut unreadable,
+    )
+    .into_iter()
+    .map(|(file, modified)| {
+        let mut summary = DocSummary::of(&file, None);
+        summary.modified = modified;
+        summary
+    })
+    .collect();
     Ok(Overview {
         root: root.to_string_lossy().into_owned(),
         project: ProjectInfo::from(&project),
@@ -194,6 +253,7 @@ pub fn overview(root: &Path) -> Result<Overview> {
         card_types: project.card_types(),
         cards: cards::list(root)?,
         copies: copies::list(root)?,
+        unreadable,
     })
 }
 
@@ -207,8 +267,10 @@ pub fn estimate_pages(root: &Path, format: &ManuscriptFormat) -> Result<Option<u
     let bodies: Vec<Vec<Block>> = listed_docs(
         root,
         Section::Manuscript,
+        None,
         project.parts.iter().flat_map(|p| &p.docs),
         &mut HashSet::new(),
+        &mut Vec::new(),
     )
     .into_iter()
     .map(|(file, _)| file.body)
@@ -229,7 +291,7 @@ fn ids_on_disk(root: &Path, section: Section) -> Result<Vec<String>> {
 /// entries listed twice. Entries whose file is missing stay: with folder sync
 /// the structure can arrive before the chapter files, and the tree leaves
 /// them out until they come. Returns whether anything changed.
-fn repair(root: &Path, project: &mut Project) -> Result<bool> {
+pub(super) fn repair(root: &Path, project: &mut Project) -> Result<bool> {
     let mut changed = false;
     if project.parts.is_empty() {
         project.parts.push(new_part("1부"));
@@ -270,7 +332,7 @@ fn repair(root: &Path, project: &mut Project) -> Result<bool> {
     Ok(changed)
 }
 
-fn sort_by_created(root: &Path, section: Section, ids: &mut [String]) {
+pub(super) fn sort_by_created(root: &Path, section: Section, ids: &mut [String]) {
     ids.sort_by_cached_key(|id| {
         let path = root.join(section.dir()).join(doc::file_name(id));
         let created = doc::read_doc(&path)

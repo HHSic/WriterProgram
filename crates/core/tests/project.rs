@@ -691,7 +691,7 @@ fn setting_cards() {
     let names: Vec<_> = ov.cards.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(names, ["달빛 서점", "윤서하"]);
 
-    let seen = cards::appearances(&root, &card.id).unwrap();
+    let seen = cards::appearances(&root, &card.id).unwrap().places;
     assert_eq!(seen.len(), 1);
     assert_eq!(seen[0].doc_id, first);
     assert_eq!(seen[0].count, 2);

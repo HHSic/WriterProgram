@@ -42,7 +42,10 @@ pub fn reconcile(root: &Path) -> Result<bool> {
                 continue;
             }
             let source = dir.join(file);
-            let mut d = doc::parse_doc(&read_text(&source)?, &id);
+            // Files written by hand are often not UTF-8 (Notepad's ANSI is
+            // EUC-KR): read them the way importing does.
+            let bytes = fs::read(&source).map_err(|e| Error::io(&source, e))?;
+            let mut d = doc::parse_doc(&crate::import::decode(&bytes, None).0, &id);
             d.meta.id = id.clone();
             if d.meta.title.trim().is_empty() {
                 d.meta.title = stem.to_string();
@@ -60,7 +63,7 @@ pub fn reconcile(root: &Path) -> Result<bool> {
 
 /// Copies of `project.json` in the project folder: `project-DESKTOP-1.json`,
 /// `project (1).json` and so on, that belong to this project.
-fn project_copies(root: &Path, id: Option<&str>) -> Vec<(PathBuf, Project)> {
+pub(crate) fn project_copies(root: &Path, id: Option<&str>) -> Vec<(PathBuf, Project)> {
     let Ok(entries) = fs::read_dir(root) else {
         return Vec::new();
     };

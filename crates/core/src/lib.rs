@@ -23,6 +23,7 @@ pub mod indent;
 pub mod journal;
 pub mod layout;
 pub mod markup;
+pub mod mend;
 pub mod notes;
 pub mod places;
 pub mod project;

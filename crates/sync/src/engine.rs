@@ -67,8 +67,9 @@ struct Here {
 
 /// Hidden folders that travel with the project: records, trash, the
 /// creation journal (one file per device, so both sides never change the same
-/// one) and what was sent to editors (교정본 주고받기).
-const HIDDEN_KEPT: [&str; 4] = [".snapshots", ".trash", ".journal", ".exchanges"];
+/// one), what was sent to editors (교정본 주고받기) and the daily backups of
+/// project.json.
+const HIDDEN_KEPT: [&str; 5] = [".snapshots", ".trash", ".journal", ".exchanges", ".backup"];
 
 /// Which files belong to the project on a drive: everything but temporary
 /// files, hidden folders other than the kept ones, and system files.
@@ -444,6 +445,7 @@ mod tests {
         assert!(wanted(".exchanges/abc/exchange.json"));
         assert!(wanted(".trash/x/item.json"));
         assert!(wanted(".journal/k7q2m9x4t1ab.jsonl"));
+        assert!(wanted(".backup/project-2026-10-03.json"));
         assert!(!wanted("manuscript/.abc.md.x1.tmp"));
         assert!(!wanted(".git/config"));
         assert!(!wanted("desktop.ini"));

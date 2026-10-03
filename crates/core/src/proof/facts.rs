@@ -12,9 +12,10 @@ use similar::{Algorithm, DiffTag, capture_diff_slices_deadline};
 
 use super::Options;
 use crate::count::count_blocks;
-use crate::doc::{self, DocFile};
+use crate::doc::{self, DocFile, Section};
 use crate::journal::fingerprint;
 use crate::markup::write_body;
+use crate::mend::{self, Reading};
 use crate::project::{self, ProjectKind};
 use crate::store::parse_iso;
 use crate::{Error, Result, corrections, snapshot};
@@ -128,6 +129,17 @@ pub(crate) struct Chapter {
     pub file: DocFile,
 }
 
+/// A chapter in scope the certificate cannot cover: its file is not there
+/// (yet) or cannot be read. Listed as 빠진 회차, never left out silently.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Missing {
+    pub id: String,
+    pub number: usize,
+    /// The title as well as it can be read; empty when unknown.
+    pub title: String,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub(crate) struct Day {
     pub inserted: u64,
@@ -192,6 +204,8 @@ pub(crate) struct Facts {
     pub pen_name: String,
     pub kind: ProjectKind,
     pub chapters: Vec<Chapter>,
+    /// Chapters in scope left out (빠진 회차).
+    pub missing: Vec<Missing>,
     pub days: BTreeMap<NaiveDate, Day>,
     pub rows: Vec<Row>,
     pub imports: Vec<ImportRow>,
@@ -207,13 +221,36 @@ pub(crate) fn noun(kind: ProjectKind) -> &'static str {
     }
 }
 
-/// The manuscript chapters in order, all of them.
-pub(crate) fn chapters(root: &Path) -> Result<(project::Project, Vec<Chapter>)> {
+/// The manuscript chapters in order, all of them, and the ones whose file
+/// is not there or cannot be read.
+pub(crate) fn chapters(root: &Path) -> Result<(project::Project, Vec<Chapter>, Vec<Missing>)> {
     let project = project::load(root)?;
     let mut out = Vec::new();
+    let mut missing = Vec::new();
     for (i, id) in project.parts.iter().flat_map(|p| &p.docs).enumerate() {
-        let Ok(file) = doc::load(root, id) else {
-            continue;
+        let path = root
+            .join(Section::Manuscript.dir())
+            .join(doc::file_name(id));
+        let file = match mend::read(&path) {
+            Reading::Read(file) => *file,
+            Reading::Missing => {
+                missing.push(Missing {
+                    id: id.clone(),
+                    number: i + 1,
+                    title: String::new(),
+                    reason: "이 기기에 파일이 없음".into(),
+                });
+                continue;
+            }
+            Reading::Unreadable(trouble) => {
+                missing.push(Missing {
+                    id: id.clone(),
+                    number: i + 1,
+                    title: trouble.title_guess,
+                    reason: trouble.reason,
+                });
+                continue;
+            }
         };
         out.push(Chapter {
             id: id.clone(),
@@ -224,7 +261,7 @@ pub(crate) fn chapters(root: &Path) -> Result<(project::Project, Vec<Chapter>)> 
             file,
         });
     }
-    Ok((project, out))
+    Ok((project, out, missing))
 }
 
 /// Works out the facts for `scope` from every device's journal lines.
@@ -233,7 +270,7 @@ pub(crate) fn gather(
     scope: &Scope,
     journals: &[(String, Vec<Vec<u8>>)],
 ) -> Result<Facts> {
-    let (project, all) = chapters(root)?;
+    let (project, all, missing) = chapters(root)?;
     let number: HashMap<&str, usize> = all.iter().map(|c| (c.id.as_str(), c.number)).collect();
     let chapters: Vec<Chapter> = all
         .iter()
@@ -241,10 +278,16 @@ pub(crate) fn gather(
         .cloned()
         .collect();
     if let Some(docs) = &scope.docs
-        && let Some(missing) = docs.iter().find(|d| !number.contains_key(d.as_str()))
+        && let Some(unknown) = docs
+            .iter()
+            .find(|d| !number.contains_key(d.as_str()) && !missing.iter().any(|m| &m.id == *d))
     {
-        return Err(Error::NotFound(format!("회차를 찾을 수 없음: {missing}")));
+        return Err(Error::NotFound(format!("회차를 찾을 수 없음: {unknown}")));
     }
+    let missing: Vec<Missing> = missing
+        .into_iter()
+        .filter(|m| scope.has_doc(&m.id))
+        .collect();
 
     let mut events: Vec<Event> = Vec::new();
     let mut devices = 0;
@@ -387,6 +430,7 @@ pub(crate) fn gather(
         kind: project.kind,
         exchanges: exchanges(root, scope, &number)?,
         chapters,
+        missing,
         days,
         rows,
         imports,

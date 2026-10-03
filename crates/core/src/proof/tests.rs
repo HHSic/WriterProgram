@@ -366,3 +366,24 @@ fn certificates_go_into_a_new_folder_each_time() {
     assert!(verify(&bundle, &[]).ok);
     assert!(first.ok);
 }
+
+#[test]
+fn chapters_that_cannot_be_read_are_listed_as_left_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = anchored(dir.path());
+    let path = root.join("manuscript").join(doc::file_name(DOCS[1]));
+    let src = format!("---\nid: \"{}\"\ntitle: \"둘째\"\n---\n\n본문\n", DOCS[1]);
+    fs::write(&path, encoding_rs::EUC_KR.encode(&src).0).unwrap();
+
+    let m = made(&root, &Options::default());
+    assert!(m.html.contains("빠진 회차"));
+    assert!(m.html.contains("2화 둘째 · 다른 글자 방식"), "{}", m.html);
+    // Picking that chapter alone is not an error: it is listed as left out.
+    let only = |id: &str| Options {
+        docs: Some(vec![id.into()]),
+        ..Options::default()
+    };
+    assert!(made(&root, &only(DOCS[1])).html.contains("빠진 회차"));
+    // A chapter that is there in full is not listed.
+    assert!(!made(&root, &only(DOCS[0])).html.contains("빠진 회차"));
+}
