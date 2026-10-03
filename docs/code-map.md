@@ -42,7 +42,7 @@
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
 | `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange, ai …), 화면은 `store/index.ts`에서 가져다 씀 |
 | AI 점검 | `workspace/AiTab.tsx`(오른쪽 탭: 보낼 내용 보기 → 보내기 → 결과), `workspace/AiDialog.tsx`(AI 연결 설정), `store/ai.ts`(설정, `askAi`, 시놉시스에 넣기), `lib/aiText.ts`(보낼 양·쓴 양 문장), `api/mock/ai.ts`(흉내 답) |
-| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
+| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조(이름 낱말 경계는 `names.ts`), 꾸밈 다시 계산(`decorate.ts`: 바뀐 문단만, 한글 조합 중에는 옮기기만), 한글 조합 끝 알림(`composition.ts`), 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
 | `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`, 창작 일지·날짜 증명·창작 과정 보관은 `JournalField.tsx`), 창작 과정 증명서는 `ProofDialog.tsx`. 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
 | `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`) |
 | `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
@@ -94,6 +94,7 @@ npm --prefix app test
 | `store::new_id` | 12자 id가 파일 이름이라 형식을 바꿀 수 없다 |
 | 문서 앞머리 읽기·쓰기 | 모르는 키를 순서 그대로 남겨야 한다(YAML 라이브러리는 파일을 다시 씀) |
 | `count.rs` 빈칸 목록, `editor/counts.ts` | Rust와 화면 글자 수가 같아야 해서 같은 목록을 둔다 |
+| `cards.rs` `NAME_ENDINGS`, `editor/names.ts` | 설정집 이름 뒤 조사 목록. 등장 위치와 화면 강조가 같아야 해서 같은 목록을 두고 `tests/fixtures/names.json`으로 맞춘다 |
 | `sync/oauth.rs` | 140줄로 작고 RFC 시험값으로 검사한다. oauth2 crate는 의존성이 늘고 ureq 3을 따로 붙여야 한다 |
 | keyring 나눠 담기 (`drives/keyring.rs`) | Windows 자격 증명 2560바이트 한도를 넘는 토큰을 나누는 crate가 없다 |
 | `crates/ai/src/client.rs` (AI 회사 SDK 없이) | Rust 공식 SDK가 없는 회사가 있고, 세 회사 요청·답이 필드 몇 개라 ureq로 직접 짜고 흉내 서버로 시험한다 |
