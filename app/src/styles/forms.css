@@ -48,6 +48,34 @@
   border-top: 1px solid var(--border);
 }
 
+.modal:focus {
+  outline: none;
+}
+
+/* "고친 내용을 버릴까요?" under the dialog's own buttons. */
+.modal-ask {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 14px 14px;
+  background: var(--chip-red-bg);
+}
+
+.modal-ask p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.modal-ask .row {
+  display: flex;
+  gap: 8px;
+}
+
 .form {
   display: flex;
   flex-direction: column;

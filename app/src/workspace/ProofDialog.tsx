@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import type { ProofOptions } from '../api/types';
 import { Modal } from '../components/Modal';
+import { useChanged } from '../lib/useChanged';
 import { docNumber } from '../lib/labels';
 import { allManuscript, closeDialog, saveEverything, showToast, toastError, useApp } from '../store';
 
@@ -30,6 +31,7 @@ export function ProofDialog() {
   const [datesOnly, setDatesOnly] = useState(true);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const dirty = useChanged({ range, picked, from, to, showText, excerpts, datesOnly });
 
   const options: ProofOptions = useMemo(
     () => ({
@@ -91,6 +93,7 @@ export function ProofDialog() {
     <Modal
       title="창작 과정 증명서 만들기"
       onClose={closeDialog}
+      dirty={dirty}
       width={560}
       footer={
         <>

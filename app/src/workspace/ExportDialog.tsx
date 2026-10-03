@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { api } from '../api';
 import type { ExportItem, FileKind, ManuscriptFormat } from '../api/types';
 import { Modal } from '../components/Modal';
+import { useChanged } from '../lib/useChanged';
 import { noteInAppCopy } from '../editor/journal';
 import { fileSafe, num } from '../lib/format';
 import { UNTITLED, docNoun, docNumber, formatName, withObject } from '../lib/labels';
@@ -41,6 +42,7 @@ export function ExportDialog({ toEditor = false, docIds }: { toEditor?: boolean;
   const [symbol, setSymbol] = useState(ov.project.sceneBreak);
   const [formatChoice, setFormatChoice] = useState('project');
   const [busy, setBusy] = useState(false);
+  const dirty = useChanged({ scope, picked, forEditor, target, perDoc, includeTitles, blankLine, symbol, formatChoice });
 
   const isFile = target === 'hwpx' || target === 'docx';
   const sending = forEditor && isFile;
@@ -132,6 +134,7 @@ export function ExportDialog({ toEditor = false, docIds }: { toEditor?: boolean;
     <Modal
       title={toEditor ? '편집자에게 보내기' : '내보내기'}
       onClose={closeDialog}
+      dirty={dirty}
       width={540}
       footer={
         <>

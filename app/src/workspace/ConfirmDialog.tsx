@@ -11,6 +11,7 @@ export function ConfirmDialog({ dialog }: { dialog: Extract<Dialog, { kind: 'con
       title={dialog.title}
       onClose={closeDialog}
       width={440}
+      dismissOnBackdrop
       footer={
         <>
           <button

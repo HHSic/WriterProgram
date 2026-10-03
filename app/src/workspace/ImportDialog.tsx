@@ -189,7 +189,7 @@ export function ImportDialog({ partId }: { partId?: string }) {
   );
 
   return (
-    <Modal title="원고 가져오기" onClose={closeDialog} width={640} footer={footer}>
+    <Modal title="원고 가져오기" onClose={closeDialog} width={640} footer={footer} dirty={paths.length > 0}>
       <ol className="steps" aria-label="진행 단계">
         {STEPS.map((s, i) => (
           <li key={s.id} className={s.id === step ? 'on' : STEPS.findIndex((x) => x.id === step) > i ? 'done' : ''} aria-current={s.id === step ? 'step' : undefined}>
