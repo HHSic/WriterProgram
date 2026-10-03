@@ -4,7 +4,7 @@
 export type { Pane, SplitDir, Target } from '../lib/tabs';
 export { useApp } from './state';
 export type { Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast, AiRequest } from './state';
-export { findDoc, allManuscript, saveEverything, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
+export { findDoc, allManuscript, saveEverything, confirmClose, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
 export { enterProject, loadCatalog, updateProject, applyFormat, openProject, leaveProject, refreshOverview } from './project';
@@ -20,4 +20,5 @@ export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, 
 export type { WebPage } from './web';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
+export { offerRescues, setRescueAside, takeRescue } from './rescue';
 export { autoUpdateCheck, setAutoUpdateCheck, checkForUpdateDaily, checkForUpdateNow } from './update';

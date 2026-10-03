@@ -6,6 +6,7 @@ import { errorText } from '../lib/format';
 import { type ViewSettings, saveView } from '../lib/view';
 import { type Dialog, type FindRequest, type Jump, type Toast, get, set } from './state';
 import { selectDoc } from './docs';
+import { unsavedKeys, worstSave } from './saves';
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -41,12 +42,32 @@ export function allManuscript(ov: Overview): DocSummary[] {
  */
 export async function saveEverything(closing = false): Promise<boolean> {
   await (closing ? closeAll() : flushAll());
-  const save = get().save;
+  const save = worstSave(get().saves);
   if (save.state === 'error') {
     set({ toast: { text: `저장하지 못함 · ${save.error ?? ''}`, tone: 'error' } });
     return false;
   }
   return true;
+}
+
+/**
+ * The window is about to close: finish every save, and when some writing
+ * still could not be saved, ask the writer (workspace/CloseAskDialog.tsx).
+ * True to let the window close.
+ */
+export async function confirmClose(): Promise<boolean> {
+  await closeAll();
+  if (unsavedKeys().length === 0) return true;
+  return new Promise<boolean>((resolve) => {
+    set({
+      closeAsk: {
+        resolve: (close) => {
+          set({ closeAsk: null });
+          resolve(close);
+        },
+      },
+    });
+  });
 }
 
 export function showToast(toast: Toast) {

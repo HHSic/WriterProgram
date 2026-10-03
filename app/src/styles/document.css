@@ -52,7 +52,10 @@
 }
 
 .save-state.error {
-  height: 30px;
+  min-height: 30px;
+  max-width: 46ch;
+  padding-right: 4px;
+  white-space: normal;
   border: 0;
   border-radius: 8px;
   background: var(--chip-red-bg);
@@ -62,6 +65,24 @@
 
 .save-state.error .dot-mark {
   background: var(--danger);
+}
+
+.save-retry {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.save-retry:hover,
+.save-retry:focus-visible {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .doc-scroll {
