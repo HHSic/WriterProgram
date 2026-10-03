@@ -25,4 +25,5 @@
 @import './ruler.css'; /* Editor ruler (workspace/Ruler.tsx). */
 @import './page-editor.css'; /* Page editor of the manuscript format (workspace/PageEditor.tsx). */
 @import './import.css'; /* 가져오기 wizard (workspace/ImportDialog.tsx). */
+@import './platforms.css'; /* 연재 플랫폼: counting rule in 작품 설정, paste preview in 내보내기. */
 @import './review.css'; /* 교정본 주고받기: sending, what was sent, the review tab. */

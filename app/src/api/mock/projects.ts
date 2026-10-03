@@ -41,6 +41,7 @@ export const projectMethods = {
     const root = createProject(opts.parent, title, opts.kind, opts.perDocGoal, opts.countSpaces);
     const p = project(root);
     if (opts.firstChapter) p.parts[0].docs.push(newDoc(p, 'manuscript', '').meta.id);
+    if (opts.platform && opts.kind === 'webnovel') p.info.platform = clone(opts.platform);
     touchRecent(root);
     return overview(root);
   },

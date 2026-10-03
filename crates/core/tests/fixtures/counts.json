@@ -19,7 +19,10 @@
    "withSpaces": 3,
    "withoutSpaces": 3,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -51,7 +54,10 @@
    "withSpaces": 4,
    "withoutSpaces": 3,
    "manuscriptLines": 2,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -74,7 +80,10 @@
    "withSpaces": 20,
    "withoutSpaces": 20,
    "manuscriptLines": 2,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -109,7 +118,10 @@
    "withSpaces": 2,
    "withoutSpaces": 2,
    "manuscriptLines": 3,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -139,7 +151,10 @@
    "withSpaces": 2,
    "withoutSpaces": 2,
    "manuscriptLines": 2,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -162,7 +177,10 @@
    "withSpaces": 5,
    "withoutSpaces": 5,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -185,7 +203,10 @@
    "withSpaces": 7,
    "withoutSpaces": 6,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 1,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -208,7 +229,10 @@
    "withSpaces": 20,
    "withoutSpaces": 20,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 1,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -231,7 +255,10 @@
    "withSpaces": 21,
    "withoutSpaces": 20,
    "manuscriptLines": 2,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -263,7 +290,10 @@
    "withSpaces": 5,
    "withoutSpaces": 4,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -280,7 +310,10 @@
    "withSpaces": 0,
    "withoutSpaces": 0,
    "manuscriptLines": 0,
-   "manuscriptPages": 0
+   "manuscriptPages": 0,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -393,7 +426,10 @@
    "withSpaces": 11,
    "withoutSpaces": 11,
    "manuscriptLines": 11,
-   "manuscriptPages": 2
+   "manuscriptPages": 2,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -416,7 +452,10 @@
    "withSpaces": 7,
    "withoutSpaces": 4,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 0,
+   "htmlExtra": 0
   }
  },
  {
@@ -439,7 +478,71 @@
    "withSpaces": 2,
    "withoutSpaces": 2,
    "manuscriptLines": 1,
-   "manuscriptPages": 1
+   "manuscriptPages": 1,
+   "plainMarks": 0,
+   "wide": 1,
+   "htmlExtra": 0
+  }
+ },
+ {
+  "name": "straight marks, emoji and html characters are counted apart",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "“그래.” 그가 말했다! 😀 <a&b>"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 21,
+   "withoutSpaces": 17,
+   "manuscriptLines": 2,
+   "manuscriptPages": 1,
+   "plainMarks": 2,
+   "wide": 1,
+   "htmlExtra": 10
+  }
+ },
+ {
+  "name": "single quotes and question marks",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "'정말?' 그는 물었다."
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "🙂🙂"
+      }
+     ]
+    }
+   ]
+  },
+  "counts": {
+   "withSpaces": 15,
+   "withoutSpaces": 13,
+   "manuscriptLines": 2,
+   "manuscriptPages": 1,
+   "plainMarks": 4,
+   "wide": 2,
+   "htmlExtra": 0
   }
  }
 ]

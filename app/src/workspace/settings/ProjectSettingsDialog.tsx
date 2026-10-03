@@ -1,9 +1,10 @@
-// 작품 설정 (S12): basic information (with the project's size), goals and
-// the manuscript format (원고 서식) with a live page preview and page estimate.
+// 작품 설정 (S12): basic information (with the project's size), goals (with
+// the 연재 플랫폼 for web novels) and the manuscript format (원고 서식) with a
+// live page preview and page estimate.
 
 import { useState } from 'react';
 import { api } from '../../api';
-import type { Goal, ManuscriptFormat, ProjectKind } from '../../api/types';
+import type { Goal, ManuscriptFormat, Platform, ProjectKind } from '../../api/types';
 import { Modal } from '../../components/Modal';
 import { useChanged } from '../../lib/useChanged';
 import { placeNote, usePlaceOf } from '../../components/PlacePicker';
@@ -12,6 +13,7 @@ import { closeDialog, openDialog, toastError, updateProject, useApp, type Settin
 import { ProjectDriveField } from '../Drives';
 import { FormatEditor } from './FormatEditor';
 import { JournalField } from './JournalField';
+import { PlatformField } from './PlatformField';
 import { ProjectSizeField } from './ProjectSizeField';
 
 const TABS: { id: SettingsTab; label: string }[] = [
@@ -34,8 +36,9 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
   const [goal, setGoal] = useState<Goal>(project.goal);
   const [format, setFormat] = useState<ManuscriptFormat>(project.manuscriptFormat);
   const [keepDaily, setKeepDaily] = useState(project.keepDaily);
+  const [platform, setPlatform] = useState<Platform | null>(project.platform);
   const [busy, setBusy] = useState(false);
-  const dirty = useChanged({ title, kind, penName, sceneBreak, goal, format, keepDaily });
+  const dirty = useChanged({ title, kind, penName, sceneBreak, goal, format, keepDaily, platform });
   const where = usePlaceOf(ov.root);
 
   const save = async () => {
@@ -49,6 +52,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
       goal,
       manuscriptFormat: format,
       keepDaily,
+      platform,
     });
     setBusy(false);
     if (ok) closeDialog();
@@ -145,6 +149,16 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
 
       {tab === 'goal' && (
         <div className="form">
+          {kind === 'webnovel' && (
+            <PlatformField
+              platform={platform}
+              goal={goal}
+              onChange={(p, g) => {
+                setPlatform(p);
+                setGoal(g);
+              }}
+            />
+          )}
           <div className="field">
             <span className="field-label">{docNoun(kind)} 목표 분량</span>
             <div className="row">
@@ -155,14 +169,18 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
                 placeholder="없음"
               />
               <span>자</span>
-              <select
-                value={goal.countSpaces ? 'with' : 'without'}
-                onChange={(e) => setGoal({ ...goal, countSpaces: e.target.value === 'with' })}
-                aria-label="공백 포함 여부"
-              >
-                <option value="with">공백 포함</option>
-                <option value="without">공백 제외</option>
-              </select>
+              {kind === 'webnovel' && platform ? (
+                <span className="meta">연재 플랫폼 기준</span>
+              ) : (
+                <select
+                  value={goal.countSpaces ? 'with' : 'without'}
+                  onChange={(e) => setGoal({ ...goal, countSpaces: e.target.value === 'with' })}
+                  aria-label="공백 포함 여부"
+                >
+                  <option value="with">공백 포함</option>
+                  <option value="without">공백 제외</option>
+                </select>
+              )}
             </div>
             <small className="hint">{docNoun(kind)}마다 따로 정할 수도 있습니다 (왼쪽 목록에서 오른쪽 클릭).</small>
           </div>

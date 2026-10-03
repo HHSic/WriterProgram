@@ -91,6 +91,7 @@ fn setup() -> (tempfile::TempDir, PathBuf, Device, Device) {
         per_doc_goal: None,
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .unwrap();
     let b = dir.path().join("b").join("달빛 서점");

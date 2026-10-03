@@ -35,6 +35,24 @@ export interface Counts {
   withoutSpaces: number;
   manuscriptLines: number;
   manuscriptPages: number;
+  /** Straight marks `. , ! ? ' "` (노벨피아 leaves them out). */
+  plainMarks: number;
+  /** Characters outside the Basic Multilingual Plane (most emoji). */
+  wide: number;
+  /** What `<`, `>` and `&` add when counted as HTML (`&lt;`, `&gt;`, `&amp;`). */
+  htmlExtra: number;
+}
+
+/** How a serial platform counts characters (crates/core/src/count.rs `CountRule`). */
+export interface CountRule {
+  /** Spaces count (공백 포함). */
+  spaces: boolean;
+  /** `. , ! ? ' "` do not count. */
+  skipMarks: boolean;
+  /** Characters outside the Basic Multilingual Plane count as two. */
+  wideTwice: boolean;
+  /** `<` and `>` count as four, `&` as five. */
+  htmlEscapes: boolean;
 }
 
 export interface DocSummary {

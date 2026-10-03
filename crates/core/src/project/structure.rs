@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use super::create::write_new_doc;
 use super::overview::{ProjectInfo, present};
-use super::{Goal, Project, ProjectKind, load, new_part, save};
+use super::{Goal, Platform, Project, ProjectKind, load, new_part, save};
 use crate::doc::Section;
 use crate::format::ManuscriptFormat;
 use crate::{Error, Result};
@@ -21,6 +21,9 @@ pub struct ProjectPatch {
     pub scene_break: Option<String>,
     pub manuscript_format: Option<ManuscriptFormat>,
     pub keep_daily: Option<bool>,
+    /// `Some(None)` takes the platform away.
+    #[serde(default, with = "crate::doc::double_option")]
+    pub platform: Option<Option<Platform>>,
 }
 
 pub fn update(root: &Path, patch: &ProjectPatch) -> Result<ProjectInfo> {
@@ -54,6 +57,9 @@ pub fn update(root: &Path, patch: &ProjectPatch) -> Result<ProjectInfo> {
     }
     if let Some(keep) = patch.keep_daily {
         project.keep_daily = keep;
+    }
+    if let Some(platform) = &patch.platform {
+        project.platform = platform.clone();
     }
     save(root, &project)?;
     Ok(ProjectInfo::from(&project))

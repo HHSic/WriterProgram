@@ -247,3 +247,7 @@
   padding-left: 18px;
   font-size: 12px;
 }
+
+.import-big .row {
+  justify-content: flex-start;
+}

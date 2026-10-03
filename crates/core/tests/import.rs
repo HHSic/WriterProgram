@@ -17,6 +17,7 @@ fn new_project(dir: &Path) -> PathBuf {
         per_doc_goal: None,
         count_spaces: true,
         first_chapter: false,
+        platform: None,
     })
     .unwrap()
 }

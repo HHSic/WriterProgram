@@ -108,6 +108,7 @@ fn story(provider: Provider) {
         per_doc_goal: None,
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .unwrap();
     let id = project::overview(&a).unwrap().parts[0].docs[0].id.clone();
@@ -256,6 +257,7 @@ fn filling_up(provider: Provider) {
         per_doc_goal: None,
         count_spaces: true,
         first_chapter: true,
+        platform: None,
     })
     .unwrap();
     let id = project::overview(&a).unwrap().parts[0].docs[0].id.clone();

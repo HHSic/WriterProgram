@@ -1,0 +1,50 @@
+/* 연재 플랫폼 (settings/PlatformField.tsx) and 붙여넣기 서식 (ExportDialog) -- */
+
+.platform-rule {
+  font-size: 13px;
+}
+
+.platform-rule summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.platform-rule[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.platform-rule .btn {
+  align-self: flex-start;
+}
+
+.paste-preview {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.6;
+  mask-image: linear-gradient(to bottom, #000 75%, transparent);
+}
+
+.paste-preview p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.paste-blank {
+  height: 1.6em;
+  overflow: hidden;
+  color: transparent;
+  user-select: none;
+  border-left: 2px dotted var(--border-strong);
+  margin-left: 2px;
+}

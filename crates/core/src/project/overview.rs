@@ -7,7 +7,9 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use super::{AUTO_RECORD_DAYS, Goal, Project, ProjectKind, TRASH_DAYS, load, new_part, save};
+use super::{
+    AUTO_RECORD_DAYS, Goal, Platform, Project, ProjectKind, TRASH_DAYS, load, new_part, save,
+};
 use crate::cards::{self, CardSummary, CardType};
 use crate::copies::{self, CopyInfo};
 use crate::count::{Counts, count_blocks};
@@ -32,6 +34,8 @@ pub struct ProjectInfo {
     pub manuscript_format: ManuscriptFormat,
     /// 창작 과정 보관 (`Project::keep_daily`).
     pub keep_daily: bool,
+    /// 연재 플랫폼 (`Project::platform`).
+    pub platform: Option<Platform>,
 }
 
 impl From<&Project> for ProjectInfo {
@@ -46,6 +50,7 @@ impl From<&Project> for ProjectInfo {
             scene_break: p.scene_break.clone(),
             manuscript_format: p.manuscript_format(),
             keep_daily: p.keep_daily,
+            platform: p.platform.clone(),
         }
     }
 }

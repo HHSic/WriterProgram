@@ -1,9 +1,10 @@
 // Counts for the status bar. Same rules as crates/core/src/count.rs; both are
-// checked against crates/core/tests/fixtures/counts.json.
+// checked against crates/core/tests/fixtures/counts.json and, for counting the
+// way a serial platform does, platform-counts.json (docs/platforms.md).
 
 import type { JSONContent } from '@tiptap/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
-import type { Counts } from '../api/types';
+import type { CountRule, Counts } from '../api/types';
 
 /** A body reduced to what counting needs: scene breaks and lines of text. */
 export type PlainBlock = { scene: true } | { scene: false; lines: string[] };
@@ -93,11 +94,26 @@ function paperLines(text: string, indent: boolean): number {
   return lines;
 }
 
-export const ZERO_COUNTS: Counts = { withSpaces: 0, withoutSpaces: 0, manuscriptLines: 0, manuscriptPages: 0 };
+export const ZERO_COUNTS: Counts = {
+  withSpaces: 0,
+  withoutSpaces: 0,
+  manuscriptLines: 0,
+  manuscriptPages: 0,
+  plainMarks: 0,
+  wide: 0,
+  htmlExtra: 0,
+};
+
+/** Straight marks 노벨피아 leaves out of its count. */
+const PLAIN_MARKS = new Set(['.', ',', '!', '?', "'", '"']);
+const HTML_EXTRA: Record<string, number> = { '<': 3, '>': 3, '&': 4 };
 
 export function countBlocks(blocks: PlainBlock[]): Counts {
   let withSpaces = 0;
   let withoutSpaces = 0;
+  let plainMarks = 0;
+  let wide = 0;
+  let htmlExtra = 0;
   let lines = 0;
   for (const block of blocks) {
     if (block.scene) {
@@ -108,12 +124,32 @@ export function countBlocks(blocks: PlainBlock[]): Counts {
       for (const c of line) {
         withSpaces += 1;
         if (!isSpace(c)) withoutSpaces += 1;
+        if (PLAIN_MARKS.has(c)) plainMarks += 1;
+        if ((c.codePointAt(0) ?? 0) > 0xffff) wide += 1;
+        htmlExtra += HTML_EXTRA[c] ?? 0;
       }
       lines += paperLines(line, i === 0);
     });
   }
   if (withSpaces === 0) return { ...ZERO_COUNTS };
-  return { withSpaces, withoutSpaces, manuscriptLines: lines, manuscriptPages: Math.ceil(lines / 10) };
+  return {
+    withSpaces,
+    withoutSpaces,
+    manuscriptLines: lines,
+    manuscriptPages: Math.ceil(lines / 10),
+    plainMarks,
+    wide,
+    htmlExtra,
+  };
+}
+
+/** Characters as a platform with `rule` counts them. Line breaks never count. */
+export function countByRule(c: Counts, rule: CountRule): number {
+  let n = rule.spaces ? c.withSpaces : c.withoutSpaces;
+  if (rule.skipMarks) n = Math.max(0, n - c.plainMarks);
+  if (rule.wideTwice) n += c.wide;
+  if (rule.htmlEscapes) n += c.htmlExtra;
+  return n;
 }
 
 /** Characters in a piece of plain text, for a selection. Line breaks do not count. */

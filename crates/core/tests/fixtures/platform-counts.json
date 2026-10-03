@@ -1,0 +1,446 @@
+[
+ {
+  "name": "dialogue with straight quotes (문피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "\"어디 가?\" 그녀가 물었다."
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "'몰라.'"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": true,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 21
+ },
+ {
+  "name": "dialogue with straight quotes (노벨피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "\"어디 가?\" 그녀가 물었다."
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "'몰라.'"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": true,
+   "wideTwice": true,
+   "htmlEscapes": true
+  },
+  "chars": 11
+ },
+ {
+  "name": "dialogue with straight quotes (공백 제외)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "\"어디 가?\" 그녀가 물었다."
+      }
+     ]
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "'몰라.'"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 18
+ },
+ {
+  "name": "curly quotes and ellipsis count (문피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "“그래…” 그는 웃었다~"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": true,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 13
+ },
+ {
+  "name": "curly quotes and ellipsis count (노벨피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "“그래…” 그는 웃었다~"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": true,
+   "wideTwice": true,
+   "htmlEscapes": true
+  },
+  "chars": 11
+ },
+ {
+  "name": "curly quotes and ellipsis count (공백 제외)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "“그래…” 그는 웃었다~"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 11
+ },
+ {
+  "name": "line breaks and scene breaks never count (문피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "첫 줄"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "둘째 줄"
+      }
+     ]
+    },
+    {
+     "type": "sceneBreak"
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "셋째"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": true,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 9
+ },
+ {
+  "name": "line breaks and scene breaks never count (노벨피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "첫 줄"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "둘째 줄"
+      }
+     ]
+    },
+    {
+     "type": "sceneBreak"
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "셋째"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": true,
+   "wideTwice": true,
+   "htmlEscapes": true
+  },
+  "chars": 7
+ },
+ {
+  "name": "line breaks and scene breaks never count (공백 제외)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "첫 줄"
+      },
+      {
+       "type": "hardBreak"
+      },
+      {
+       "type": "text",
+       "text": "둘째 줄"
+      }
+     ]
+    },
+    {
+     "type": "sceneBreak"
+    },
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "셋째"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 7
+ },
+ {
+  "name": "emoji and html characters (문피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "좋아 😀 <진짜> & 끝!"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": true,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 14
+ },
+ {
+  "name": "emoji and html characters (노벨피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "좋아 😀 <진짜> & 끝!"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": true,
+   "wideTwice": true,
+   "htmlEscapes": true
+  },
+  "chars": 20
+ },
+ {
+  "name": "emoji and html characters (공백 제외)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "좋아 😀 <진짜> & 끝!"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 10
+ },
+ {
+  "name": "full-width space (문피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가　나 다"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": true,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 5
+ },
+ {
+  "name": "full-width space (노벨피아)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가　나 다"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": true,
+   "wideTwice": true,
+   "htmlEscapes": true
+  },
+  "chars": 3
+ },
+ {
+  "name": "full-width space (공백 제외)",
+  "body": {
+   "type": "doc",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "가　나 다"
+      }
+     ]
+    }
+   ]
+  },
+  "rule": {
+   "spaces": false,
+   "skipMarks": false,
+   "wideTwice": false,
+   "htmlEscapes": false
+  },
+  "chars": 3
+ }
+]

@@ -36,7 +36,7 @@ export function DialogHost() {
     case 'exchanges':
       return <ExchangesDialog />;
     case 'import':
-      return <ImportDialog partId={dialog.partId} />;
+      return <ImportDialog partId={dialog.partId} newProject={dialog.newProject} />;
     case 'view':
       return <ViewDialog />;
     case 'symbols':
