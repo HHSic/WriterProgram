@@ -11,6 +11,8 @@ import { afterComposition } from '../editor/composition';
 import { setIndentRules } from '../editor/indent';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { setWhitespaceMarks } from '../editor/marks';
+import { setAutoType } from '../editor/autoType';
+import { setFocusLook } from '../editor/focus';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
 import { showMatch } from '../editor/search';
@@ -35,6 +37,7 @@ import {
   useApp,
 } from '../store';
 import { touchCapable, touchLike } from '../lib/pointer';
+import { keysText } from '../lib/shortcuts';
 import { useNameIndex } from './CardPanels';
 import { DocBanners } from './Copies';
 import { EditToolbar } from './EditToolbar';
@@ -162,6 +165,20 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
 
   const showMarks = useApp((s) => s.view.showMarks);
   useEffect(() => setWhitespaceMarks(editor, showMarks), [editor, showMarks]);
+
+  // 따옴표·말줄임표 자동 바꾸기, as set in 보기 설정 on this device.
+  const autoType = useApp((s) => s.view.autoType);
+  const quoteStyle = useApp((s) => s.view.quoteStyle);
+  useEffect(() => setAutoType(editor, { on: autoType, quotes: quoteStyle }), [editor, autoType, quoteStyle]);
+
+  // 집중 모드: other paragraphs fade, the line being written stays put.
+  const focusMode = useApp((s) => s.focusMode);
+  const focusDim = useApp((s) => s.view.focusDim);
+  const typewriter = useApp((s) => s.view.typewriter);
+  useEffect(
+    () => setFocusLook(editor, focusMode ? { dim: focusDim, typewriter } : null),
+    [editor, focusMode, focusDim, typewriter],
+  );
 
   // The manuscript format's first-line rules, for chapters (planning documents follow no rules).
   const rules = useApp((s) => s.overview!.project.manuscriptFormat.indentRules);
@@ -400,8 +417,8 @@ function FormatBubble({ editor }: { editor: Editor }) {
       <button
         type="button"
         className="bubble-memo"
-        aria-label="메모 달기 (Ctrl+Alt+M)"
-        title="메모 달기 (Ctrl+Alt+M)"
+        aria-label={`메모 달기 (${keysText('note')})`}
+        title={`메모 달기 (${keysText('note')})`}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => void addTextNote()}
       >

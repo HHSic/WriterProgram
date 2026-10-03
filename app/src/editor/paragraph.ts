@@ -12,6 +12,7 @@
 import { Extension, type CommandProps } from '@tiptap/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import type { EditorState } from '@tiptap/pm/state';
+import { editorKeys } from '../lib/shortcuts';
 
 /** Widest margin, in characters (same as ParaAttrs::MAX). */
 export const MAX_MARGIN = 20;
@@ -138,8 +139,8 @@ export const ParagraphMargins = Extension.create({
 
   addKeyboardShortcuts() {
     return {
-      'Mod-]': () => this.editor.commands.shiftMargins(1),
-      'Mod-[': () => this.editor.commands.shiftMargins(-1),
+      ...editorKeys('marginIn', () => this.editor.commands.shiftMargins(1)),
+      ...editorKeys('marginOut', () => this.editor.commands.shiftMargins(-1)),
     };
   },
 });
@@ -161,10 +162,9 @@ export const SpecialSpaces = Extension.create({
   addKeyboardShortcuts() {
     return {
       // 묶음 빈칸: Word's Ctrl+Shift+Space, and 한글's Alt+Space when Windows lets it through.
-      'Mod-Shift-Space': () => this.editor.commands.insertSpace(NO_BREAK_SPACE),
-      'Alt-Space': () => this.editor.commands.insertSpace(NO_BREAK_SPACE),
+      ...editorKeys('noBreakSpace', () => this.editor.commands.insertSpace(NO_BREAK_SPACE)),
       // 고정폭 빈칸
-      'Alt-Shift-Space': () => this.editor.commands.insertSpace(FIXED_SPACE),
+      ...editorKeys('fixedSpace', () => this.editor.commands.insertSpace(FIXED_SPACE)),
     };
   },
 });

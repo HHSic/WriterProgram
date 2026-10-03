@@ -13,6 +13,7 @@ import { MoveDialog } from './MoveProject';
 import { PromptDialog } from './PromptDialog';
 import { ProofDialog } from './ProofDialog';
 import { RemovalsDialog } from './RemovalsDialog';
+import { ShortcutsDialog } from './ShortcutsDialog';
 import { ProjectSettingsDialog } from './settings/ProjectSettingsDialog';
 import { SymbolsDialog } from './Symbols';
 import { TrashDialog } from './TrashDialog';
@@ -39,6 +40,8 @@ export function DialogHost() {
       return <ViewDialog />;
     case 'symbols':
       return <SymbolsDialog />;
+    case 'shortcuts':
+      return <ShortcutsDialog />;
     case 'newProject':
       return <NewProjectDialog />;
     case 'project':

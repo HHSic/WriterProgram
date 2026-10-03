@@ -26,6 +26,18 @@ export function compositionEnded(tr: Transaction): boolean {
   return tr.getMeta(COMPOSITION_END) === true;
 }
 
+/**
+ * Whether a key press belongs to a composition under way. Its Esc only
+ * cancels the syllable being put together, so it must not also leave a mode
+ * or stop something. `view`: the editor the keys go to, if any.
+ */
+export function keyInComposition(
+  e: { isComposing?: boolean; keyCode?: number },
+  view?: Pick<EditorView, 'composing' | 'isDestroyed'> | null,
+): boolean {
+  return !!e.isComposing || e.keyCode === 229 || (!!view && !view.isDestroyed && view.composing);
+}
+
 /** What the plugin needs of a view (tests pass a stand-in). */
 export type ComposingView = Pick<EditorView, 'composing' | 'isDestroyed' | 'state' | 'dispatch'>;
 

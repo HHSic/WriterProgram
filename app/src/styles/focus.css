@@ -1,0 +1,100 @@
+/* 집중 모드 (workspace/Workspace.tsx, editor/focus.ts): the page alone in the
+   middle. The columns stay mounted and are only hidden, so the tree and the
+   panels come back as they were. */
+
+.workspace.focus-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.focus-mode .sidebar,
+.focus-mode .right,
+.focus-mode .center-head,
+.focus-mode .tab-bar,
+.focus-mode .ruler {
+  display: none;
+}
+
+/* With two panes, only the one being written in. */
+.focus-mode .panes[class*='split-'] .pane:not(.focused) {
+  display: none;
+}
+
+.focus-mode .panes[class*='split-'] .pane + .pane {
+  border: 0;
+}
+
+.focus-mode .page {
+  border-color: transparent;
+  background: transparent;
+}
+
+.focus-mode .doc-scroll {
+  padding-top: 56px;
+}
+
+/* The count stays, quietly, until the pointer comes near. */
+.focus-mode .status-bar {
+  border-top-color: transparent;
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+
+.focus-mode .status-bar:hover,
+.focus-mode .status-bar:focus-within {
+  opacity: 1;
+}
+
+/* A mouse has the keys; a finger keeps the 편집 도구줄. */
+@media (hover: hover) and (pointer: fine) {
+  .focus-mode .edit-toolbar {
+    display: none;
+  }
+}
+
+.focus-exit {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 20;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  opacity: 0.35;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.focus-exit:hover,
+.focus-exit:focus-visible {
+  opacity: 1;
+  color: var(--text);
+}
+
+/* No hover on touch screens: the way out is always easy to see. */
+@media (hover: none) {
+  .focus-exit {
+    opacity: 0.8;
+    padding: 10px 16px;
+  }
+}
+
+/* 다른 문단 흐리게: only the block with the cursor stays clear. */
+.manuscript.focus-dim > * {
+  transition: opacity 0.25s;
+}
+
+.manuscript.focus-dim > :not(.is-current) {
+  opacity: 0.3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manuscript.focus-dim > *,
+  .focus-mode .status-bar,
+  .focus-exit {
+    transition: none;
+  }
+}

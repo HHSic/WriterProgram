@@ -1,7 +1,8 @@
 import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { UNTITLED, docNumber } from '../lib/labels';
-import { findDoc, openDialog, openWeb, splitView, toggleReading, unsplit, useApp, webPages } from '../store';
+import { keysText } from '../lib/shortcuts';
+import { findDoc, openDialog, openWeb, setFocusMode, splitView, toggleReading, unsplit, useApp, webPages } from '../store';
 import { marginMenu } from './EditToolbar';
 import { SaveStatus } from './SaveStatus';
 import { openSymbols } from './Symbols';
@@ -91,7 +92,7 @@ export function CenterHead() {
           type="button"
           className="icon-btn"
           aria-label="문단 여백"
-          title="문단 여백: 문단을 통째로 들이기 (Ctrl+] / Ctrl+[)"
+          title={`문단 여백: 문단을 통째로 들이기 (${keysText('marginIn')} / ${keysText('marginOut')})`}
           disabled={!editor || !editor.isEditable}
           onClick={(e) => editor && openMenu(e, marginMenu(editor), { title: '문단 여백' })}
         >
@@ -104,7 +105,11 @@ export function CenterHead() {
           className={`icon-btn${reading ? ' on' : ''}`}
           aria-label={reading ? '소리 내어 읽기 멈춤' : '소리 내어 읽기'}
           aria-pressed={reading}
-          title={reading ? '소리 내어 읽기 멈춤 (Ctrl+Shift+R)' : '소리 내어 읽기: 커서가 있는 문장부터, 고른 글이 있으면 그 글만 (Ctrl+Shift+R)'}
+          title={
+            reading
+              ? `소리 내어 읽기 멈춤 (${keysText('readAloud')})`
+              : `소리 내어 읽기: 커서가 있는 문장부터, 고른 글이 있으면 그 글만 (${keysText('readAloud')})`
+          }
           disabled={!editor}
           onMouseDown={(e) => e.preventDefault()}
           onClick={toggleReading}
@@ -116,7 +121,7 @@ export function CenterHead() {
         type="button"
         className="icon-btn"
         aria-label="문자표"
-        title="문자표: 특수 문자와 빈칸 넣기 (Ctrl+F10)"
+        title={`문자표: 특수 문자와 빈칸 넣기 (${keysText('symbols')})`}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => openSymbols()}
       >
@@ -136,7 +141,7 @@ export function CenterHead() {
         className={`icon-btn${split ? ' on' : ''}`}
         aria-label="나눠 보기"
         aria-pressed={split !== null}
-        title="나눠 보기 (Ctrl+\)"
+        title={`나눠 보기 (${keysText('split')})`}
         onClick={(e) =>
           openMenu(e, [
             { label: '좌우로 나눠 보기', checked: split === 'row', onSelect: () => splitView('row') },
@@ -147,6 +152,16 @@ export function CenterHead() {
         }
       >
         <Icon name={split === 'column' ? 'splitDown' : 'split'} size={17} />
+      </button>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="집중 모드"
+        title={`집중 모드: 본문만 크게 (${keysText('focusMode')}, 나갈 때 Esc)`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setFocusMode(true)}
+      >
+        <Icon name="focus" size={17} />
       </button>
       <button type="button" className="icon-btn" aria-label="보기 설정" title="보기 설정" onClick={() => openDialog({ kind: 'view' })}>
         <Icon name="type" size={18} />

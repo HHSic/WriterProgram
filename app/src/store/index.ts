@@ -18,6 +18,7 @@ export { webPages, rememberWebPage, openWeb, clipPage } from './web';
 export { loadJournal, setJournalEnabled, setAnchorAllowed, anchorNow } from './journal';
 export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';
 export type { WebPage } from './web';
+export { setFocusMode, toggleFocusMode } from './focus';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
 export { offerRescues, setRescueAside, takeRescue } from './rescue';

@@ -4,11 +4,18 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { Modal } from '../components/Modal';
+import type { QuoteStyle } from '../editor/autoType';
 import { koreanVoices, loadVoices, pickVoice, sayOnce, speechAvailable } from '../editor/readAloud';
 import { ACCENTS, PALETTES, previewColors } from '../lib/colors';
+import { keysText } from '../lib/shortcuts';
 import { FONT_LABEL, READ_RATES, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
 import { autoUpdateCheck, checkForUpdateNow, closeDialog, setAutoUpdateCheck, setView, useApp } from '../store';
 import { NO_VOICE_HELP, rateLabel } from './ReadingBar';
+
+const QUOTE_STYLES: { id: QuoteStyle; label: string }[] = [
+  { id: 'curly', label: '“큰따옴표” ‘작은따옴표’' },
+  { id: 'corner', label: '「낫표」 『겹낫표』' },
+];
 
 const THEMES: { id: Theme; label: string }[] = [
   { id: 'system', label: '시스템 따라' },
@@ -64,7 +71,7 @@ export function ViewDialog() {
         <Slider label="본문 폭" value={view.width} min={440} max={840} step={20} unit="px" onChange={(width) => setView({ width })} />
         <label className="check">
           <input type="checkbox" checked={view.showMarks} onChange={(e) => setView({ showMarks: e.target.checked })} />
-          빈칸·문단 부호 보이기 (Ctrl+Shift+8)
+          빈칸·문단 부호 보이기 ({keysText('showMarks')})
         </label>
         <label className="check">
           <input type="checkbox" checked={view.ruler} onChange={(e) => setView({ ruler: e.target.checked })} />
@@ -78,6 +85,42 @@ export function ViewDialog() {
             <option value="never">숨기기</option>
           </select>
         </label>
+        <fieldset className="field">
+          <legend className="field-label">집중 모드 ({keysText('focusMode')}, 나갈 때 Esc)</legend>
+          <label className="check">
+            <input type="checkbox" checked={view.focusDim} onChange={(e) => setView({ focusDim: e.target.checked })} />
+            쓰는 문단만 또렷하게, 다른 문단은 흐리게
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={view.typewriter} onChange={(e) => setView({ typewriter: e.target.checked })} />
+            타자기처럼 쓰는 줄을 화면 같은 높이에 두기
+          </label>
+          <span className="hint">옆 칸과 탭, 도구줄을 숨기고 본문만 가운데에 둡니다.</span>
+        </fieldset>
+        <fieldset className="field">
+          <legend className="field-label">쓰는 대로 바꾸기</legend>
+          <label className="check">
+            <input type="checkbox" checked={view.autoType} onChange={(e) => setView({ autoType: e.target.checked })} />
+            따옴표·말줄임표 자동으로 바꾸기
+          </label>
+          <div className={`segmented small${view.autoType ? '' : ' off'}`} role="radiogroup" aria-label="따옴표 모양">
+            {QUOTE_STYLES.map((q) => (
+              <label key={q.id} className={view.quoteStyle === q.id ? 'on' : ''}>
+                <input
+                  type="radio"
+                  disabled={!view.autoType}
+                  checked={view.quoteStyle === q.id}
+                  onChange={() => setView({ quoteStyle: q.id })}
+                />
+                {q.label}
+              </label>
+            ))}
+          </div>
+          <span className="hint">
+            "와 '는 앞 글자를 보고 여는 따옴표나 닫는 따옴표로, ...는 …로, --는 —로 바뀝니다. 바로 {keysText('undo')}를 누르면 바꾸기 전으로
+            돌아갑니다. 이 기기에서만 적용됩니다.
+          </span>
+        </fieldset>
         <fieldset className="field">
           <legend className="field-label">화면 밝기</legend>
           <div className="segmented">
@@ -190,7 +233,7 @@ function ReadAloudFields({ view }: { view: ViewSettings }) {
 
   return (
     <fieldset className="field read-aloud-fields">
-      <legend className="field-label">소리 내어 읽기 (Ctrl+Shift+R)</legend>
+      <legend className="field-label">소리 내어 읽기 ({keysText('readAloud')})</legend>
       {!speechAvailable() ? (
         <span className="hint">이 기기에서는 소리 내어 읽을 수 없습니다.</span>
       ) : voices === null ? (

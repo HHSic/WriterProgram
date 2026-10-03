@@ -3,6 +3,7 @@
 
 import type { ChainedCommands, Editor } from '@tiptap/core';
 import type { ReactNode } from 'react';
+import { keysText } from '../lib/shortcuts';
 
 export type MarkKey = 'bold' | 'italic' | 'underline' | 'strike' | 'dot';
 
@@ -17,11 +18,11 @@ export interface MarkButton {
 }
 
 export const MARK_BUTTONS: Record<MarkKey, MarkButton> = {
-  bold: { key: 'bold', name: '굵게', keys: 'Ctrl+B', glyph: <b>가</b>, toggle: (c) => c.toggleBold() },
-  italic: { key: 'italic', name: '기울임', keys: 'Ctrl+I', glyph: <i>가</i>, toggle: (c) => c.toggleItalic() },
-  underline: { key: 'underline', name: '밑줄', keys: 'Ctrl+U', glyph: <u>가</u>, toggle: (c) => c.toggleUnderline() },
-  strike: { key: 'strike', name: '취소선', keys: 'Ctrl+Shift+S', glyph: <s>가</s>, toggle: (c) => c.toggleStrike() },
-  dot: { key: 'dot', name: '방점', keys: 'Ctrl+Shift+D', glyph: <span className="dot">가</span>, toggle: (c) => c.toggleDot() },
+  bold: { key: 'bold', name: '굵게', keys: keysText('bold'), glyph: <b>가</b>, toggle: (c) => c.toggleBold() },
+  italic: { key: 'italic', name: '기울임', keys: keysText('italic'), glyph: <i>가</i>, toggle: (c) => c.toggleItalic() },
+  underline: { key: 'underline', name: '밑줄', keys: keysText('underline'), glyph: <u>가</u>, toggle: (c) => c.toggleUnderline() },
+  strike: { key: 'strike', name: '취소선', keys: keysText('strike'), glyph: <s>가</s>, toggle: (c) => c.toggleStrike() },
+  dot: { key: 'dot', name: '방점', keys: keysText('dot'), glyph: <span className="dot">가</span>, toggle: (c) => c.toggleDot() },
 };
 
 /** Which marks the selection has, for a `useEditorState` selector. */

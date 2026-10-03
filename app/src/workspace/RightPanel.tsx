@@ -10,6 +10,7 @@ import { sceneAt, scenesOf, type Scene } from '../editor/outline';
 import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { num, timeLabel } from '../lib/format';
+import { keysText } from '../lib/shortcuts';
 import { RECORD_KIND_LABEL, docNoun, formatName, withObject } from '../lib/labels';
 import {
   applyFormat,
@@ -18,6 +19,7 @@ import {
   openDialog,
   patchSummary,
   saveEverything,
+  setFocusMode,
   toastError,
   useApp,
   type RightTab,
@@ -89,6 +91,8 @@ export function RightPanel() {
               { label: '교정본 주고받기', onSelect: () => openDialog({ kind: 'exchanges' }) },
               { separator: true },
               { label: '보기 설정', onSelect: () => openDialog({ kind: 'view' }) },
+              { label: '집중 모드', hint: keysText('focusMode'), onSelect: () => setFocusMode(true) },
+              { label: '단축키', hint: keysText('shortcuts'), onSelect: () => openDialog({ kind: 'shortcuts' }) },
               { label: 'AI 연결 (내 API 키)', onSelect: () => openDialog({ kind: 'ai' }) },
               { label: '휴지통', onSelect: () => openDialog({ kind: 'trash' }) },
               { separator: true },

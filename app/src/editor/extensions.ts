@@ -5,8 +5,11 @@ import { Mark, Node, mergeAttributes, type Extensions } from '@tiptap/core';
 import { Plugin } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import StarterKit from '@tiptap/starter-kit';
+import { editorKeys } from '../lib/shortcuts';
+import { AutoType } from './autoType';
 import { CardHighlight } from './cards';
 import { Composition } from './composition';
+import { FocusWriting } from './focus';
 import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
@@ -104,9 +107,7 @@ export const Dot = Mark.create({
   },
 
   addKeyboardShortcuts() {
-    return {
-      'Mod-Shift-d': () => this.editor.commands.toggleDot(),
-    };
+    return editorKeys('dot', () => this.editor.commands.toggleDot());
   },
 });
 
@@ -140,12 +141,10 @@ export const Memo = Mark.create<{ onOpen: (noteId: string) => void; onAdd: () =>
   },
 
   addKeyboardShortcuts() {
-    return {
-      'Mod-Alt-m': () => {
-        this.options.onAdd();
-        return true;
-      },
-    };
+    return editorKeys('note', () => {
+      this.options.onAdd();
+      return true;
+    });
   },
 
   addProseMirrorPlugins() {
@@ -189,6 +188,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
       link: false,
     }),
     Composition,
+    AutoType,
     SceneBreak.configure({ symbol: sceneSymbol }),
     Dot,
     Memo.configure({ onOpen: hooks.onNoteOpen, onAdd: hooks.onNoteAdd }),
@@ -198,6 +198,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     IndentRulesExtension,
     SearchHighlight,
     ReadAloudHighlight,
+    FocusWriting,
     CardHighlight.configure({ onOpen: hooks.onCardOpen }),
     Placeholder.configure({
       placeholder: ({ editor }) => (editor.isEmpty ? '여기에 쓰기 시작하세요' : ''),
