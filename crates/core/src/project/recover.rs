@@ -213,6 +213,8 @@ fn rebuild(root: &Path, damaged: &str) -> Result<Project> {
             ProjectKind::Print => "*".into(),
         },
         preset: manuscript_format.preset.clone(),
+        // The platform's own counting is a setting the writer picks again.
+        platform: None,
         manuscript_format: Some(manuscript_format),
         card_types: Some(card_types),
         parts: vec![part],
@@ -238,6 +240,7 @@ mod tests {
             per_doc_goal: None,
             count_spaces: true,
             first_chapter: true,
+            platform: None,
         })
         .unwrap();
         let part = add_part(&root, "2부").unwrap();
