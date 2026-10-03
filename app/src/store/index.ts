@@ -3,7 +3,7 @@
 
 export type { Pane, SplitDir, Target } from '../lib/tabs';
 export { useApp } from './state';
-export type { Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast, AiRequest } from './state';
+export type { HeldRemovals, Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast, AiRequest } from './state';
 export { findDoc, allManuscript, saveEverything, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
@@ -13,7 +13,7 @@ export { previewCard, openCard, refreshCardCounts, createCard, patchCardSummary,
 export { loadNotes, focusNote, patchNote, addNote, addTextNote, showNote, trashNote, openNoteCounts } from './notes';
 export { selectPart, newDocPartId, openNotesBoard, openTable } from './places';
 export { markConflict, clearConflict, keepMine, takeTheirs, resolveCopy, moveProject } from './devices';
-export { syncNow, linkProject, unlinkProject } from './drives';
+export { syncNow, linkProject, unlinkProject, answerRemovals, putOffRemovals } from './drives';
 export { webPages, rememberWebPage, openWeb, clipPage } from './web';
 export { loadJournal, setJournalEnabled, setAnchorAllowed, anchorNow } from './journal';
 export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';

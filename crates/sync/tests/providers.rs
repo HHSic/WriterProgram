@@ -132,7 +132,8 @@ fn story(provider: Provider) {
         dir.path().join("base-a.json"),
         dir.path().join("base-b.json"),
     );
-    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     assert!(
         report.uploaded.contains(&"project.json".to_string()),
         "{report:?}"
@@ -141,7 +142,7 @@ fn story(provider: Provider) {
 
     let b = dir.path().join("b").join(&folder);
     fs::create_dir_all(&b).unwrap();
-    accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    accounts::sync_project(&session, &link, &b, &base_b, &lock, &Default::default()).unwrap();
     assert_eq!(files(&a), files(&b));
 
     // Both change the chapter: B keeps its own, A's arrives as a copy.
@@ -161,10 +162,11 @@ fn story(provider: Provider) {
         SaveGuard::default(),
     )
     .unwrap();
-    accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
-    let report = accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &b, &base_b, &lock, &Default::default()).unwrap();
     assert_eq!(report.copies.len(), 1, "{report:?}");
-    accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     assert_eq!(
         doc::load(&a, &id).unwrap().body,
         body(&["휴대폰에서 고친 글."])
@@ -175,14 +177,16 @@ fn story(provider: Provider) {
     // A removes the copy (the writer picked): gone from the drive and from B.
     let copy = copies::list(&a).unwrap().remove(0);
     fs::remove_file(a.join("manuscript").join(&copy.file)).unwrap();
-    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     assert_eq!(report.removed_there.len(), 1, "{report:?}");
-    accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    accounts::sync_project(&session, &link, &b, &base_b, &lock, &Default::default()).unwrap();
     assert!(copies::list(&b).unwrap().is_empty());
     assert_eq!(files(&a), files(&b));
 
     // Nothing left to do.
-    let quiet = accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    let quiet =
+        accounts::sync_project(&session, &link, &b, &base_b, &lock, &Default::default()).unwrap();
     assert!(
         quiet.uploaded.is_empty() && quiet.downloaded.is_empty(),
         "{quiet:?}"
@@ -271,9 +275,10 @@ fn filling_up(provider: Provider) {
     fs::create_dir_all(&b).unwrap();
 
     // Plenty of room: no warning.
-    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     assert_eq!(report.space_left, None, "{report:?}");
-    accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    accounts::sync_project(&session, &link, &b, &base_b, &lock, &Default::default()).unwrap();
 
     // The drive will not say how full it is: the pass goes on all the same.
     set_room(
@@ -284,7 +289,8 @@ fn filling_up(provider: Provider) {
             readable: false,
         },
     );
-    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     assert_eq!(report.space_left, None);
 
     // Under 50 MB left: the report says how much.
@@ -296,7 +302,8 @@ fn filling_up(provider: Provider) {
             readable: true,
         },
     );
-    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     let left = report.space_left.expect("running low");
     assert!(left < 10 * MB && left > 9 * MB, "{left}");
 
@@ -319,7 +326,8 @@ fn filling_up(provider: Provider) {
     )
     .unwrap();
     let written = files(&a);
-    let err = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap_err();
+    let err = accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default())
+        .unwrap_err();
     assert!(err.user_message().contains(providers::FULL), "{err}");
     assert_eq!(files(&a), written);
     assert_eq!(
@@ -327,12 +335,15 @@ fn filling_up(provider: Provider) {
         body(&["공간이 없을 때 쓴 글."])
     );
     // Again later, still full: nothing lost, nothing changed here.
-    assert!(accounts::sync_project(&session, &link, &a, &base_a, &lock).is_err());
+    assert!(
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).is_err()
+    );
     assert_eq!(files(&a), written);
 
     // Room again: the chapter goes up on the next pass and reaches B.
     set_room(&ends, Room::default());
-    let report = accounts::sync_project(&session, &link, &a, &base_a, &lock).unwrap();
+    let report =
+        accounts::sync_project(&session, &link, &a, &base_a, &lock, &Default::default()).unwrap();
     assert!(
         report
             .uploaded
@@ -340,7 +351,7 @@ fn filling_up(provider: Provider) {
             .any(|p| p.ends_with(&format!("{id}.md"))),
         "{report:?}"
     );
-    accounts::sync_project(&session, &link, &b, &base_b, &lock).unwrap();
+    accounts::sync_project(&session, &link, &b, &base_b, &lock, &Default::default()).unwrap();
     assert_eq!(
         doc::load(&b, &id).unwrap().body,
         body(&["공간이 없을 때 쓴 글."])

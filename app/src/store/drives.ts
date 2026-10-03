@@ -1,10 +1,11 @@
 // Keeping a project in step with a drive.
 
 import { api } from '../api';
-import type { DriveProvider, Overview } from '../api/types';
+import type { DriveProvider, Overview, SyncChoices, SyncReport } from '../api/types';
 import { localDate, sizeText } from '../lib/format';
 import { get, set } from './state';
-import { saveEverything, showToast, toastError } from './ui';
+import { closeDialog, openDialog, saveEverything, showToast, toastError } from './ui';
+import type { HeldRemovals } from './state';
 import { refreshOverview } from './project';
 import { refreshCardCounts } from './cards';
 import { loadNotes } from './notes';
@@ -63,18 +64,62 @@ function lowSpaceWarning(left: number): string | null {
   return `드라이브 남은 공간이 ${sizeText(left)}뿐입니다. 공간이 차면 맞추기가 멈춥니다.`;
 }
 
-/** One pass with the drive now. Quiet passes only speak up about problems in the status bar. */
-export async function syncNow(opts: { quiet?: boolean } = {}) {
+// Many removals at once (a folder moved or emptied by mistake) wait for the
+// writer: the pass holds them back and the app asks whether to remove them
+// on the other side too, or bring them back (crates/sync engine.rs).
+
+/** The held removals the writer chose to answer later; not asked again by quiet passes. */
+let putOff = '';
+
+const heldKey = (held: HeldRemovals) => [...held.there, '|', ...held.here].join('\n');
+
+/** Remembers what the last pass held back, and asks about it when there is something new to ask. */
+function noteHeld(r: SyncReport | null, quiet: boolean) {
+  if (!r) return;
+  const held = r.heldThere.length || r.heldHere.length ? { there: r.heldThere, here: r.heldHere } : null;
+  set({ heldRemovals: held });
+  const dialog = get().dialog;
+  if (!held) {
+    if (dialog?.kind === 'removals') closeDialog();
+    return;
+  }
+  if (dialog || (quiet && heldKey(held) === putOff)) return;
+  openDialog({ kind: 'removals' });
+}
+
+/** The writer's answer to held removals: remove them on the other side too, or bring them back. */
+export async function answerRemovals(remove: boolean) {
+  const held = get().heldRemovals;
+  if (!held) return;
+  const paths = [...held.there, ...held.here];
+  // A quiet pass may be running; the answer goes with the next one.
+  while (get().syncing) await new Promise((resolve) => setTimeout(resolve, 200));
+  await syncNow({ choices: remove ? { remove: paths, keep: [] } : { remove: [], keep: paths } });
+}
+
+/** Closes the question until a pass holds back something else (or the writer syncs by hand). */
+export function putOffRemovals() {
+  const held = get().heldRemovals;
+  if (held) putOff = heldKey(held);
+  closeDialog();
+}
+
+/**
+ * One pass with the drive now. Quiet passes only speak up about problems in the status bar.
+ * `choices` carries the writer's answer about removals an earlier pass held back.
+ */
+export async function syncNow(opts: { quiet?: boolean; choices?: SyncChoices } = {}) {
   const ov = get().overview;
   if (!ov || !get().link || get().syncing) return;
   // Edits waiting to be saved go first, so they travel in this pass.
   if (!(await saveEverything())) return;
   set({ syncing: true });
   try {
-    const out = await api.projectSync(ov.root, ov.project.id);
+    const out = await api.projectSync(ov.root, ov.project.id, opts.choices);
     if (get().overview?.root !== ov.root) return;
     set({ link: out.link });
     const r = out.report;
+    noteHeld(r, opts.quiet ?? false);
     if (r && (r.downloaded.length || r.removedHere.length || r.copies.length || r.merged)) {
       await refreshOverview();
       void loadNotes();
@@ -117,7 +162,7 @@ export async function unlinkProject() {
   try {
     await api.projectUnlink(ov.project.id);
     stopAutoSync();
-    set({ link: null });
+    set({ link: null, heldRemovals: null });
   } catch (e) {
     toastError('그만두지 못함', e);
   }

@@ -14,7 +14,7 @@ use writer_core::store::{atomic_write, now_iso, read_text};
 
 use crate::Result;
 use crate::base::Base;
-use crate::engine::{self, Report};
+use crate::engine::{self, Choices, Report};
 use crate::http::Http;
 use crate::oauth::{self, Listener};
 use crate::providers::{self, Account, AppId, Endpoints, Provider, Session, Space};
@@ -129,17 +129,19 @@ pub fn running_low(space: Space, project: u64) -> bool {
 /// lightly; when it is running low the report says how much is left. That
 /// read never stops the pass. When the drive is full the pass stops with an
 /// error; what was not sent stays on this device and goes up next time.
+/// `choices` is what the writer said about removals held back before.
 pub fn sync_project(
     session: &Session,
     link: &Link,
     root: &Path,
     base_file: &Path,
     lock: &Mutex<()>,
+    choices: &Choices,
 ) -> Result<Report> {
     let mut remote = providers::open(session, &link.folder, true)?;
     let space = providers::space(session);
     let mut base = Base::load(base_file);
-    let report = engine::sync(root, remote.as_mut(), &mut base, lock);
+    let report = engine::sync(root, remote.as_mut(), &mut base, lock, choices);
     // Keep what went through even when the pass stopped half way.
     base.save(base_file)?;
     let mut report = report?;
