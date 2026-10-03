@@ -11,7 +11,7 @@
 | 모듈 | 하는 일 |
 |---|---|
 | `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간) |
-| `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기 재시도 |
+| `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문), 원자적 저장, id, 시각 문자열, 이름 바꾸기·지우기 재시도, 정리 결과(`Cleanup`) |
 | `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수, 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝) |
 | `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |
@@ -44,7 +44,7 @@
 | AI 점검 | `workspace/AiTab.tsx`(오른쪽 탭: 보낼 내용 보기 → 보내기 → 결과), `workspace/AiDialog.tsx`(AI 연결 설정), `store/ai.ts`(설정, `askAi`, 시놉시스에 넣기), `lib/aiText.ts`(보낼 양·쓴 양 문장), `api/mock/ai.ts`(흉내 답) |
 | `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조, 서식 버튼(`markButtons.tsx`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
 | `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`, 창작 일지·날짜 증명·창작 과정 보관은 `JournalField.tsx`), 창작 과정 증명서는 `ProofDialog.tsx`. 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
-| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`) |
+| `lib/` | 순수 도움 함수(탭 계산, 색, 날짜 글, 지연 저장 `useDebouncedSave`, 교정본 검토의 고른 것과 본문 조각 `review.ts`, 드라이브 맞추기 문장 `syncText.ts`) |
 | `styles/` | 영역별 CSS. `index.css`가 순서대로 불러오고, **순서가 우선순위**라 새 파일은 맞는 자리에 끼운다 |
 
 ## 자주 하는 작업
@@ -100,4 +100,4 @@ npm --prefix app test
 | `lib/diff.ts` | 문단 짝짓기가 앱에 맞춰져 있고, 글자 비교만 jsdiff로 바꿔도 줄어드는 양이 작다 |
 | 끌어서 옮기기 (Sidebar, 탭, 개요 표) | 마우스와 길게 누르기 메뉴가 엮여 있어 dnd-kit로 바꾸면 위험이 크다 |
 
-나중에 할 일: `trash.rs`·`copies/`의 파일 이름 바꾸기에는 재시도가 없다(동기화 프로그램이 파일을 잡고 있으면 실패할 수 있음). `commands/`는 파일 작업을 async 안에서 바로 하고 `drives/`는 `spawn_blocking`을 쓴다. 둘을 한쪽으로 맞출지 정해야 한다.
+나중에 할 일: `copies/`의 파일 이름 바꾸기에는 재시도가 없다(동기화 프로그램이 파일을 잡고 있으면 실패할 수 있음. `trash.rs`는 `store::rename_retry`를 씀). `commands/`는 파일 작업을 async 안에서 바로 하고 `drives/`는 `spawn_blocking`을 쓴다. 둘을 한쪽으로 맞출지 정해야 한다.
