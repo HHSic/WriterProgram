@@ -34,6 +34,9 @@ interface Session {
 }
 
 const open = new Map<string, Session>();
+/** Change in length of the composition under way in a session, counted
+ * into the session once the composition ends (docs/safety-design.md K1). */
+const composed = new Map<string, number>();
 let on = true;
 
 /** Follows this device's setting; turning it off drops sessions under way. */
@@ -42,6 +45,7 @@ export function setJournalOn(value: boolean) {
   if (!value) {
     for (const s of open.values()) clearTimeout(s.timer);
     open.clear();
+    composed.clear();
   }
 }
 
@@ -125,7 +129,19 @@ async function send(root: string, event: Parameters<typeof api.journalEvent>[1])
   }
 }
 
+/** Counts a finished composition into its session. */
+function settle(key: string) {
+  const net = composed.get(key);
+  if (net === undefined) return;
+  composed.delete(key);
+  const s = open.get(key);
+  if (!s) return;
+  s.inserted += Math.max(net, 0);
+  s.deleted += Math.max(-net, 0);
+}
+
 function end(key: string): Promise<void> {
+  settle(key);
   const s = open.get(key);
   if (!s) return Promise.resolve();
   clearTimeout(s.timer);
@@ -138,12 +154,8 @@ export function endSessions(): Promise<void> {
   return Promise.all([...open.keys()].map(end)).then(() => {});
 }
 
-/** Counts an edit the writer made in document `doc` (not one passed on or reloaded). */
-export function noteEdit(root: string, doc: string, tr: Transaction, composing = false) {
-  if (!on) return;
-  const { inserted, deleted } = editCounts(tr, composing);
-  if (!inserted && !deleted) return;
-  const key = sessionKey(root, doc);
+/** Adds to the session of `key`, starting one if needed, and keeps it open. */
+function touch(key: string, root: string, doc: string, inserted: number, deleted: number) {
   const now = new Date().toISOString();
   const timer = setTimeout(() => void end(key), SESSION_IDLE_MS);
   const s = open.get(key);
@@ -156,6 +168,28 @@ export function noteEdit(root: string, doc: string, tr: Transaction, composing =
   } else {
     open.set(key, { root, doc, start: now, end: now, inserted, deleted, timer });
   }
+}
+
+/**
+ * Counts an edit the writer made in document `doc` (not one passed on or
+ * reloaded). Input of a composition under way only adds to its change in
+ * length, counted when the composition ends (noteComposed) or the next
+ * edit comes: ㅎ → 하 → 한 is one character in, however it was put together.
+ */
+export function noteEdit(root: string, doc: string, tr: Transaction, composing = false) {
+  if (!on) return;
+  const key = sessionKey(root, doc);
+  if (composing || tr.getMeta('composition') != null) {
+    const { inserted, deleted } = editCounts(tr, true);
+    if (!inserted && !deleted) return;
+    composed.set(key, (composed.get(key) ?? 0) + inserted - deleted);
+    touch(key, root, doc, 0, 0);
+    return;
+  }
+  settle(key);
+  const { inserted, deleted } = editCounts(tr);
+  if (!inserted && !deleted) return;
+  touch(key, root, doc, inserted, deleted);
 
   const pasted = tr.getMeta('paste') === true || tr.getMeta('uiEvent') === 'paste';
   if (pasted && inserted >= PASTE_MIN_CHARS) {
@@ -163,6 +197,11 @@ export function noteEdit(root: string, doc: string, tr: Transaction, composing =
     void send(root, { kind: 'paste', doc, chars: inserted, outside: recent?.outside ?? true });
   }
   if (pasted) lastPaste = null;
+}
+
+/** A composition in document `doc` has ended: its input counts now. */
+export function noteComposed(root: string, doc: string) {
+  if (on) settle(sessionKey(root, doc));
 }
 
 let installed = false;
