@@ -13,7 +13,7 @@ use similar::{Algorithm, DiffTag, capture_diff_slices_deadline};
 use super::Options;
 use crate::count::count_blocks;
 use crate::doc::{self, DocFile};
-use crate::journal::fingerprint;
+use crate::journal::{fingerprint, saves_of};
 use crate::markup::write_body;
 use crate::project::{self, ProjectKind};
 use crate::store::parse_iso;
@@ -302,8 +302,10 @@ pub(crate) fn gather(
                 }
             }
             "save" => {
-                days.entry(e.date).or_default().saves += 1;
-                totals.saves += 1;
+                // A gathered line stands for several saves.
+                let saves = saves_of(&e.v);
+                days.entry(e.date).or_default().saves += saves;
+                totals.saves += saves;
                 if let Some(row) = rows.get_mut(doc) {
                     row.last_edit = Some(e.date);
                 }

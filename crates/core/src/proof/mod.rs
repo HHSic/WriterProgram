@@ -71,12 +71,15 @@ fn local_offset() -> FixedOffset {
 
 /// The summary sentence alone, for the dialog to show before making.
 pub fn preview(root: &Path, options: &Options) -> Result<String> {
+    // Saves still gathering go in first, so the counts include them.
+    journal::flush(root);
     let scope = facts::Scope::new(options, local_offset())?;
     let journals = journal::read_all(root)?;
     Ok(facts::summary(&facts::gather(root, &scope, &journals)?))
 }
 
 pub fn make(root: &Path, options: &Options) -> Result<Made> {
+    journal::flush(root);
     make_at(root, options, local_offset(), Utc::now())
 }
 

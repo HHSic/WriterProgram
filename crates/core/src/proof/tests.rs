@@ -366,3 +366,63 @@ fn certificates_go_into_a_new_folder_each_time() {
     assert!(verify(&bundle, &[]).ok);
     assert!(first.ok);
 }
+
+#[test]
+fn journals_split_by_month_still_check_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = anchored(dir.path());
+    let sept = root.join(".journal").join(DEV1).join("2026-09.jsonl");
+    let before = fs::read(&sept).unwrap();
+    // November: chapter 1 saved three times (one gathered line), then a paste.
+    let save = |chars: u32| {
+        Entry::Save(journal::Save {
+            doc: DOCS[0].into(),
+            body: crate::anchor::tests::body_print(TEXTS[0]),
+            chars,
+            added: 10,
+            removed: 0,
+            saves: None,
+            since: None,
+        })
+    };
+    for (i, chars) in [100, 110, 120].into_iter().enumerate() {
+        let time = Utc.with_ymd_and_hms(2026, 11, 2, 3, i as u32, 0).unwrap();
+        journal::note_at(&root, DEV1, save(chars), time).unwrap();
+    }
+    let paste = Entry::Paste(Paste {
+        doc: DOCS[0].into(),
+        chars: 120,
+        outside: false,
+    });
+    append_at(&root, DEV1, &paste, "2026-11-02T03:05:00.000Z").unwrap();
+    // The past month stays as it was; a later piece has the two lines (the
+    // November one, or a later one if the stamp's line was written after).
+    assert_eq!(fs::read(&sept).unwrap(), before);
+    let journals = journal::read_all(&root).unwrap();
+    let lines = &journals.iter().find(|(d, _)| d == DEV1).unwrap().1;
+    let newest: Vec<&str> = lines[lines.len() - 2..]
+        .iter()
+        .map(|l| std::str::from_utf8(l).unwrap())
+        .collect();
+    assert!(newest[0].contains("\"saves\":3,\"since\":\"2026-11-02T03:00:00.000Z\""));
+    assert!(newest[1].contains("\"kind\":\"paste\""));
+    assert!(journal::verify(&root).unwrap().ok);
+
+    // The time stamp's leaf is the newest piece's last line.
+    let leaf = crate::anchor::leaves(&root)
+        .unwrap()
+        .into_iter()
+        .find(|l| l.label == format!("journal:{DEV1}"))
+        .unwrap();
+    assert_eq!(leaf.value, fingerprint(newest[1].as_bytes()));
+
+    // The certificate counts the gathered saves and its proof file checks out.
+    let scope = facts::Scope::new(&Options::default(), korea()).unwrap();
+    let f = facts::gather(&root, &scope, &journals).unwrap();
+    assert_eq!(f.totals.saves, 4 + 3);
+    let now = Utc.with_ymd_and_hms(2026, 11, 3, 3, 0, 0).unwrap();
+    let m = make_at(&root, &Options::default(), korea(), now).unwrap();
+    assert!(m.ok, "{}", m.html);
+    let v = verify(m.bundle.as_bytes(), &[]);
+    assert!(v.ok, "{}", v.text());
+}

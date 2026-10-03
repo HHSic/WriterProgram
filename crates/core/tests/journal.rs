@@ -54,7 +54,15 @@ fn saves_records_and_imports_are_journaled_without_text() {
         )
         .unwrap()
     };
-    let journal_file = root.join(".journal").join(format!("{DEVICE}.jsonl"));
+    // This device's lines over all its monthly pieces.
+    let journal_text = || {
+        let all = journal::read_all(&root).unwrap();
+        let (_, lines) = all.iter().find(|(d, _)| d == DEVICE).unwrap();
+        lines
+            .iter()
+            .map(|l| String::from_utf8(l.clone()).unwrap() + "\n")
+            .collect::<String>()
+    };
 
     // Off: nothing is written.
     journal::set_device(None);
@@ -90,11 +98,23 @@ fn saves_records_and_imports_are_journaled_without_text() {
     };
     let done = import::commit(&root, std::slice::from_ref(&source), &opts, &spec).unwrap();
 
-    let text = fs::read_to_string(&journal_file).unwrap();
+    let text = journal_text();
     // The first save also kept an automatic record of the text before it.
-    assert_eq!(
-        kinds(&text),
-        ["snapshot", "save", "save", "snapshot", "import"]
+    // The two saves are gathered into one line, written before the record.
+    assert_eq!(kinds(&text), ["snapshot", "save", "snapshot", "import"]);
+    // Written to monthly pieces in the device's folder; no single file.
+    assert!(
+        !root
+            .join(".journal")
+            .join(format!("{DEVICE}.jsonl"))
+            .exists()
+    );
+    let month = chrono::Utc::now().format("%Y-%m").to_string();
+    assert!(
+        root.join(".journal")
+            .join(DEVICE)
+            .join(format!("{month}.jsonl"))
+            .is_file()
     );
     let lines: Vec<serde_json::Value> = text
         .lines()
@@ -102,24 +122,26 @@ fn saves_records_and_imports_are_journaled_without_text() {
         .map(|l| serde_json::from_str(l).unwrap())
         .collect();
     let first = SECRET.chars().count() as u64;
-    assert_eq!(lines[0]["chars"], first);
-    // Added and removed are how much longer or shorter the text got.
+    // Added and removed are how much longer or shorter the text got, summed
+    // over the saves of the line.
     let before = "꺼져 있을 때 쓴 글".chars().count() as u64;
-    assert_eq!(lines[0]["added"], first - before);
-    assert_eq!(lines[1]["added"], "둘째 문단.".chars().count() as u64);
-    assert_eq!(lines[1]["removed"], 0);
+    let second = "둘째 문단.".chars().count() as u64;
+    assert_eq!(lines[0]["saves"], 2);
+    assert_eq!(lines[0]["added"], first - before + second);
+    assert_eq!(lines[0]["removed"], 0);
+    assert!(lines[0]["since"].as_str().unwrap() <= lines[0]["time"].as_str().unwrap());
     let written = writer_core::markup::write_body(&current.body);
     assert_eq!(
-        lines[1]["body"].as_str().unwrap(),
+        lines[0]["body"].as_str().unwrap(),
         journal::fingerprint(written.as_bytes())
     );
-    assert_eq!(lines[2]["snapshotKind"], "manual");
-    assert_eq!(lines[3]["file"], "초고.txt");
+    assert_eq!(lines[1]["snapshotKind"], "manual");
+    assert_eq!(lines[2]["file"], "초고.txt");
     assert_eq!(
-        lines[3]["fileHash"].as_str().unwrap(),
+        lines[2]["fileHash"].as_str().unwrap(),
         journal::fingerprint(&fs::read(&source).unwrap())
     );
-    assert_eq!(lines[3]["docs"].as_array().unwrap().len(), done.docs.len());
+    assert_eq!(lines[2]["docs"].as_array().unwrap().len(), done.docs.len());
 
     // No manuscript text, record name or folder anywhere in the journal.
     for words in [SECRET, "둘째 문단", IMPORTED, "보관 이름", "꺼져 있을 때"] {
@@ -129,7 +151,7 @@ fn saves_records_and_imports_are_journaled_without_text() {
 
     assert!(journal::verify(&root).unwrap().ok);
     let sum = journal::summary(&root, Some(DEVICE)).unwrap();
-    assert_eq!((sum.saves, sum.imports, sum.this_device), (2, 1, 5));
+    assert_eq!((sum.saves, sum.imports, sum.this_device), (2, 1, 4));
 
     // 교정 주고받기: sent, taken back, applied. The "corrected" file is the
     // chapter exported again after a change, so it differs from what was sent.
@@ -192,7 +214,9 @@ fn saves_records_and_imports_are_journaled_without_text() {
     .unwrap();
     assert_eq!(applied.docs, std::slice::from_ref(&id));
 
-    let text = fs::read_to_string(&journal_file).unwrap();
+    // As when the project closes: saves still gathering go in.
+    journal::flush(&root);
+    let text = journal_text();
     let exchanges: Vec<serde_json::Value> = text
         .lines()
         .map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap())
@@ -236,5 +260,5 @@ fn saves_records_and_imports_are_journaled_without_text() {
     // Off again: nothing more.
     journal::set_device(None);
     save(&["다시 꺼짐"]);
-    assert_eq!(fs::read_to_string(&journal_file).unwrap(), text);
+    assert_eq!(journal_text(), text);
 }

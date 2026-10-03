@@ -278,22 +278,43 @@ fn each_device_journal_travels_without_copies() {
             outside: true,
         })
     };
-    journal::append(&a.root, "devaaaaaaaaa", &paste(100)).unwrap();
+    journal::append_at(
+        &a.root,
+        "devaaaaaaaaa",
+        &paste(100),
+        "2026-09-30T12:00:00.000Z",
+    )
+    .unwrap();
     a.sync(&drive);
     b.sync(&drive);
     // Both write at the same time, each to its own file.
-    journal::append(&a.root, "devaaaaaaaaa", &paste(200)).unwrap();
-    journal::append(&b.root, "devbbbbbbbbb", &paste(300)).unwrap();
+    journal::append_at(
+        &a.root,
+        "devaaaaaaaaa",
+        &paste(200),
+        "2026-10-01T12:00:00.000Z",
+    )
+    .unwrap();
+    journal::append_at(
+        &b.root,
+        "devbbbbbbbbb",
+        &paste(300),
+        "2026-10-01T12:00:00.000Z",
+    )
+    .unwrap();
     let up = b.sync(&drive);
     assert!(
         up.uploaded
-            .contains(&".journal/devbbbbbbbbb.jsonl".to_string())
+            .contains(&".journal/devbbbbbbbbb/2026-10.jsonl".to_string())
     );
+    // A new month goes up as a new piece; the past month is not sent again.
     let report = a.sync(&drive);
     assert!(report.copies.is_empty(), "{report:?}");
+    assert_eq!(report.uploaded, [".journal/devaaaaaaaaa/2026-10.jsonl"]);
     b.sync(&drive);
     assert_eq!(files(&a.root), files(&b.root));
     let check = journal::verify(&b.root).unwrap();
     assert!(check.ok);
     assert_eq!(check.files.len(), 2);
+    assert_eq!(check.files[0].lines, 2);
 }

@@ -348,6 +348,8 @@ pub fn save_body(
             chars: counts.with_spaces,
             added: counts.with_spaces.saturating_sub(before),
             removed: before.saturating_sub(counts.with_spaces),
+            saves: None,
+            since: None,
         }),
     );
     Ok(SaveOutcome {

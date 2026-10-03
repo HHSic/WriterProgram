@@ -218,6 +218,8 @@ pub fn prepare(
     device: &str,
     force: bool,
 ) -> Result<std::result::Result<Pending, Skip>> {
+    // Saves still gathering go in first, so the journal leaf covers them.
+    journal::flush(root);
     prepare_at(root, device, force, Utc::now())
 }
 

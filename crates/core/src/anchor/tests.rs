@@ -84,6 +84,8 @@ pub(crate) fn sample(parent: &Path) -> PathBuf {
             chars: text.chars().count() as u32,
             added,
             removed: 0,
+            saves: None,
+            since: None,
         })
     };
     let session = |doc: &str, start: &str, end: &str, inserted, deleted| {
@@ -330,8 +332,9 @@ fn finishing_keeps_good_replies_and_journals_them() {
     assert_eq!(token.sha256, fingerprint(DIGICERT));
 
     // One anchor line, and the chain still holds.
-    let text = fs::read_to_string(root.join(".journal").join(format!("{DEV1}.jsonl"))).unwrap();
-    let last = text.lines().last().unwrap();
+    let journals = crate::journal::read_all(&root).unwrap();
+    let dev1 = &journals.iter().find(|(d, _)| d == DEV1).unwrap().1;
+    let last = std::str::from_utf8(dev1.last().unwrap()).unwrap();
     assert!(last.contains("\"kind\":\"anchor\""));
     assert!(last.contains(&format!("\"root\":\"{SAMPLE_ROOT}\"")));
     assert!(last.contains(&format!("\"token\":\"{}\"", fingerprint(DIGICERT))));

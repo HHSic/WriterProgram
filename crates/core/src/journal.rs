@@ -1,18 +1,36 @@
 //! Creation journal (창작 일지): a quiet record of how a work was written, so
 //! the writer can later show it (docs/creation-proof.md).
 //!
-//! Each device appends to its own file, `.journal/<device id>.jsonl`, one JSON
-//! object per line:
+//! Each device appends to its own journal, one JSON object per line, split
+//! into one file per month (the UTC month of the line's time):
 //!
 //! ```text
-//! {"kind":"save","time":"2026-10-02T01:02:03.456Z","doc":"k7q2m9x4t1ab","body":"9f2c…","chars":5120,"added":42,"removed":0,"prev":"3b1a…"}
+//! .journal/<device id>.jsonl              before monthly pieces (kept as is)
+//! .journal/<device id>/2026-10.jsonl      then one piece per month
+//! .journal/<device id>/2026-11.jsonl
+//! ```
+//!
+//! ```text
+//! {"kind":"save","time":"2026-10-02T01:02:03.456Z","doc":"k7q2m9x4t1ab","body":"9f2c…","chars":5120,"added":42,"removed":0,"saves":12,"since":"2026-10-02T00:55:10.120Z","prev":"3b1a…"}
 //! ```
 //!
 //! `prev` is the SHA-256 (hex) of the previous line's bytes, or 64 zeros on
-//! the first line: a hash chain, so changing or removing a line in the middle
-//! shows up in `verify`. Lines are only ever added; the app never rewrites or
-//! removes them. Two devices never write the same file, so a sync program
-//! carrying the folder between them has nothing to merge.
+//! the device's first line: a hash chain, so changing or removing a line in
+//! the middle shows up in `verify`. The chain runs on across pieces: the
+//! first line of a month links to the last line of the piece before it, so
+//! the pieces read in order are one journal. Lines are only ever added; the
+//! app never rewrites or removes them, and never writes to a piece once a
+//! later one exists, so a sync program sends only the current month again.
+//! Two devices never write the same file, so a sync program carrying the
+//! folder between them has nothing to merge.
+//!
+//! Saves are gathered (`note`): the saves of one chapter within ten minutes
+//! become one `save` line with how many there were (`saves`), when the first
+//! was (`since`), the sums of `added` and `removed`, and the body and length
+//! after the last. The line is written when the batch is ten minutes old,
+//! when another chapter is saved, right before any other line for the
+//! project, and when the project closes or the app quits (`flush`,
+//! `flush_all`). Old lines without `saves` stand for one save.
 //!
 //! No manuscript text goes in: only ids, fingerprints, counts and times.
 //!
@@ -21,13 +39,15 @@
 //! device id (`set_device`); with none set, the hooks in `doc`, `snapshot`,
 //! `import` and `corrections` write nothing.
 
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Mutex, MutexGuard, RwLock};
 use std::thread;
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -37,19 +57,100 @@ use crate::{Error, Result};
 
 pub const JOURNAL_DIR: &str = ".journal";
 const EXTENSION: &str = "jsonl";
-/// `prev` of the first line of a file.
+/// The folder of time stamps inside the journal folder (`anchor` module):
+/// never a device's folder.
+const ANCHOR_DIR: &str = "anchors";
+/// `prev` of a device's first line.
 const NO_PREV: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 /// Pastes shorter than this are not worth a line (spec §3).
 pub const PASTE_MIN_CHARS: u32 = 100;
+/// Saves of one chapter within this many minutes become one line.
+pub const BATCH_MINUTES: i64 = 10;
 
 /// The device the journal is written for; none while the journal is off.
 static DEVICE: RwLock<Option<String>> = RwLock::new(None);
-/// Appends one at a time, so two lines never chain to the same previous one.
-static APPEND: Mutex<()> = Mutex::new(());
+/// The saves not yet written, one batch per project folder. Every line is
+/// written while holding it, so two lines never chain to the same previous
+/// one and a batch always goes in before the line that follows it.
+static PENDING: Mutex<BTreeMap<PathBuf, Batch>> = Mutex::new(BTreeMap::new());
+
+/// Saves of one chapter gathered into one line.
+#[derive(Debug, Clone)]
+struct Batch {
+    device: String,
+    doc: String,
+    first: DateTime<Utc>,
+    last: DateTime<Utc>,
+    saves: u32,
+    added: u32,
+    removed: u32,
+    /// Body fingerprint and length after the last save.
+    body: String,
+    chars: u32,
+}
+
+impl Batch {
+    fn entry(&self) -> Entry {
+        Entry::Save(Save {
+            doc: self.doc.clone(),
+            body: self.body.clone(),
+            chars: self.chars,
+            added: self.added,
+            removed: self.removed,
+            saves: Some(self.saves),
+            since: Some(to_iso(self.first)),
+        })
+    }
+}
+
+fn pending() -> MutexGuard<'static, BTreeMap<PathBuf, Batch>> {
+    PENDING.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// Writes the batch waiting for `root`, if any. A batch that cannot be
+/// written is dropped with a note in the log: it never stops the work.
+fn flush_locked(pending: &mut BTreeMap<PathBuf, Batch>, root: &Path) {
+    if let Some(batch) = pending.remove(root)
+        && let Err(e) = write_line(root, &batch.device, &batch.entry(), &to_iso(batch.last))
+    {
+        eprintln!("창작 일지를 쓰지 못함: {}", e.user_message());
+    }
+}
+
+/// Writes the saves waiting for `root` now: when the project closes, and
+/// before reading the journal for a certificate or a time stamp.
+pub fn flush(root: &Path) {
+    flush_locked(&mut pending(), root);
+}
+
+/// Writes every waiting batch: when the app quits or the journal is switched.
+pub fn flush_all() {
+    let mut pending = pending();
+    let roots: Vec<PathBuf> = pending.keys().cloned().collect();
+    for root in roots {
+        flush_locked(&mut pending, &root);
+    }
+}
+
+/// Writes the batches that are `BATCH_MINUTES` old by `now`; the app calls
+/// it every minute, so a batch never waits much longer than that.
+pub fn flush_due(now: DateTime<Utc>) {
+    let mut pending = pending();
+    let due: Vec<PathBuf> = pending
+        .iter()
+        .filter(|(_, b)| now - b.first >= chrono::Duration::minutes(BATCH_MINUTES))
+        .map(|(root, _)| root.clone())
+        .collect();
+    for root in due {
+        flush_locked(&mut pending, &root);
+    }
+}
 
 /// Turns the journal on for `device` (its id, see `new_device_id`), or off
 /// with none. Called by the app at start and when the writer switches it.
+/// Saves gathered so far are written first, for the device they were made on.
 pub fn set_device(device: Option<String>) {
+    flush_all();
     let mut slot = DEVICE.write().unwrap_or_else(|p| p.into_inner());
     *slot = device.filter(|d| is_id(d));
 }
@@ -146,9 +247,17 @@ pub struct Save {
     pub body: String,
     /// Characters with spaces after the save.
     pub chars: u32,
-    /// How much longer or shorter the text got with this save.
+    /// How much longer or shorter the text got with this save (with all the
+    /// saves of a batch: the sums).
     pub added: u32,
     pub removed: u32,
+    /// How many saves the line stands for; none on lines from before saves
+    /// were gathered, which stand for one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub saves: Option<u32>,
+    /// When the first of them was; the line's time is the last.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -291,25 +400,94 @@ pub fn fingerprint(bytes: &[u8]) -> String {
     hex(&sha256(bytes))
 }
 
-fn file_of(root: &Path, device: &str) -> PathBuf {
+/// The single file a device wrote before monthly pieces.
+fn single_file(root: &Path, device: &str) -> PathBuf {
     root.join(JOURNAL_DIR).join(format!("{device}.{EXTENSION}"))
 }
 
-/// Adds `entry` to this device's journal in `root`.
+/// The piece of a device's journal for `month` (`YYYY-MM`).
+fn piece_file(root: &Path, device: &str, month: &str) -> PathBuf {
+    root.join(JOURNAL_DIR)
+        .join(device)
+        .join(format!("{month}.{EXTENSION}"))
+}
+
+/// `YYYY-MM` from a piece's file name, if it is one.
+fn month_of(name: &str) -> Option<&str> {
+    let month = name.strip_suffix(&format!(".{EXTENSION}"))?;
+    let b = month.as_bytes();
+    let digits = |r: std::ops::Range<usize>| b[r].iter().all(u8::is_ascii_digit);
+    (b.len() == 7 && digits(0..4) && b[4] == b'-' && digits(5..7)).then_some(month)
+}
+
+/// The pieces of `device`'s journal, oldest first: the single file from
+/// before monthly pieces, then the months in order. Other files in the
+/// device's folder (a sync program's copy, say) are not part of it.
+fn pieces(root: &Path, device: &str) -> Result<Vec<PathBuf>> {
+    let mut out = Vec::new();
+    let single = single_file(root, device);
+    if single.is_file() {
+        out.push(single);
+    }
+    let dir = root.join(JOURNAL_DIR).join(device);
+    if !dir.is_dir() {
+        return Ok(out);
+    }
+    let entries = fs::read_dir(&dir).map_err(|e| Error::io(&dir, e))?;
+    let mut months: Vec<(String, PathBuf)> = entries
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            Some((month_of(&name)?.to_string(), e.path()))
+        })
+        .collect();
+    months.sort();
+    out.extend(months.into_iter().map(|(_, path)| path));
+    Ok(out)
+}
+
+/// Adds `entry` to this device's journal in `root`, right away (after any
+/// saves still waiting for that project).
 pub fn append(root: &Path, device: &str, entry: &Entry) -> Result<()> {
     append_at(root, device, entry, &now_iso())
 }
 
-pub(crate) fn append_at(root: &Path, device: &str, entry: &Entry, time: &str) -> Result<()> {
-    if !is_id(device) {
+/// `append` with the line's time given (UTC, `store::to_iso`).
+pub fn append_at(root: &Path, device: &str, entry: &Entry, time: &str) -> Result<()> {
+    let mut pending = pending();
+    flush_locked(&mut pending, root);
+    write_line(root, device, entry, time)
+}
+
+/// Writes one line to the piece for its month; the caller holds `PENDING`.
+/// A line whose month is before the newest piece's (the clock was put back)
+/// goes into the newest piece: a past piece never changes.
+fn write_line(root: &Path, device: &str, entry: &Entry, time: &str) -> Result<()> {
+    if !is_id(device) || device == ANCHOR_DIR {
         return Err(Error::Invalid("올바르지 않은 기기 이름".into()));
     }
-    let _one = APPEND.lock().unwrap_or_else(|p| p.into_inner());
-    let path = file_of(root, device);
-    let dir = path.parent().expect("inside the journal folder");
+    let month = parse_iso(time)
+        .unwrap_or_else(Utc::now)
+        .format("%Y-%m")
+        .to_string();
+    let before = pieces(root, device)?;
+    let newest = before
+        .iter()
+        .filter_map(|p| month_of(&p.file_name()?.to_string_lossy()).map(str::to_string))
+        .max();
+    let month = newest.filter(|n| *n > month).unwrap_or(month);
+    let path = piece_file(root, device, &month);
+    let dir = path.parent().expect("inside the device's folder");
     fs::create_dir_all(dir).map_err(|e| Error::io(dir, e))?;
     let mut file = open_retry(&path).map_err(|e| Error::io(&path, e))?;
     let (last, torn) = last_line(&mut file).map_err(|e| Error::io(&path, e))?;
+    let last = match last {
+        Some(line) => Some(line),
+        // A new month: the chain goes on from the last line of the piece
+        // before (read only; that piece stays as it is, even cut short).
+        None => last_of_pieces(before.iter().rev().filter(|p| **p != path))?,
+    };
     let prev = last.map_or_else(|| NO_PREV.to_string(), |line| fingerprint(&line));
     let mut out = Vec::new();
     // A line cut short (the app stopped mid-write) is closed first: it stays,
@@ -321,6 +499,17 @@ pub(crate) fn append_at(root: &Path, device: &str, entry: &Entry, time: &str) ->
     out.push(b'\n');
     file.write_all(&out).map_err(|e| Error::io(&path, e))?;
     file.sync_data().map_err(|e| Error::io(&path, e))
+}
+
+/// The last line of the first of `pieces` (newest first) that has one.
+fn last_of_pieces<'a>(pieces: impl Iterator<Item = &'a PathBuf>) -> Result<Option<Vec<u8>>> {
+    for path in pieces {
+        let mut file = File::open(path).map_err(|e| Error::io(path, e))?;
+        if let (Some(line), _) = last_line(&mut file).map_err(|e| Error::io(path, e))? {
+            return Ok(Some(line));
+        }
+    }
+    Ok(None)
 }
 
 /// Opens the journal for reading and appending, retrying briefly while a sync
@@ -370,14 +559,54 @@ fn last_line(file: &mut File) -> std::io::Result<(Option<Vec<u8>>, bool)> {
     }
 }
 
-/// Adds `entry` to the journal when it is on; called from saves, records and
-/// imports. A journal that cannot be written never stops the work itself.
+/// Adds `entry` to the journal when it is on; called from saves, records,
+/// imports and 교정 주고받기. Saves are gathered into batches (module
+/// docs); anything else is written at once, after the waiting batch. A
+/// journal that cannot be written never stops the work itself.
 pub(crate) fn note(root: &Path, entry: Entry) {
     if let Some(device) = device()
-        && let Err(e) = append(root, &device, &entry)
+        && let Err(e) = note_at(root, &device, entry, Utc::now())
     {
         eprintln!("창작 일지를 쓰지 못함: {}", e.user_message());
     }
+}
+
+pub(crate) fn note_at(root: &Path, device: &str, entry: Entry, now: DateTime<Utc>) -> Result<()> {
+    let mut pending = pending();
+    let Entry::Save(save) = entry else {
+        flush_locked(&mut pending, root);
+        return write_line(root, device, &entry, &to_iso(now));
+    };
+    if !is_id(device) {
+        return Err(Error::Invalid("올바르지 않은 기기 이름".into()));
+    }
+    if pending
+        .get(root)
+        .is_some_and(|b| b.doc != save.doc || b.device != device)
+    {
+        flush_locked(&mut pending, root);
+    }
+    let batch = pending.entry(root.to_path_buf()).or_insert_with(|| Batch {
+        device: device.to_string(),
+        doc: save.doc.clone(),
+        first: now,
+        last: now,
+        saves: 0,
+        added: 0,
+        removed: 0,
+        body: String::new(),
+        chars: 0,
+    });
+    batch.last = batch.last.max(now);
+    batch.saves += save.saves.unwrap_or(1);
+    batch.added = batch.added.saturating_add(save.added);
+    batch.removed = batch.removed.saturating_add(save.removed);
+    batch.body = save.body;
+    batch.chars = save.chars;
+    if now - batch.first >= chrono::Duration::minutes(BATCH_MINUTES) {
+        flush_locked(&mut pending, root);
+    }
+    Ok(())
 }
 
 /// A writing session or paste reported by the editor.
@@ -452,43 +681,60 @@ pub fn editor_entry(event: EditorEvent) -> Result<Option<Entry>> {
 // ---------------------------------------------------------------------------
 // Reading
 
-/// The journal files in `root`: (device id, path), sorted by device.
-fn files(root: &Path) -> Result<Vec<(String, PathBuf)>> {
+/// The devices with a journal in `root`: a single file `<device>.jsonl`, a
+/// folder `<device>/` of monthly pieces, or both. Sorted.
+fn devices(root: &Path) -> Result<Vec<String>> {
     let dir = root.join(JOURNAL_DIR);
     let entries = match fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(Error::io(&dir, e)),
     };
-    let mut out: Vec<(String, PathBuf)> = entries
+    let mut out: Vec<String> = entries
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_file())
         .filter_map(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') {
+            let path = e.path();
+            let device = if path.is_dir() {
+                name
+            } else if path.is_file() {
+                name.strip_suffix(&format!(".{EXTENSION}"))?.to_string()
+            } else {
                 return None;
-            }
-            let device = name.strip_suffix(&format!(".{EXTENSION}"))?.to_string();
-            Some((device, e.path()))
+            };
+            (is_id(&device) && device != ANCHOR_DIR).then_some(device)
         })
         .collect();
     out.sort();
+    out.dedup();
     Ok(out)
 }
 
-/// Every device's journal in `root`: (device id, its lines without line
-/// breaks), sorted by device.
-pub fn read_all(root: &Path) -> Result<Vec<(String, Vec<Vec<u8>>)>> {
+/// A device's lines, without line breaks, over all its pieces in order.
+/// Each piece is split on its own, so a piece's last line cut short stays
+/// one line.
+fn read_device(root: &Path, device: &str) -> Result<Vec<Vec<u8>>> {
     let mut out = Vec::new();
-    for (device, path) in files(root)? {
+    for path in pieces(root, device)? {
         let bytes = fs::read(&path).map_err(|e| Error::io(&path, e))?;
-        let lines = lines(&bytes).into_iter().map(<[u8]>::to_vec).collect();
-        out.push((device, lines));
+        out.extend(lines(&bytes).into_iter().map(<[u8]>::to_vec));
     }
     Ok(out)
 }
 
-/// The `prev` of a file's first line.
+/// Every device's journal in `root`: (device id, its lines without line
+/// breaks, all pieces in order), sorted by device.
+pub fn read_all(root: &Path) -> Result<Vec<(String, Vec<Vec<u8>>)>> {
+    devices(root)?
+        .into_iter()
+        .map(|device| {
+            let lines = read_device(root, &device)?;
+            Ok((device, lines))
+        })
+        .collect()
+}
+
+/// The `prev` of a device's first line.
 pub const FIRST_PREV: &str = NO_PREV;
 
 /// Lines of a journal file, without line breaks. A last line without a line
@@ -515,6 +761,7 @@ pub enum Problem {
 #[serde(rename_all = "camelCase")]
 pub struct FileCheck {
     pub device: String,
+    /// Lines over all the device's pieces.
     pub lines: usize,
     /// First line that is wrong (from 1), and what is wrong with it.
     pub first_bad: Option<(usize, Problem)>,
@@ -528,8 +775,7 @@ pub struct Report {
     pub ok: bool,
 }
 
-fn check_file(device: &str, bytes: &[u8]) -> FileCheck {
-    let lines = lines(bytes);
+fn check_file(device: &str, lines: &[Vec<u8>]) -> FileCheck {
     let mut prev = NO_PREV.to_string();
     let mut first_bad = None;
     for (i, line) in lines.iter().enumerate() {
@@ -560,15 +806,20 @@ fn check_file(device: &str, bytes: &[u8]) -> FileCheck {
     }
 }
 
-/// Checks the chain of every device's journal in `root`.
+/// Checks the chain of every device's journal in `root`, across its pieces.
 pub fn verify(root: &Path) -> Result<Report> {
-    let mut checks = Vec::new();
-    for (device, path) in files(root)? {
-        let bytes = fs::read(&path).map_err(|e| Error::io(&path, e))?;
-        checks.push(check_file(&device, &bytes));
-    }
+    let checks: Vec<FileCheck> = read_all(root)?
+        .iter()
+        .map(|(device, lines)| check_file(device, lines))
+        .collect();
     let ok = checks.iter().all(|c| c.first_bad.is_none());
     Ok(Report { files: checks, ok })
+}
+
+/// How many saves a `save` line stands for: its `saves`, or one on lines
+/// from before saves were gathered.
+pub fn saves_of(line: &Value) -> u64 {
+    line.get("saves").and_then(Value::as_u64).unwrap_or(1)
 }
 
 /// What the journal holds, for the writer to see that it works.
@@ -577,7 +828,7 @@ pub fn verify(root: &Path) -> Result<Report> {
 pub struct Summary {
     /// Time of the earliest line on any device.
     pub since: Option<String>,
-    /// Saves on all devices.
+    /// Saves on all devices (a gathered line counts its `saves`).
     pub saves: usize,
     pub sessions: usize,
     pub pastes: usize,
@@ -598,19 +849,17 @@ pub fn summary(root: &Path, device: Option<&str>) -> Result<Summary> {
     let mut out = Summary::default();
     let mut since: Option<chrono::DateTime<chrono::Utc>> = None;
     let mut last_anchor: Option<chrono::DateTime<chrono::Utc>> = None;
-    for (name, path) in files(root)? {
-        let bytes = fs::read(&path).map_err(|e| Error::io(&path, e))?;
+    for (name, lines) in read_all(root)? {
         out.devices += 1;
-        let lines = lines(&bytes);
         if device == Some(name.as_str()) {
             out.this_device = lines.len();
         }
-        for line in lines {
+        for line in &lines {
             let Ok(v) = serde_json::from_slice::<Value>(line) else {
                 continue;
             };
             match v.get("kind").and_then(Value::as_str) {
-                Some("save") => out.saves += 1,
+                Some("save") => out.saves += saves_of(&v) as usize,
                 Some("session") => out.sessions += 1,
                 Some("paste") => out.pastes += 1,
                 Some("import") => out.imports += 1,
@@ -642,6 +891,13 @@ pub fn summary(root: &Path, device: Option<&str>) -> Result<Summary> {
 mod tests {
     use super::*;
 
+    /// The one piece a device has written so far.
+    fn only_piece(root: &Path, device: &str) -> PathBuf {
+        let pieces = pieces(root, device).unwrap();
+        assert_eq!(pieces.len(), 1, "{pieces:?}");
+        pieces.into_iter().next().unwrap()
+    }
+
     fn save(doc: &str, chars: u32) -> Entry {
         Entry::Save(Save {
             doc: doc.into(),
@@ -649,6 +905,8 @@ mod tests {
             chars,
             added: chars,
             removed: 0,
+            saves: None,
+            since: None,
         })
     }
 
@@ -668,7 +926,7 @@ mod tests {
             }),
         )
         .unwrap();
-        let text = fs::read_to_string(root.join(".journal/dev1aaaaaaaa.jsonl")).unwrap();
+        let text = fs::read_to_string(only_piece(root, "dev1aaaaaaaa")).unwrap();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 3);
         assert!(lines[0].starts_with("{\"kind\":\"save\",\"time\":\""));
@@ -697,7 +955,7 @@ mod tests {
         for chars in [10, 20, 30, 40] {
             append(root, "dev1aaaaaaaa", &save("d1", chars)).unwrap();
         }
-        let path = root.join(".journal/dev1aaaaaaaa.jsonl");
+        let path = only_piece(root, "dev1aaaaaaaa");
         let text = fs::read_to_string(&path).unwrap();
 
         // One number changed in line 2: line 3 no longer links to it.
@@ -733,7 +991,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         append(root, "dev1aaaaaaaa", &save("d1", 10)).unwrap();
-        let path = root.join(".journal/dev1aaaaaaaa.jsonl");
+        let path = only_piece(root, "dev1aaaaaaaa");
         let mut file = OpenOptions::new().append(true).open(&path).unwrap();
         file.write_all(b"{\"kind\":\"sa").unwrap();
         drop(file);
@@ -808,7 +1066,7 @@ mod tests {
             docs: Vec::new(),
         });
         append(root, "dev1aaaaaaaa", &received).unwrap();
-        let text = fs::read_to_string(root.join(".journal/dev1aaaaaaaa.jsonl")).unwrap();
+        let text = fs::read_to_string(only_piece(root, "dev1aaaaaaaa")).unwrap();
         let first = text.lines().next().unwrap();
         assert_eq!(
             first,
@@ -899,9 +1157,227 @@ mod tests {
             "2026-10-02T01:02:03.456Z",
         )
         .unwrap();
-        let text = fs::read_to_string(dir.path().join(".journal/dev1aaaaaaaa.jsonl")).unwrap();
+        let text = fs::read_to_string(only_piece(dir.path(), "dev1aaaaaaaa")).unwrap();
         assert!(text.starts_with(
             "{\"kind\":\"save\",\"time\":\"2026-10-02T01:02:03.456Z\",\"doc\":\"d1\","
         ));
+    }
+
+    const DEV: &str = "dev1aaaaaaaa";
+
+    fn at(s: &str) -> DateTime<Utc> {
+        parse_iso(s).unwrap()
+    }
+
+    fn values(root: &Path, device: &str) -> Vec<Value> {
+        read_device(root, device)
+            .unwrap()
+            .iter()
+            .map(|l| serde_json::from_slice(l).unwrap())
+            .collect()
+    }
+
+    fn kinds_of(values: &[Value]) -> Vec<&str> {
+        values.iter().map(|v| v["kind"].as_str().unwrap()).collect()
+    }
+
+    /// A save as `doc::save_body` reports it: one save, `chars` long after.
+    fn saved(doc: &str, chars: u32, added: u32, removed: u32) -> Entry {
+        Entry::Save(Save {
+            doc: doc.into(),
+            body: fingerprint(format!("{doc}{chars}").as_bytes()),
+            chars,
+            added,
+            removed,
+            saves: None,
+            since: None,
+        })
+    }
+
+    #[test]
+    fn a_hundred_saves_become_a_few_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let start = at("2026-10-02T01:00:00.000Z");
+        // One save every 15 seconds for 25 minutes: 5 longer, every third 2 shorter.
+        let mut chars = 0u32;
+        let (mut added, mut removed) = (0u64, 0u64);
+        for i in 0..100u32 {
+            let (a, r) = if i % 3 == 2 { (0, 2) } else { (5, 0) };
+            chars = chars + a - r;
+            added += u64::from(a);
+            removed += u64::from(r);
+            let now = start + chrono::Duration::seconds(15 * i64::from(i));
+            note_at(root, DEV, saved("d1", chars, a, r), now).unwrap();
+        }
+        // The last batch waits until the project closes.
+        assert_eq!(values(root, DEV).len(), 2);
+        flush(root);
+        let lines = values(root, DEV);
+        assert_eq!(kinds_of(&lines), ["save", "save", "save"]);
+        let sum = |key: &str| lines.iter().map(|v| v[key].as_u64().unwrap()).sum::<u64>();
+        assert_eq!(sum("saves"), 100);
+        assert_eq!((sum("added"), sum("removed")), (added, removed));
+        // A batch is closed by the save ten minutes after its first.
+        assert_eq!(lines[0]["saves"], 41);
+        assert_eq!(lines[0]["since"], "2026-10-02T01:00:00.000Z");
+        assert_eq!(lines[0]["time"], "2026-10-02T01:10:00.000Z");
+        assert_eq!(lines[1]["since"], "2026-10-02T01:10:15.000Z");
+        let last = &lines[2];
+        assert_eq!(last["time"], "2026-10-02T01:24:45.000Z");
+        assert_eq!(last["chars"], u64::from(chars));
+        assert_eq!(last["body"], fingerprint(format!("d1{chars}").as_bytes()));
+        assert!(verify(root).unwrap().ok);
+        let s = summary(root, Some(DEV)).unwrap();
+        assert_eq!((s.saves, s.this_device), (100, 3));
+    }
+
+    #[test]
+    fn a_waiting_batch_goes_in_before_any_other_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        // January, so `flush_due` here never reaches other tests' batches.
+        let t = |s: &str| at(&format!("2026-01-02T01:{s}.000Z"));
+        note_at(root, DEV, saved("d1", 10, 10, 0), t("00:00")).unwrap();
+        note_at(root, DEV, saved("d1", 30, 20, 0), t("00:30")).unwrap();
+        // A record: the two saves first, then the record.
+        let record = Entry::Snapshot(Snapshot {
+            doc: "d1".into(),
+            snapshot: "20261002-010100-000.manual".into(),
+            body: fingerprint(b"d130"),
+            snapshot_kind: "manual".into(),
+        });
+        note_at(root, DEV, record, t("01:00")).unwrap();
+        // Another chapter saved: the first chapter's batch goes in.
+        note_at(root, DEV, saved("d1", 25, 0, 5), t("02:00")).unwrap();
+        note_at(root, DEV, saved("d2", 7, 7, 0), t("03:00")).unwrap();
+        // The editor's session line (`append`) goes after the waiting save.
+        let session = Entry::Session(Session {
+            doc: "d2".into(),
+            start: "2026-01-02T01:02:30.000Z".into(),
+            end: "2026-01-02T01:03:30.000Z".into(),
+            inserted: 7,
+            deleted: 0,
+        });
+        append_at(root, DEV, &session, "2026-01-02T01:04:00.000Z").unwrap();
+        let lines = values(root, DEV);
+        assert_eq!(
+            kinds_of(&lines),
+            ["save", "snapshot", "save", "save", "session"]
+        );
+        assert_eq!(
+            (lines[0]["saves"].as_u64(), lines[0]["added"].as_u64()),
+            (Some(2), Some(30))
+        );
+        assert_eq!(lines[0]["time"], "2026-01-02T01:00:30.000Z");
+        assert_eq!(
+            (lines[2]["doc"].as_str(), lines[2]["removed"].as_u64()),
+            (Some("d1"), Some(5))
+        );
+        assert_eq!(
+            (lines[3]["doc"].as_str(), lines[3]["saves"].as_u64()),
+            (Some("d2"), Some(1))
+        );
+        assert!(verify(root).unwrap().ok);
+
+        // Ten minutes after its first save, the app's minute check writes it.
+        note_at(root, DEV, saved("d2", 9, 2, 0), t("05:00")).unwrap();
+        flush_due(t("14:59"));
+        assert_eq!(values(root, DEV).len(), 5);
+        flush_due(t("15:00"));
+        assert_eq!(values(root, DEV).len(), 6);
+        assert!(verify(root).unwrap().ok);
+    }
+
+    #[test]
+    fn months_are_pieces_of_one_chain() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        append_at(root, DEV, &save("d1", 1), "2026-09-30T23:59:00.000Z").unwrap();
+        append_at(root, DEV, &save("d1", 2), "2026-10-01T00:01:00.000Z").unwrap();
+        append_at(root, DEV, &save("d1", 3), "2026-10-15T00:00:00.000Z").unwrap();
+        let sept = piece_file(root, DEV, "2026-09");
+        let oct = piece_file(root, DEV, "2026-10");
+        assert_eq!(pieces(root, DEV).unwrap(), [sept.clone(), oct.clone()]);
+        let sept_text = fs::read_to_string(&sept).unwrap();
+        let oct_text = fs::read_to_string(&oct).unwrap();
+        assert_eq!(
+            (sept_text.lines().count(), oct_text.lines().count()),
+            (1, 2)
+        );
+        // October's first line links to September's last.
+        let first_oct = oct_text.lines().next().unwrap();
+        assert!(first_oct.ends_with(&format!(
+            ",\"prev\":\"{}\"}}",
+            fingerprint(sept_text.lines().next().unwrap().as_bytes())
+        )));
+        let report = verify(root).unwrap();
+        assert!(report.ok);
+        assert_eq!((report.files.len(), report.files[0].lines), (1, 3));
+
+        // A clock put back never writes into a past month.
+        append_at(root, DEV, &save("d1", 4), "2026-09-20T00:00:00.000Z").unwrap();
+        assert_eq!(fs::read_to_string(&sept).unwrap(), sept_text);
+        assert_eq!(fs::read_to_string(&oct).unwrap().lines().count(), 3);
+        assert!(verify(root).unwrap().ok);
+
+        // Removing a past month shows where the chain breaks.
+        fs::remove_file(&sept).unwrap();
+        assert_eq!(
+            verify(root).unwrap().files[0].first_bad,
+            Some((1, Problem::Broken))
+        );
+    }
+
+    #[test]
+    fn the_old_single_file_is_the_first_piece() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        // Written by a version before monthly pieces, the last line cut short.
+        let first = encode(&save("d1", 1), "2026-08-01T00:00:00.000Z", NO_PREV);
+        let torn = "{\"kind\":\"sa";
+        let single = single_file(root, DEV);
+        fs::create_dir_all(single.parent().unwrap()).unwrap();
+        let old = format!("{first}\n{torn}");
+        fs::write(&single, &old).unwrap();
+
+        append_at(root, DEV, &save("d1", 2), "2026-10-01T00:00:00.000Z").unwrap();
+        // The old file is never written again; the chain goes on from it.
+        assert_eq!(fs::read_to_string(&single).unwrap(), old);
+        let oct = fs::read_to_string(piece_file(root, DEV, "2026-10")).unwrap();
+        assert!(oct.ends_with(&format!(
+            ",\"prev\":\"{}\"}}\n",
+            fingerprint(torn.as_bytes())
+        )));
+        let lines = read_device(root, DEV).unwrap();
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[1], torn.as_bytes());
+        // The cut line shows, as before.
+        assert_eq!(
+            verify(root).unwrap().files[0].first_bad,
+            Some((2, Problem::Unreadable))
+        );
+
+        // Without the cut line, old file and pieces check out as one.
+        let dir2 = tempfile::tempdir().unwrap();
+        let root2 = dir2.path();
+        let single2 = single_file(root2, DEV);
+        fs::create_dir_all(single2.parent().unwrap()).unwrap();
+        fs::write(&single2, format!("{first}\n")).unwrap();
+        append_at(root2, DEV, &save("d1", 2), "2026-10-01T00:00:00.000Z").unwrap();
+        append_at(root2, DEV, &save("d1", 3), "2026-11-01T00:00:00.000Z").unwrap();
+        // Another device's journal from before pieces, not written since.
+        let other = encode(&save("d1", 4), "2026-08-02T00:00:00.000Z", NO_PREV);
+        fs::write(single_file(root2, "dev2bbbbbbbb"), format!("{other}\n")).unwrap();
+        let report = verify(root2).unwrap();
+        assert!(report.ok, "{report:?}");
+        assert_eq!(report.files.len(), 2);
+        assert_eq!(report.files[0].lines, 3);
+        let s = summary(root2, Some(DEV)).unwrap();
+        assert_eq!((s.saves, s.devices, s.this_device), (4, 2, 3));
+        assert_eq!(s.since.as_deref(), Some("2026-08-01T00:00:00.000Z"));
+        // The time stamps' folder is never taken for a device.
+        fs::create_dir_all(root2.join(JOURNAL_DIR).join(ANCHOR_DIR)).unwrap();
+        assert_eq!(read_all(root2).unwrap().len(), 2);
     }
 }
