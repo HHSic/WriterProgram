@@ -95,7 +95,9 @@ export type Dialog =
       onCancel?: () => void;
     }
   /** 창작 과정 증명서 만들기. */
-  | { kind: 'proof' };
+  | { kind: 'proof' }
+  /** Many files removed at once on one side: remove them on the other too? (`heldRemovals`) */
+  | { kind: 'removals' };
 
 /** A document whose text another device changed while it was being edited here. */
 export interface DocConflict {
@@ -168,6 +170,8 @@ interface AppState {
   link: DriveLink | null;
   /** A pass with the drive is running. */
   syncing: boolean;
+  /** Removals the last pass held back because too many went at once, until the writer answers. */
+  heldRemovals: HeldRemovals | null;
   /** Bumped when a browser tab's page or title changes (tab labels follow). */
   webVersion: number;
   /** 소리 내어 읽기 going on in `editor` (or, `noVoice`, asked for there with
@@ -176,6 +180,14 @@ interface AppState {
   /** This device's AI settings; null until read. */
   ai: AiSettings | null;
   aiRequest: AiRequest | null;
+}
+
+/** Paths a pass did not remove because too many went at once (crates/sync engine.rs). */
+export interface HeldRemovals {
+  /** Gone here; to remove on the drive. */
+  there: string[];
+  /** Gone on the drive; to remove here. */
+  here: string[];
 }
 
 export interface Reading {
@@ -219,6 +231,7 @@ export const useApp = create<AppState>(() => ({
   busy: null,
   link: null,
   syncing: false,
+  heldRemovals: null,
   webVersion: 0,
   reading: null,
   ai: null,

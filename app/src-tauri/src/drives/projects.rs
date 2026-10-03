@@ -8,7 +8,7 @@ use tauri::{AppHandle, Manager};
 use writer_core::project::{self, Overview};
 use writer_core::store::now_iso;
 use writer_sync::accounts::{self, Link, Registry};
-use writer_sync::engine::Report;
+use writer_sync::engine::{Choices, Report};
 use writer_sync::providers::{self, Provider};
 use writer_sync::remote::Remote;
 
@@ -109,9 +109,16 @@ pub struct SyncOutcome {
 }
 
 /// One pass for an open project. Errors end up in the link (and the report is
-/// none) rather than failing, so the screen can say what happened.
+/// none) rather than failing, so the screen can say what happened. `choices`
+/// is what the writer said about removals an earlier pass held back.
 #[tauri::command]
-pub async fn project_sync(app: AppHandle, root: String, project_id: String) -> Res<SyncOutcome> {
+pub async fn project_sync(
+    app: AppHandle,
+    root: String,
+    project_id: String,
+    choices: Option<Choices>,
+) -> Res<SyncOutcome> {
+    let choices = choices.unwrap_or_default();
     blocking(move || {
         let file = registry_file(&app)?;
         let registry = Registry::load(&file);
@@ -123,8 +130,15 @@ pub async fn project_sync(app: AppHandle, root: String, project_id: String) -> R
         let result = session(&app, &registry, link.provider).and_then(|session| {
             let state = app.state::<AppState>();
             let base = accounts::base_file(&base_dir(&app)?, &project_id);
-            accounts::sync_project(&session, &link, Path::new(&root), &base, state.lock())
-                .map_err(fail)
+            accounts::sync_project(
+                &session,
+                &link,
+                Path::new(&root),
+                &base,
+                state.lock(),
+                &choices,
+            )
+            .map_err(fail)
         });
         // Read again: another pass or a link change may have happened meanwhile.
         let mut registry = Registry::load(&file);
@@ -211,7 +225,15 @@ pub async fn drive_fetch(
         let state = app.state::<AppState>();
         let base = accounts::base_file(&base_dir(&app)?, &project_id);
         let _ = std::fs::remove_file(&base);
-        accounts::sync_project(&session, &link, &root, &base, state.lock()).map_err(fail)?;
+        accounts::sync_project(
+            &session,
+            &link,
+            &root,
+            &base,
+            state.lock(),
+            &Choices::default(),
+        )
+        .map_err(fail)?;
         let overview = project::open(&root).map_err(fail)?;
         let _ = writer_core::recent::touch(&recent_file(&app)?, &overview);
         let mut registry = Registry::load(&file);

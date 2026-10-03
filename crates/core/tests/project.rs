@@ -140,6 +140,93 @@ fn automatic_records() {
 }
 
 #[test]
+fn a_big_deletion_keeps_the_text_before_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    let hour = Duration::hours(1);
+    let long = "가".repeat(1000);
+    let kept_part = "남길 문장.";
+
+    // Written, with an automatic record just taken: none is due for an hour.
+    doc::save_body(
+        &root,
+        &id,
+        body(&[kept_part]),
+        Duration::zero(),
+        Default::default(),
+    )
+    .unwrap();
+    let out = doc::save_body(
+        &root,
+        &id,
+        body(&[kept_part, &long]),
+        Duration::zero(),
+        Default::default(),
+    )
+    .unwrap();
+    assert_eq!(out.snapshot.unwrap().kind, "auto");
+
+    // 100 characters go: no record.
+    let shorter = "가".repeat(900);
+    let out = doc::save_body(
+        &root,
+        &id,
+        body(&[kept_part, &shorter]),
+        hour,
+        Default::default(),
+    )
+    .unwrap();
+    assert!(out.snapshot.is_none());
+
+    // The 900 characters left go at once: kept before saving.
+    let out = doc::save_body(&root, &id, body(&[kept_part]), hour, Default::default()).unwrap();
+    let rec = out.snapshot.expect("text before the deletion is kept");
+    assert_eq!(rec.kind, "before-shrink");
+    assert_eq!(
+        snapshot::load(&root, &id, &rec.id).unwrap().body,
+        body(&[kept_part, &shorter])
+    );
+    snapshot::restore(&root, &id, &rec.id).unwrap();
+    assert_eq!(
+        doc::load(&root, &id).unwrap().body,
+        body(&[kept_part, &shorter])
+    );
+
+    // 250 of 1,000 characters (25%) counts too; 250 of 2,000 (12.5%) does not.
+    assert!(snapshot::shrinks_a_lot(1000, 750));
+    assert!(!snapshot::shrinks_a_lot(2000, 1750));
+    assert!(snapshot::shrinks_a_lot(5000, 4500));
+    assert!(!snapshot::shrinks_a_lot(150, 0));
+}
+
+#[test]
+fn a_big_deletion_record_is_cleared_like_automatic_ones() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    doc::save_body(
+        &root,
+        &id,
+        body(&["기록할 문장."]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
+    let old = old_record(&root, &id, "before-shrink", 100);
+    let recent = old_record(&root, &id, "before-shrink", 10);
+    let done = snapshot::prune(&root, Duration::days(90), false);
+    assert_eq!(done.removed, 1);
+    let left: Vec<_> = snapshot::list(&root, &id)
+        .unwrap()
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
+    assert_eq!(left, [recent]);
+    assert!(!left.contains(&old));
+}
+
+#[test]
 fn records_by_hand_and_going_back() {
     let dir = tempfile::tempdir().unwrap();
     let root = new_project(dir.path(), ProjectKind::Print);
@@ -476,6 +563,159 @@ fn open_repairs_structure_from_files() {
         ov.total.with_spaces,
         "본문".chars().count() as u32 + "그냥 쓴 글".chars().count() as u32
     );
+}
+
+/// Holds a file the way a sync program or virus scanner does, so it cannot
+/// be removed until the guard is dropped. On Windows an open handle that
+/// shares nothing; elsewhere a folder that cannot be written.
+struct Held {
+    #[cfg(windows)]
+    _file: fs::File,
+    #[cfg(not(windows))]
+    dir: PathBuf,
+}
+
+fn hold(file: &Path) -> Held {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        let _file = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(file)
+            .unwrap();
+        Held { _file }
+    }
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = file.parent().unwrap().to_path_buf();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o555)).unwrap();
+        Held { dir }
+    }
+}
+
+#[cfg(not(windows))]
+impl Drop for Held {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.dir, fs::Permissions::from_mode(0o755));
+    }
+}
+
+/// A trash item made to look `days` old.
+fn age_trash_item(root: &Path, id: &str, days: i64) {
+    let path = root.join(".trash").join(id).join("item.json");
+    let mut item: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    item["deletedAt"] =
+        writer_core::store::to_iso(chrono::Utc::now() - Duration::days(days)).into();
+    fs::write(&path, serde_json::to_string(&item).unwrap()).unwrap();
+}
+
+#[test]
+fn open_succeeds_when_cleanup_cannot_remove_a_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let held_doc = first_doc(&root);
+    let free_doc = project::add_doc(&root, &NewDoc::default()).unwrap();
+    for id in [&held_doc, &free_doc] {
+        doc::save_body(
+            &root,
+            id,
+            body(&["오래된 기록이 남은 회차."]),
+            Duration::hours(1),
+            Default::default(),
+        )
+        .unwrap();
+    }
+    let held_record = old_record(&root, &held_doc, "auto", 120);
+    let free_record = old_record(&root, &free_doc, "auto", 120);
+
+    // Two chapters deleted long ago; one of them is held by another program.
+    let gone_a = project::add_doc(&root, &NewDoc::default()).unwrap();
+    let gone_b = project::add_doc(&root, &NewDoc::default()).unwrap();
+    let held_item = trash::trash_doc(&root, &gone_a).unwrap();
+    let free_item = trash::trash_doc(&root, &gone_b).unwrap();
+    age_trash_item(&root, &held_item.id, 40);
+    age_trash_item(&root, &free_item.id, 40);
+
+    let records = root.join(".snapshots");
+    let record_file = |doc: &str, stem: &str| records.join(doc).join(format!("{stem}.md"));
+    let item_file = root
+        .join(".trash")
+        .join(&held_item.id)
+        .join(format!("{gone_a}.md"));
+    {
+        let _record = hold(&record_file(&held_doc, &held_record));
+        let _item = hold(&item_file);
+
+        let ov = project::open(&root).expect("opens although clearing failed");
+        assert_eq!(ov.parts[0].docs.len(), 2);
+
+        // What could be removed was; what was held stays for next time.
+        assert!(!record_file(&free_doc, &free_record).exists());
+        assert!(record_file(&held_doc, &held_record).exists());
+        let left: Vec<_> = trash::list(&root)
+            .unwrap()
+            .into_iter()
+            .map(|i| i.id)
+            .collect();
+        assert_eq!(left, std::slice::from_ref(&held_item.id));
+    }
+
+    // Let go: the next opening clears the rest.
+    project::open(&root).unwrap();
+    assert!(!record_file(&held_doc, &held_record).exists());
+    assert!(trash::list(&root).unwrap().is_empty());
+}
+
+#[test]
+fn steps_that_guard_the_manuscript_still_stop_opening_in_plain_words() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    // A sync program's copy whose original is gone takes its place on
+    // opening; held by another program, it cannot be moved.
+    let copy = root.join("manuscript").join("k7q2m9x4t1ab (1).md");
+    fs::write(
+        &copy,
+        "---\nid: \"k7q2m9x4t1ab\"\ntitle: \"사본\"\n---\n\n본문\n",
+    )
+    .unwrap();
+    {
+        let _held = hold(&copy);
+        let err = project::open(&root).unwrap_err().user_message();
+        assert!(
+            err.starts_with("동기화 프로그램이 남긴 사본을 정리하지 못함 · "),
+            "{err}"
+        );
+        assert!(err.ends_with("(k7q2m9x4t1ab (1).md)"), "{err}");
+    }
+    assert!(project::open(&root).is_ok());
+}
+
+#[test]
+fn clearing_reports_what_it_could_not_remove() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path(), ProjectKind::Webnovel);
+    let id = first_doc(&root);
+    doc::save_body(
+        &root,
+        &id,
+        body(&["기록할 문장."]),
+        Duration::hours(1),
+        Default::default(),
+    )
+    .unwrap();
+    let old = old_record(&root, &id, "auto", 120);
+    let path = root.join(".snapshots").join(&id).join(format!("{old}.md"));
+    let held = hold(&path);
+    let done = snapshot::prune(&root, Duration::days(90), false);
+    assert_eq!(done.removed, 0);
+    assert_eq!(done.failed, std::slice::from_ref(&path));
+    drop(held);
+    let done = snapshot::prune(&root, Duration::days(90), false);
+    assert_eq!((done.removed, done.failed.len()), (1, 0));
 }
 
 #[test]

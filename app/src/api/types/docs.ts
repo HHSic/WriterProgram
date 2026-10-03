@@ -26,7 +26,9 @@ export type SnapshotKind =
   | 'before-reload'
   | 'before-copy'
   // Before an editor's corrections were accepted (crates/core/src/corrections).
-  | 'before-corrections';
+  | 'before-corrections'
+  // Before a save that took a lot of the text away (crates/core/src/doc.rs save_body).
+  | 'before-shrink';
 
 export interface Counts {
   withSpaces: number;

@@ -71,9 +71,22 @@ export interface SyncReport {
   removedThere: string[];
   copies: string[];
   merged: boolean;
+  /** Changed during the pass or not readable on this device right now; taken up by the next pass. */
   later: string[];
+  /** Removed on this device, but too many at once: removing them on the drive waits for the writer. */
+  heldThere: string[];
+  /** Removed on the drive, but too many at once: removing them here waits for the writer. */
+  heldHere: string[];
   /** Room left on the drive in bytes when it is running low; null when there is room or the drive does not say. */
   spaceLeft: number | null;
+}
+
+/** What the writer said about removals a pass held back (crates/sync engine.rs `Choices`). */
+export interface SyncChoices {
+  /** Remove these even though many go at once. */
+  remove: string[];
+  /** Do not remove these: they come back from the side that still has them. */
+  keep: string[];
 }
 
 export interface SyncOutcome {

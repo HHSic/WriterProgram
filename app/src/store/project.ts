@@ -30,6 +30,7 @@ export function enterProject(ov: Overview) {
     conflicts: {},
     cardReloads: {},
     link: null,
+    heldRemovals: null,
     liveCounts: null,
     selection: null,
   });
@@ -99,6 +100,7 @@ export async function leaveProject() {
   stopAutoSync();
   set({
     link: null,
+    heldRemovals: null,
     overview: null,
     panes: [],
     focus: 0,

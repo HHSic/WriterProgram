@@ -14,7 +14,7 @@ use serde::Serialize;
 use crate::count::{Counts, count_blocks};
 use crate::doc::{self, DocFile};
 use crate::markup::write_body;
-use crate::store::{parse_stamp, stamp, to_iso};
+use crate::store::{Cleanup, parse_stamp, remove_dir_all_retry, remove_file_retry, stamp, to_iso};
 use crate::{Error, Result, journal};
 
 pub const SNAPSHOT_DIR: &str = ".snapshots";
@@ -26,8 +26,9 @@ pub const SNAPSHOT_DIR: &str = ".snapshots";
 /// another device's text replaced by this one's, this device's text before
 /// another device's was loaded, and the text before a copy replaced it.
 /// `before-corrections` is the text before an editor's corrections were
-/// accepted (corrections/).
-pub const KINDS: [&str; 10] = [
+/// accepted (corrections/). `before-shrink` is the text before a save that
+/// took a lot of it away ([`shrinks_a_lot`]).
+pub const KINDS: [&str; 11] = [
     "auto",
     "manual",
     "before-replace",
@@ -38,10 +39,28 @@ pub const KINDS: [&str; 10] = [
     "before-reload",
     "before-copy",
     "before-corrections",
+    "before-shrink",
 ];
 
 /// Kinds removed after a while, like automatic records.
-const PRUNED: [&str; 2] = ["auto", "before-reload"];
+const PRUNED: [&str; 3] = ["auto", "before-reload", "before-shrink"];
+
+/// A save that takes away this many characters (spaces included) or more
+/// keeps the text before it as a `before-shrink` record, however recent the
+/// last record is …
+pub const SHRINK_CHARS: u32 = 500;
+/// … and so does one taking away at least this many characters …
+pub const SHRINK_SOME_CHARS: u32 = 200;
+/// … when they are this share (in percent) of the text or more.
+pub const SHRINK_PERCENT: u32 = 20;
+
+/// Whether going from `before` to `after` characters takes away enough of the
+/// text to keep it first (크게 지우기 전).
+pub fn shrinks_a_lot(before: u32, after: u32) -> bool {
+    let removed = before.saturating_sub(after);
+    removed >= SHRINK_CHARS
+        || (removed >= SHRINK_SOME_CHARS && removed * 100 >= before * SHRINK_PERCENT)
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -252,11 +271,25 @@ fn daily_last(stems: &[String]) -> HashSet<&str> {
 }
 
 /// Removes automatic records (and ones kept before loading another device's
-/// text) older than `keep`. Other kinds stay, and so does each document's
-/// last record of a day when `keep_daily`.
-pub fn prune(root: &Path, keep: Duration, keep_daily: bool) -> Result<()> {
+/// text or before a big deletion) older than `keep`. Other kinds stay, and so does each document's
+/// last record of a day when `keep_daily`. A record that cannot be removed
+/// now (held by another program) is skipped and listed in the result; the
+/// next pass tries it again.
+pub fn prune(root: &Path, keep: Duration, keep_daily: bool) -> Cleanup {
+    let mut done = Cleanup::default();
+    let Ok(docs) = fs::read_dir(root.join(SNAPSHOT_DIR)) else {
+        return done;
+    };
     let cutoff = Utc::now() - keep;
-    for (doc_id, stems) in all_stems(root)? {
+    for entry in docs.filter_map(|e| e.ok()) {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let doc_id = entry.file_name().to_string_lossy().into_owned();
+        let Ok(stems) = stems(root, &doc_id) else {
+            done.failed.push(entry.path());
+            continue;
+        };
         let daily = if keep_daily {
             daily_last(&stems)
         } else {
@@ -268,11 +301,14 @@ pub fn prune(root: &Path, keep: Duration, keep_daily: bool) -> Result<()> {
                 && !daily.contains(stem.as_str())
             {
                 let path = dir(root, &doc_id).join(format!("{stem}.md"));
-                fs::remove_file(&path).map_err(|e| Error::io(&path, e))?;
+                match remove_file_retry(&path, 4, std::time::Duration::from_millis(40)) {
+                    Ok(()) => done.removed += 1,
+                    Err(_) => done.failed.push(path),
+                }
             }
         }
     }
-    Ok(())
+    done
 }
 
 /// Automatic records younger than this stay when the writer tidies records
@@ -346,9 +382,6 @@ pub fn tidy(root: &Path, keep: Duration, keep_daily: bool) -> Result<u64> {
 pub fn remove_all(root: &Path, doc_id: &str) -> Result<()> {
     check_id(doc_id)?;
     let dir = dir(root, doc_id);
-    match fs::remove_dir_all(&dir) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(Error::io(&dir, e)),
-    }
+    remove_dir_all_retry(&dir, 4, std::time::Duration::from_millis(40))
+        .map_err(|e| Error::io(&dir, e))
 }

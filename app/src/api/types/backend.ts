@@ -13,6 +13,7 @@ import type {
   DriveProvider,
   DriveStatus,
   Place,
+  SyncChoices,
   SyncOutcome,
 } from './devices';
 import type { DocData, DocMeta, MetaPatch, NewDoc, SaveOutcome, Section, SnapshotInfo, SnapshotKind, TrashItem } from './docs';
@@ -164,7 +165,7 @@ export interface Backend {
   projectLinkGet(projectId: string): Promise<DriveLink | null>;
   projectLink(projectId: string, title: string, provider: DriveProvider): Promise<DriveLink>;
   projectUnlink(projectId: string): Promise<void>;
-  projectSync(root: string, projectId: string): Promise<SyncOutcome>;
+  projectSync(root: string, projectId: string, choices?: SyncChoices): Promise<SyncOutcome>;
   /** This device's AI settings (자기 API 키 연결). */
   aiSettings(): Promise<AiSettings>;
   /** Turns AI on or off (on notes the agreement), picks the company or its models. */

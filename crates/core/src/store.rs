@@ -4,7 +4,7 @@ use std::collections::hash_map::RandomState;
 use std::fs::{self, File};
 use std::hash::{BuildHasher, Hasher};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
@@ -101,6 +101,54 @@ pub(crate) fn rename_retry(
         }
     }
     Err(last.expect("retried at least once"))
+}
+
+/// Removes a file the way [`rename_retry`] renames one: a brief lock by a sync
+/// client or virus scanner ("access denied") is waited out. A file that is
+/// already gone counts as removed.
+pub(crate) fn remove_file_retry(path: &Path, tries: u32, wait: Duration) -> std::io::Result<()> {
+    retry_removal(|| fs::remove_file(path), tries, wait)
+}
+
+/// Removes a folder and everything in it, like [`remove_file_retry`].
+pub(crate) fn remove_dir_all_retry(path: &Path, tries: u32, wait: Duration) -> std::io::Result<()> {
+    retry_removal(|| fs::remove_dir_all(path), tries, wait)
+}
+
+fn retry_removal(
+    remove: impl Fn() -> std::io::Result<()>,
+    tries: u32,
+    wait: Duration,
+) -> std::io::Result<()> {
+    let mut last = None;
+    for attempt in 0..tries {
+        match remove() {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+                last = Some(e);
+                thread::sleep(wait * (attempt + 1));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last.expect("retried at least once"))
+}
+
+/// What a clean-up pass (expired trash, old automatic records) did. What
+/// could not be removed is skipped and tried again the next time a project
+/// opens; it never stops the project from opening.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Cleanup {
+    pub removed: usize,
+    pub failed: Vec<PathBuf>,
+}
+
+impl Cleanup {
+    pub fn add(&mut self, other: Cleanup) {
+        self.removed += other.removed;
+        self.failed.extend(other.failed);
+    }
 }
 
 /// Reads a UTF-8 text file, dropping a byte order mark and turning CRLF into LF.

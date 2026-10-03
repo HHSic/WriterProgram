@@ -282,7 +282,9 @@ pub struct SaveGuard<'a> {
 
 /// Replaces a document's body, keeping its front matter as it is on disk, so
 /// that title or status changes made elsewhere are never overwritten by the
-/// editor. Keeps an automatic record first when one is due.
+/// editor. Keeps an automatic record first when one is due, and a
+/// `before-shrink` record whenever the save takes away a lot of the text
+/// (`snapshot::shrinks_a_lot`), so a big deletion can always be undone.
 ///
 /// With a `guard.base`, a body on disk that is neither that text nor the one
 /// being saved means another device changed it: the save is refused (see
@@ -329,12 +331,14 @@ pub fn save_body(
             conflict: true,
         });
     }
+    let before = count_blocks(&current.body).with_spaces;
     let snapshot = if changed_elsewhere {
         snapshot::keep_unless_same(root, &current, "other-device")?
+    } else if snapshot::shrinks_a_lot(before, counts.with_spaces) {
+        snapshot::keep_unless_same(root, &current, "before-shrink")?
     } else {
         snapshot::auto_if_due(root, &current, auto_record_every)?
     };
-    let before = count_blocks(&current.body).with_spaces;
     let saved = DocFile {
         meta: current.meta,
         body,

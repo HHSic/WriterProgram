@@ -12,7 +12,7 @@ use writer_core::markup::Block;
 use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
 use writer_core::trash;
 use writer_sync::base::Base;
-use writer_sync::engine::{Report, sync};
+use writer_sync::engine::{Choices, Report, sync};
 use writer_sync::folder::FolderRemote;
 
 struct Device {
@@ -22,12 +22,17 @@ struct Device {
 
 impl Device {
     fn sync(&mut self, drive: &Path) -> Report {
+        self.sync_with(drive, &Choices::default())
+    }
+
+    fn sync_with(&mut self, drive: &Path, choices: &Choices) -> Report {
         let lock = Mutex::new(());
         sync(
             &self.root,
             &mut FolderRemote::new(drive),
             &mut self.base,
             &lock,
+            choices,
         )
         .unwrap()
     }
@@ -317,4 +322,199 @@ fn each_device_journal_travels_without_copies() {
     assert!(check.ok);
     assert_eq!(check.files.len(), 2);
     assert_eq!(check.files[0].lines, 2);
+}
+
+/// Holds a file the way a sync program or virus scanner does, so it cannot
+/// be read until the guard is dropped. On Windows an open handle that shares
+/// nothing; elsewhere a file nobody may read.
+struct Held {
+    #[cfg(windows)]
+    _file: fs::File,
+    #[cfg(not(windows))]
+    path: PathBuf,
+}
+
+fn hold(path: &Path) -> Held {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        let _file = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(path)
+            .unwrap();
+        Held { _file }
+    }
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o000)).unwrap();
+        Held {
+            path: path.to_path_buf(),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl Drop for Held {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.path, fs::Permissions::from_mode(0o644));
+    }
+}
+
+#[test]
+fn a_file_that_cannot_be_read_is_not_removed_on_the_drive() {
+    let (_dir, drive, mut a, mut b) = setup();
+    let id = project::overview(&a.root).unwrap().parts[0].docs[0]
+        .id
+        .clone();
+    write(&a.root, &id, &["처음 쓴 글."]);
+    a.sync(&drive);
+    b.sync(&drive);
+    let rel = format!("manuscript/{id}.md");
+
+    // Saved again, then held by another program before the pass reads it.
+    write(&a.root, &id, &["다시 고친 글."]);
+    let base_before = a.base.files.get(&rel).cloned();
+    {
+        let _held = hold(&a.root.join("manuscript").join(format!("{id}.md")));
+        let report = a.sync(&drive);
+        assert!(report.later.contains(&rel), "{report:?}");
+        assert!(report.removed_there.is_empty(), "{report:?}");
+        assert!(drive.join(&rel).is_file());
+        assert_eq!(a.base.files.get(&rel).cloned(), base_before);
+    }
+    // The other device keeps it too.
+    let report = b.sync(&drive);
+    assert!(report.removed_here.is_empty(), "{report:?}");
+    assert_eq!(text(&b.root, &id), body(&["처음 쓴 글."]));
+
+    // Let go: the change goes up as usual.
+    let report = a.sync(&drive);
+    assert!(report.uploaded.contains(&rel), "{report:?}");
+    b.sync(&drive);
+    assert_eq!(text(&b.root, &id), body(&["다시 고친 글."]));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_folder_that_cannot_be_read_is_left_alone() {
+    use std::os::unix::fs::PermissionsExt;
+    let (_dir, drive, mut a, mut b) = setup();
+    a.sync(&drive);
+    b.sync(&drive);
+    let manuscript = a.root.join("manuscript");
+    fs::set_permissions(&manuscript, fs::Permissions::from_mode(0o000)).unwrap();
+    let report = a.sync(&drive);
+    fs::set_permissions(&manuscript, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(report.removed_there.is_empty(), "{report:?}");
+    assert!(!report.later.is_empty());
+    assert_eq!(files(&a.root), files(&b.root));
+}
+
+/// How many of `paths` are chapter files.
+fn chapters(paths: &[String]) -> usize {
+    paths
+        .iter()
+        .filter(|p| p.starts_with("manuscript/"))
+        .count()
+}
+
+#[test]
+fn many_removals_wait_for_the_writer() {
+    let (_dir, drive, mut a, mut b) = setup();
+    let first = project::overview(&a.root).unwrap().parts[0].docs[0]
+        .id
+        .clone();
+    let ids: Vec<String> = (0..30)
+        .map(|_| project::add_doc(&a.root, &NewDoc::default()).unwrap())
+        .collect();
+    a.sync(&drive);
+    b.sync(&drive);
+
+    // A folder emptied by mistake: 30 chapter files gone at once. One
+    // chapter is also edited; that goes up as usual.
+    for id in &ids {
+        fs::remove_file(a.root.join("manuscript").join(format!("{id}.md"))).unwrap();
+    }
+    write(&a.root, &first, &["지우는 사이에 고친 글."]);
+    let report = a.sync(&drive);
+    assert_eq!(chapters(&report.held_there), 30, "{report:?}");
+    assert!(report.removed_there.is_empty());
+    assert!(report.uploaded.contains(&format!("manuscript/{first}.md")));
+    for id in &ids {
+        assert!(drive.join("manuscript").join(format!("{id}.md")).is_file());
+    }
+    // Asked again on the next pass; still nothing removed.
+    let again = a.sync(&drive);
+    assert_eq!(again.held_there, report.held_there);
+    assert!(again.removed_there.is_empty());
+    // The other device loses nothing meanwhile.
+    let report_b = b.sync(&drive);
+    assert!(report_b.removed_here.is_empty() && report_b.held_here.is_empty());
+    assert_eq!(text(&b.root, &first), body(&["지우는 사이에 고친 글."]));
+
+    // The writer says yes: removed on the drive.
+    let confirm = Choices {
+        remove: again.held_there.iter().cloned().collect(),
+        ..Default::default()
+    };
+    let done = a.sync_with(&drive, &confirm);
+    assert_eq!(chapters(&done.removed_there), 30, "{done:?}");
+    assert!(done.held_there.is_empty());
+    assert!(
+        !drive
+            .join("manuscript")
+            .join(format!("{}.md", ids[0]))
+            .exists()
+    );
+
+    // On the other device the same rule holds the other way round.
+    let report_b = b.sync(&drive);
+    assert_eq!(chapters(&report_b.held_here), 30, "{report_b:?}");
+    assert!(report_b.removed_here.is_empty());
+    assert!(
+        b.root
+            .join("manuscript")
+            .join(format!("{}.md", ids[0]))
+            .is_file()
+    );
+    let confirm = Choices {
+        remove: report_b.held_here.iter().cloned().collect(),
+        ..Default::default()
+    };
+    let done = b.sync_with(&drive, &confirm);
+    assert_eq!(chapters(&done.removed_here), 30, "{done:?}");
+    assert_eq!(files(&a.root), files(&b.root));
+}
+
+#[test]
+fn held_removals_can_be_taken_back() {
+    let (_dir, drive, mut a, mut b) = setup();
+    let ids: Vec<String> = (0..25)
+        .map(|_| project::add_doc(&a.root, &NewDoc::default()).unwrap())
+        .collect();
+    a.sync(&drive);
+    b.sync(&drive);
+    for id in &ids {
+        fs::remove_file(a.root.join("manuscript").join(format!("{id}.md"))).unwrap();
+    }
+    let report = a.sync(&drive);
+    assert_eq!(chapters(&report.held_there), 25);
+
+    // The writer says no: the files come back from the drive.
+    let keep = Choices {
+        keep: report.held_there.iter().cloned().collect(),
+        ..Default::default()
+    };
+    let done = a.sync_with(&drive, &keep);
+    assert_eq!(chapters(&done.downloaded), 25, "{done:?}");
+    assert!(done.removed_there.is_empty() && done.held_there.is_empty());
+    for id in &ids {
+        assert!(a.root.join("manuscript").join(format!("{id}.md")).is_file());
+    }
+    assert!(a.sync(&drive).held_there.is_empty());
+    b.sync(&drive);
+    assert_eq!(files(&a.root), files(&b.root));
 }
