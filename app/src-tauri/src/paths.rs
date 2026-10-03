@@ -45,6 +45,15 @@ pub fn ai_file(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "ai.json")
 }
 
+/// Rescue copies of writing that could not be saved into its project
+/// (`writer_core::rescue`), in the app's data folder.
+pub fn rescue_dir(app: &AppHandle) -> Res<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("rescue"))
+        .map_err(|e| e.to_string())
+}
+
 /// What each project looked like after its last pass (`sync/<id>.json`).
 pub fn base_dir(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "sync")

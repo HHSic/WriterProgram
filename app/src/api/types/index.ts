@@ -14,5 +14,6 @@ export type * from './import';
 export type * from './journal';
 export type * from './notes';
 export type * from './project';
+export type * from './rescue';
 export type * from './search-export';
 export type * from './update';

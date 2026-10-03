@@ -30,6 +30,7 @@ import type {
 } from './journal';
 import type { NewNote, Note } from './notes';
 import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem } from './project';
+import type { RescueContent, RescueFile } from './rescue';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
 import type { UpdateInfo, UpdateProgress } from './update';
 
@@ -186,6 +187,20 @@ export interface Backend {
   browserClip(label: string): Promise<PageClip>;
   onBrowserPage(handler: (event: PageEvent) => void): () => void;
   reveal(path: string): Promise<void>;
+  /**
+   * 비상 보관: writes what could not be saved into the project to the app's
+   * data folder and answers the file's path. `since` (ms) is when the saves
+   * started failing; one run of failures keeps one file per item.
+   */
+  rescueSave(projectId: string, item: string, since: number, content: RescueContent): Promise<string>;
+  /** The project's rescue copies not dealt with yet, newest first. */
+  rescueList(projectId: string): Promise<RescueFile[]>;
+  /** A chapter's rescue copy, for comparing. */
+  rescueLoad(path: string): Promise<JSONContent>;
+  /** Takes a rescue copy off the list (it is kept in an `old` folder). */
+  rescueSetAside(path: string): Promise<void>;
+  /** The project's rescue folder, for 위치 열기. */
+  rescueFolder(projectId: string): Promise<string>;
   pickFolder(title: string, defaultPath?: string): Promise<string | null>;
   /**
    * Files to import (txt, md, docx, hwpx); empty when the writer cancels.

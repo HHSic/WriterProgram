@@ -28,6 +28,7 @@ pub mod places;
 pub mod project;
 pub mod proof;
 pub mod recent;
+pub mod rescue;
 pub mod search;
 pub mod snapshot;
 pub mod store;

@@ -137,6 +137,18 @@ export const tauriBackend: Backend = {
     return () => void unlisten.then((stop) => stop());
   },
   reveal: (path) => invoke('reveal', { path }),
+  rescueSave: (projectId, item, since, content) =>
+    invoke('rescue_save', {
+      projectId,
+      item,
+      since,
+      body: 'body' in content ? content.body : null,
+      text: 'text' in content ? content.text : null,
+    }),
+  rescueList: (projectId) => invoke('rescue_list', { projectId }),
+  rescueLoad: (path) => invoke('rescue_load', { path }),
+  rescueSetAside: (path) => invoke('rescue_set_aside', { path }),
+  rescueFolder: (projectId) => invoke('rescue_folder', { projectId }),
   pickFolder: async (title, defaultPath) => {
     const picked = await open({ directory: true, multiple: false, title, defaultPath });
     return typeof picked === 'string' ? picked : null;

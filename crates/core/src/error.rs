@@ -41,6 +41,9 @@ impl Error {
     /// The UI puts it after its own lead-in, e.g. "저장하지 못함 · 디스크 공간 부족".
     pub fn user_message(&self) -> String {
         match self {
+            Error::Io { source, .. } if is_held(source) => {
+                "파일이 다른 프로그램에 잡혀 있음".into()
+            }
             Error::Io { source, .. } => match source.kind() {
                 io::ErrorKind::StorageFull => "디스크 공간 부족".into(),
                 io::ErrorKind::PermissionDenied => "이 위치에 쓸 권한이 없음".into(),
@@ -57,5 +60,43 @@ impl Error {
             }
             Error::NotFound(message) | Error::Invalid(message) => message.clone(),
         }
+    }
+}
+
+/// Another program (a sync client, a virus scanner, a word processor) has the
+/// file open and will not share it: ERROR_SHARING_VIOLATION (32) and
+/// ERROR_LOCK_VIOLATION (33) on Windows.
+fn is_held(e: &io::Error) -> bool {
+    e.kind() == io::ErrorKind::ResourceBusy
+        || (cfg!(windows) && matches!(e.raw_os_error(), Some(32 | 33)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn message(e: io::Error) -> String {
+        Error::io(Path::new("a.md"), e).user_message()
+    }
+
+    #[test]
+    fn says_why_a_file_could_not_be_written() {
+        assert_eq!(
+            message(io::ErrorKind::StorageFull.into()),
+            "디스크 공간 부족"
+        );
+        assert_eq!(
+            message(io::ErrorKind::PermissionDenied.into()),
+            "이 위치에 쓸 권한이 없음"
+        );
+        assert_eq!(
+            message(io::ErrorKind::ResourceBusy.into()),
+            "파일이 다른 프로그램에 잡혀 있음"
+        );
+        #[cfg(windows)]
+        assert_eq!(
+            message(io::Error::from_raw_os_error(32)),
+            "파일이 다른 프로그램에 잡혀 있음"
+        );
     }
 }
