@@ -93,8 +93,10 @@ impl Speller {
     /// Words the writer may have meant, best first. Can take a second for a
     /// long word.
     pub fn suggest(&self, word: &str) -> Vec<String> {
-        let mut out = Vec::new();
-        self.dict.suggest(word, &mut out);
+        let mut found = Vec::new();
+        self.dict.suggest(word, &mut found);
+        let mut out: Vec<String> = check::slip_fix(self, word).into_iter().collect();
+        out.extend(found);
         let mut seen = std::collections::HashSet::new();
         out.retain(|s| {
             !s.is_empty()

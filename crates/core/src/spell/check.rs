@@ -72,11 +72,44 @@ fn attaches(speller: &Speller, last: char, rest: &str) -> bool {
         .any(|noun| speller.knows(&format!("{noun}{rest}")))
 }
 
-/// Whether a Hangul word is right: in the dictionary, a known word (maybe
-/// with particles), or a drawn-out or repeated sound of a word.
+/// Common slips the dictionary lets through because another reading exists
+/// ("되요" as 되, a measure, + 요): wrong ending, right ending.
+const SLIPS: [(&str, &str); 4] = [
+    ("되요", "돼요"),
+    ("되서", "돼서"),
+    ("께요", "게요"),
+    ("께", "게"),
+];
+
+/// The word as meant, when it is one of the common slips: "되요" → "돼요",
+/// "할께" → "할게". "께" counts only after ㄹ, so "선생님께" stays.
+pub(crate) fn slip_fix(speller: &Speller, word: &str) -> Option<String> {
+    for (wrong, right) in SLIPS {
+        let Some(stem) = word.strip_suffix(wrong) else {
+            continue;
+        };
+        if wrong.starts_with('께')
+            && stem.chars().next_back().and_then(final_sound) != Some((true, true))
+        {
+            continue;
+        }
+        let fixed = format!("{stem}{right}");
+        if speller.knows(&fixed) {
+            return Some(fixed);
+        }
+    }
+    None
+}
+
+/// Whether a Hangul word is right: in the dictionary (and not a common
+/// slip), a known word (maybe with particles), or a drawn-out or repeated
+/// sound of a word.
 pub fn word_ok(speller: &Speller, known: &Known, word: &str) -> bool {
-    if known.has(word) || speller.knows(word) {
+    if known.has(word) {
         return true;
+    }
+    if speller.knows(word) {
+        return slip_fix(speller, word).is_none();
     }
     // A known word with particles or 이다 after it: "서하는", "서하였다".
     let bounds: Vec<usize> = word.char_indices().map(|(i, _)| i).skip(1).collect();
@@ -236,6 +269,18 @@ mod tests {
         assert!(flagged("ㅋㅋㅋ hello 漢字 2026 SNS를", &[]).is_empty());
         assert_eq!(flagged("SNS을", &[]), Vec::<String>::new());
         assert_eq!(flagged("3멱었다", &[]), vec!["3멱었다"]);
+    }
+
+    #[test]
+    fn common_slips_are_flagged_though_the_dictionary_has_them() {
+        assert_eq!(flagged("할께", &[]), vec!["할께"]);
+        assert_eq!(
+            speller().suggest("할께").first().map(String::as_str),
+            Some("할게")
+        );
+        // 께 after a word not ending in ㄹ is the particle.
+        assert!(flagged("선생님께 할게", &[]).is_empty());
+        assert!(flagged("할께", &["할께"]).is_empty());
     }
 
     #[test]
