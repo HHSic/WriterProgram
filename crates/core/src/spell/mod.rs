@@ -25,6 +25,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 pub use check::{Issue, Known, check_text, word_ok};
+pub use install::DictInfo;
 pub use work::{DocIssues, WorkCheck, check_work};
 
 use crate::store::read_text;

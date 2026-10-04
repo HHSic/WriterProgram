@@ -1,7 +1,9 @@
 //! What the app keeps while it runs: the write lock, what it wrote itself,
-//! and the open project's folder watcher.
+//! the open project's folder watcher and the loaded spelling dictionary.
 
 use std::sync::{Arc, Mutex, MutexGuard};
+
+use writer_core::spell::Speller;
 
 use crate::watch::{OwnWrites, Watching};
 
@@ -13,6 +15,8 @@ pub struct AppState {
     pub own: Arc<OwnWrites>,
     /// The open project's folder watcher.
     watching: Mutex<Option<Watching>>,
+    /// The spelling dictionary once loaded (commands/spell.rs).
+    pub speller: Arc<Mutex<Option<Arc<Speller>>>>,
 }
 
 impl AppState {

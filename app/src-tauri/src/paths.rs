@@ -58,3 +58,17 @@ pub fn rescue_dir(app: &AppHandle) -> Res<PathBuf> {
 pub fn base_dir(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "sync")
 }
+
+/// The spelling dictionary, fetched once with the writer's agreement
+/// (`writer_core::spell::install`), in the app's data folder.
+pub fn spelling_dir(app: &AppHandle) -> Res<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .map(|dir| dir.join("spelling"))
+        .map_err(|e| e.to_string())
+}
+
+/// This device's spelling word list (이 기기 사전), used in every work.
+pub fn spelling_words_file(app: &AppHandle) -> Res<PathBuf> {
+    config_file(app, "spelling-words.json")
+}
