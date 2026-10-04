@@ -1,4 +1,4 @@
-# 코드 지도 (2026-10-02, 창작 과정 증명·집중 모드·단축키 2026-10-03)
+# 코드 지도 (2026-10-02, 창작 과정 증명·집중 모드·단축키 2026-10-03, 맞춤법 2026-10-04)
 
 어디를 고치면 되는지, 여럿이 동시에 작업할 때 어디서 나뉘는지 정리한 문서. 파일 형식과 설계 이유는 [architecture.md](architecture.md).
 
@@ -24,6 +24,7 @@
 | `journal.rs` | 창작 일지: 기기별·달별 조각 `.journal/<기기 id>/<YYYY-MM>.jsonl`(옛 `<기기 id>.jsonl`은 첫 조각), 해시 사슬, 저장 묶음(10분, `flush`·`flush_all`), 저장·기록·가져오기·교정 주고받기·시각 고정 항목(각 모듈이 `journal::note`로 남김), 확인(`verify`), 요약, 기기 설정(`Settings`, 날짜 증명 허락 포함). 화면 쪽은 `editor/journal.ts`(쓰기 묶음·붙여넣기), `store/journal.ts`(켜고 끄기·첫 알림·날짜 증명 동의, 받는 때: 10분마다·회차 완료·보내기·내보내기·닫기, 오른쪽 아래 알림 `components/CornerNote.tsx`), `workspace/settings/JournalField.tsx`, 명령은 `commands/journal.rs` |
 | `anchor/` | 시각 고정 ([creation-proof.md](creation-proof.md) 4.2): `merkle.rs`(잎과 RFC 6962 루트), `tsp.rs`(RFC 3161 요청 만들기, 응답 확인: CMS 서명·인증서 용도·사슬), `mod.rs`(잎 모으기, 보낼 때인지 `prepare`, 응답 저장과 일지 줄 `finish`, `.journal/anchors/` 읽기). 네트워크는 앱 `commands/anchor.rs`만 |
 | `proof/` | 창작 과정 증명서 (5·6장): `facts.rs`(범위, 날짜별 분량·회차별 표·요약 문장), `bundle.rs`(`증명자료.json`, 범위 밖 일지 줄은 지문만), `html.rs`(증명서 한 파일, SVG 그래프), `excerpt.rs`(초고와 지금 글 비교), `verify.rs`(검증, `examples/verify_proof.rs`가 씀). 화면은 `workspace/ProofDialog.tsx`, 명령은 `commands/proof.rs` |
+| `spell/` | 맞춤법 검사 ([spellcheck-license.md](spellcheck-license.md)): `prepare.rs`(hunspell-dict-ko를 `spellbook`이 읽게 메모리에서 고쳐 쓰기: AF 별칭 풀기, 규칙 합성어의 끝말을 표시 글자 붙여 한 번 더), `compound.rs`(규칙 합성어 맞추기: 사람+들은, 새겨+져), `hangul.rs`(자모 풀기, 늘인 소리·되풀이), `check.rs`(어절 나누기, `Known`: 설정집 이름·사전에 넣은 낱말을 조사와 함께, 흔한 실수 되요·할께, UTF-16 자리), `work.rs`(작품 전체·고른 문서, 잠근 회차 표시), `words.rs`(이 작품 사전 `spelling.json`, 이 기기 사전), `install.rs`(고정한 판·주소·SHA-256, zip 풀기와 라이선스·`NOTICE.txt`). 시험 사전은 `tests/fixtures/spell/`(직접 쓴 것, GPL 사전 아님), 실제 사전으로 재기는 `examples/spell_check.rs`. 명령 `commands/spell.rs`(유일한 네트워크: 사전 받기), 화면은 `editor/spell.ts`(밑줄), `store/spell.ts`, `workspace/SpellTab.tsx`(맞춤법 탭), `workspace/spellMenu.ts`(밑줄 낱말 메뉴), 보기 설정 `ViewDialog.tsx`의 `SpellFields`, `styles/spell.css` |
 | `copies/`, `changes.rs`, `places.rs`, `recent.rs` | 다른 기기: `scan.rs`(동기화 사본 찾기), `merge.rs`(project.json 사본 합치기), 바뀐 파일 알아보기, 저장 위치 찾기, 최근 작품 |
 
 ### 나머지 crate
@@ -33,7 +34,7 @@
 | `crates/sync` (writer-sync) | 드라이브와 맞추기: `engine.rs`(이 기기·드라이브·지난번 셋을 비교), `base.rs`(지난번 모습), `remote.rs`(드라이브가 해 줘야 할 일), `folder.rs`(흉내 드라이브), `providers/`(`config.rs` 앱 등록·주소, `session.rs` 로그인 세션과 오류 말(공간 부족 포함), 드라이브별 파일과 남은 공간 읽기), `oauth.rs`(PKCE 로그인), `http.rs`(ureq 감싸기), `secrets.rs`(자격 증명), `accounts.rs`(연결·맞추는 작품 목록) |
 | `crates/ai` (writer-ai) | 자기 API 키로 쓰는 AI ([architecture.md](architecture.md) "AI 점검"): `provider.rs`(세 회사, 기본 모델, 주소·`WRITER_AI_<회사>_ENDPOINT`), `client.rs`(회사별 요청·답·오류), `mask.rs`(이름 가리기와 조사 맞추기), `tasks.rs`(회차 요약·설정 모순 점검에 보낼 글, 답 읽기, 인용 찾기), `settings.rs`(`ai.json`). 시험 `tests/flow.rs`, 흉내 서버 `tests/support/` |
 | `crates/revise` (writer-revise) | 퇴고 점검 시제품: `rules/`에 점검 종류별 파일(`repetition.rs` 반복, `rhythm.rs` 문장 리듬, `expression.rs` 표현, `dialogue.rs` 대사, `names.rs` 이름) |
-| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, rescue(비상 보관), output, search, cards, notes, journal, anchor, proof, exchange, sync_folder, ai: 키는 `drives/keyring.rs`로 자격 증명 저장소에), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
+| `app/src-tauri/src` (writer-app) | Tauri 명령: `commands/`에 영역별 파일(project, doc, rescue(비상 보관), output, search, spell(맞춤법: 사전 받기·검사·사전에 넣기, 불러온 사전은 `AppState.speller`), cards, notes, journal, anchor, proof, exchange, sync_folder, ai: 키는 `drives/keyring.rs`로 자격 증명 저장소에), `drives/`(keyring, connect, projects), `browser.rs`, `watch.rs`. 공용은 `state.rs`(AppState), `paths.rs`(설정 파일 위치), `error.rs`(`Res`, `fail`) |
 
 ## TypeScript (`app/src`)
 
@@ -44,7 +45,7 @@
 | `api/mock/` | 브라우저 미리보기용 가짜 백엔드(`npm run dev`일 때만, 배포 빌드에는 안 들어감). 영역별 파일 |
 | `store/` | 화면 상태(`state.ts`)와 동작. 영역별 파일(tabs, project, docs, cards, notes, devices, drives, web, exchange, ai …), 화면은 `store/index.ts`에서 가져다 씀 |
 | AI 점검 | `workspace/AiTab.tsx`(오른쪽 탭: 보낼 내용 보기 → 보내기 → 결과), `workspace/AiDialog.tsx`(AI 연결 설정), `store/ai.ts`(설정, `askAi`, 시놉시스에 넣기), `lib/aiText.ts`(보낼 양·쓴 양 문장), `api/mock/ai.ts`(흉내 답) |
-| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조(이름 낱말 경계는 `names.ts`), 꾸밈 다시 계산(`decorate.ts`: 바뀐 문단만, 한글 조합 중에는 옮기기만), 한글 조합 끝 알림과 조합 중 키인지(`composition.ts`), 서식 버튼(`markButtons.tsx`), 따옴표·말줄임표 자동 바꾸기(`autoType.ts`: 조합 중에는 안 바꿈, Ctrl+Z로 바꾸기만 되돌리기), 집중 모드의 다른 문단 흐리게·타자기 스크롤(`focus.ts`; 켜고 끄기는 `store/focus.ts`, 화면은 `workspace/Workspace.tsx`와 `styles/focus.css`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
+| `editor/` | Tiptap 확장, 자동 저장 세션, 글자 수, 찾기·메모·설정집 강조(이름 낱말 경계는 `names.ts`), 꾸밈 다시 계산(`decorate.ts`: 바뀐 문단만, 한글 조합 중에는 옮기기만), 맞춤법 밑줄(`spell.ts`: 문단 글마다 답을 기억, 바뀐 문단만 Rust에 묶어 보내고 답이 오기 전에는 옛 밑줄을 옮기기만, 쓰는 낱말은 커서가 떠날 때까지 기다림), 한글 조합 끝 알림과 조합 중 키인지(`composition.ts`), 서식 버튼(`markButtons.tsx`), 따옴표·말줄임표 자동 바꾸기(`autoType.ts`: 조합 중에는 안 바꿈, Ctrl+Z로 바꾸기만 되돌리기), 집중 모드의 다른 문단 흐리게·타자기 스크롤(`focus.ts`; 켜고 끄기는 `store/focus.ts`, 화면은 `workspace/Workspace.tsx`와 `styles/focus.css`), 소리 내어 읽기(`sentences.ts` 문장 나누기, `readAloud.ts` 읽을 범위·강조·speechSynthesis; 상태는 `store/reading.ts`, 막대는 `workspace/ReadingBar.tsx`) |
 | 단축키 | `lib/shortcuts.ts`의 표 하나(`SHORTCUTS`): 목록 창 `workspace/ShortcutsDialog.tsx`, 창의 키 처리 `workspace/Workspace.tsx`(`WINDOW_KEYS`), 편집기 확장의 `editorKeys`, 툴팁의 `keysText`가 모두 이 표를 읽는다 |
 | 완료 회차 잠금 | 저장은 `doc.rs`(`locked`), 건너뛰기는 `search.rs`·`corrections/apply.rs`. 화면은 `store/docs.ts`(`setLocked`), 트리 자물쇠 `workspace/DocItem.tsx`, 회차 메뉴 `sidebarMenus.ts`, 배너와 읽기 전용 `DocPane.tsx`, 찾기 `SearchTab.tsx`, 스타일 `styles/lock.css` |
 | `workspace/` | 작업 화면. 대화상자는 파일 하나에 하나(`DialogHost.tsx`가 고름), 작품 설정은 `settings/`(작품 크기는 `ProjectSizeField.tsx`, 창작 일지·날짜 증명·창작 과정 보관은 `JournalField.tsx`, 연재 플랫폼은 `PlatformField.tsx`), 가져오기 `ImportDialog.tsx`(시작 화면에서는 `newProject`로 새 작품을 만듦, 새 작품 칸은 `screens/NewProjectDialog.tsx`의 `KindOptions`·`PlaceField`), 창작 과정 증명서는 `ProofDialog.tsx`. 가운데 탭 종류(문서, 설정 카드, 메모함, 개요 표, 웹, 교정본 검토 `ReviewPane.tsx`)는 `lib/tabs.ts`의 `Target`과 `Panes.tsx`의 `TabContent` |
@@ -91,7 +92,7 @@ npm --prefix app test
 
 ## 라이브러리를 쓴 곳과 일부러 직접 짠 곳
 
-이미 쓰는 것: quick-xml(XML 읽기·엔티티), zip, similar(교정본 비교와 증명서 초고 비교의 diff), chrono(시각 글), encoding_rs(EUC-KR 등), sha2, regex, ureq(HTTP: 드라이브, 시각 인증 요청), base64(로그인, 증명 자료의 토큰), getrandom(로그인), notify-debouncer-mini(폴더 감시), keyring-core, lindera(형태소), Tiptap, zustand. 시각 인증 응답 읽기와 서명 확인은 RustCrypto 한 계열(der 0.7): `x509-tsp`(TimeStampReq·TSTInfo), `cms`(SignedData), `x509-cert`(인증서), `rsa`·`p256`·`p384`(서명 확인). 직접 짠 DER로는 인증서 사슬과 CMS 서명 속성을 바르게 다루기 어렵고, 같은 코드가 나중에 WebAssembly 검증 페이지에서도 돈다.
+이미 쓰는 것: quick-xml(XML 읽기·엔티티), zip, spellbook(Hunspell 사전 읽기, MPL-2.0: hunspell C++ 라이브러리는 빌드에 libclang·C++이 들고 휴대폰 빌드가 번거로움), similar(교정본 비교와 증명서 초고 비교의 diff), chrono(시각 글), encoding_rs(EUC-KR 등), sha2, regex, ureq(HTTP: 드라이브, 시각 인증 요청, 맞춤법 사전 받기), base64(로그인, 증명 자료의 토큰), getrandom(로그인), notify-debouncer-mini(폴더 감시), keyring-core, lindera(형태소), Tiptap, zustand. 시각 인증 응답 읽기와 서명 확인은 RustCrypto 한 계열(der 0.7): `x509-tsp`(TimeStampReq·TSTInfo), `cms`(SignedData), `x509-cert`(인증서), `rsa`·`p256`·`p384`(서명 확인). 직접 짠 DER로는 인증서 사슬과 CMS 서명 속성을 바르게 다루기 어렵고, 같은 코드가 나중에 WebAssembly 검증 페이지에서도 돈다.
 
 직접 짠 채로 둔 것과 이유:
 
