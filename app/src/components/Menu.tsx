@@ -68,6 +68,11 @@ export function closeMenu() {
   useMenu.setState({ menu: null });
 }
 
+/** Whether the open menu is the one opened with `items` (to fill it in later). */
+export function menuShows(items: MenuItem[]): boolean {
+  return useMenu.getState().menu?.items === items;
+}
+
 export function MenuHost() {
   const menu = useMenu((s) => s.menu);
   const ref = useRef<HTMLDivElement>(null);

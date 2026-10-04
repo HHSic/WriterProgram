@@ -10,6 +10,7 @@ import type { CardSummary, IndentRules } from '../api/types';
 import { CardHighlight, nameIndex, setCardNames } from './cards';
 import { manuscriptExtensions } from './extensions';
 import { IndentRulesExtension, setIndentRules } from './indent';
+import { forgetSpelling, rememberSpelling, setSpelling, showAnswers, spellPlugin, spellingHits } from './spell';
 
 const RULES: IndentRules = { chapterFirst: true, afterScene: true, margined: true, dialogue: true, dialogueHang: false };
 const CARDS = ['서하', '윤서하', '강윤석', '달빛 서점', '이도윤', '한별'].map(
@@ -101,5 +102,32 @@ describe('a 1.4 million character chapter', () => {
     expect(cardsTyping).toBeLessThan(100);
     expect(indentFull).toBeLessThan(1000);
     expect(cardsFull).toBeLessThan(2000);
+  }, 60_000);
+
+  it('shows spelling lines and types without checking the whole chapter again', () => {
+    forgetSpelling('big chapter');
+    const ed = fakeEditor(EditorState.create({ doc, plugins: [spellPlugin()] }));
+    const setup = { check: async (texts: string[]) => texts.map(() => []), onMenu() {} };
+    // Nothing known yet: every paragraph is queued, nothing drawn.
+    let t0 = performance.now();
+    setSpelling(ed as unknown as Editor, setup);
+    const queued = performance.now() - t0;
+    // The answers come (one per distinct paragraph text here).
+    doc.forEach((node) => {
+      const text = node.textContent;
+      if (text) rememberSpelling(text, text.startsWith('셔터를') ? [{ start: 6, end: 8, word: '반쯤' }] : []);
+    });
+    t0 = performance.now();
+    showAnswers({ state: ed.state, isDestroyed: false, dispatch: ed.view.dispatch });
+    const answered = performance.now() - t0;
+    const lines = spellingHits(ed.state).length;
+    const typing = typingTime(ed.state);
+    console.log(
+      `1.4M chars: spelling queue ${queued.toFixed(1)}ms, answers drawn ${answered.toFixed(1)}ms (${lines} lines), typing ${typing.toFixed(2)}ms`,
+    );
+    expect(lines).toBeGreaterThan(1000);
+    expect(typing).toBeLessThan(100);
+    expect(queued).toBeLessThan(2000);
+    expect(answered).toBeLessThan(3000);
   }, 60_000);
 });

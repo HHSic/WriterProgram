@@ -18,6 +18,7 @@ import { noteMethods } from './notes';
 import { projectMethods } from './projects';
 import { rescueMethods } from './rescue';
 import { searchMethods } from './search';
+import { spellMethods } from './spell';
 import { seed } from './state';
 
 /**
@@ -36,6 +37,7 @@ export function startMockBackend(): Backend {
     ...ioMethods,
     ...exchangeMethods,
     ...searchMethods,
+    ...spellMethods,
     ...cardMethods,
     ...noteMethods,
     ...formatMethods,

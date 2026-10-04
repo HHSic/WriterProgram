@@ -47,6 +47,8 @@ export interface ViewSettings {
   autoType: boolean;
   /** The quotes it makes: “ ” ‘ ’, or 「 」 『 』. */
   quoteStyle: QuoteStyle;
+  /** 맞춤법 표시: wavy lines under unknown words, once the dictionary is on this device. */
+  spellcheck: boolean;
 }
 
 /** Speeds offered for 소리 내어 읽기. */
@@ -87,6 +89,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   typewriter: true,
   autoType: false,
   quoteStyle: 'curly',
+  spellcheck: true,
 };
 
 const KEY = 'wp.view';

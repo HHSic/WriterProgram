@@ -175,9 +175,15 @@ pub struct SpellWords {
     device: Vec<String>,
 }
 
+/// The lists; `root` is empty when no project is open (only this device's).
 fn word_lists(app: &AppHandle, root: &str) -> Res<SpellWords> {
+    let project = if root.is_empty() {
+        Vec::new()
+    } else {
+        words::read(&words::project_words_file(Path::new(root))).map_err(fail)?
+    };
     Ok(SpellWords {
-        project: words::read(&words::project_words_file(Path::new(root))).map_err(fail)?,
+        project,
         device: words::read(&spelling_words_file(app)?).map_err(fail)?,
     })
 }
@@ -191,6 +197,7 @@ pub async fn spell_words(app: AppHandle, root: String) -> Res<SpellWords> {
 fn list_file(app: &AppHandle, root: &str, place: &str) -> Res<std::path::PathBuf> {
     match place {
         "device" => spelling_words_file(app),
+        _ if root.is_empty() => Err("작품을 연 뒤에 넣을 수 있음".into()),
         _ => Ok(words::project_words_file(Path::new(root))),
     }
 }

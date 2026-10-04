@@ -11,6 +11,7 @@ import { startWatching, stopWatching } from './devices';
 import { loadLink, stopAutoSync } from './drives';
 import { loadJournal, stampOnClosing } from './journal';
 import { loadAi } from './ai';
+import { loadSpell } from './spell';
 import { offerRescues } from './rescue';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ export function enterProject(ov: Overview) {
     heldRemovals: null,
     liveCounts: null,
     selection: null,
+    spellWords: { project: [], device: [] },
   });
   const layout = initialLayout(ov);
   commit(layout.panes, layout.focus, layout.split);
@@ -44,6 +46,7 @@ export function enterProject(ov: Overview) {
   void loadNotes();
   void loadJournal(ov.copies.length > 0);
   void loadAi();
+  void loadSpell();
   // Writing kept in the rescue folder last time, newer than its chapter.
   void offerRescues();
   if (ov.copies.length) {

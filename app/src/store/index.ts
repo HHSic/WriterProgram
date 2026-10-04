@@ -23,3 +23,17 @@ export { startReading, pauseReading, resumeReading, stopReading, toggleReading, 
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
 export { offerRescues, setRescueAside, takeRescue } from './rescue';
 export { autoUpdateCheck, setAutoUpdateCheck, checkForUpdateDaily, checkForUpdateNow } from './update';
+export {
+  loadSpell,
+  spellKnown,
+  spellKnownKey,
+  spellingOn,
+  downloadText,
+  offerSpellDictionary,
+  removeSpellDictionary,
+  addSpellWord,
+  removeSpellWord,
+  ignoreSpellWord,
+  spellSuggestions,
+  checkSpelling,
+} from './spell';

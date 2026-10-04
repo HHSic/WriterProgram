@@ -15,7 +15,8 @@ import { setAutoType } from '../editor/autoType';
 import { setFocusLook } from '../editor/focus';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
-import { showMatch } from '../editor/search';
+import { replaceMatch, showMatch } from '../editor/search';
+import { forgetSpelling, recheckSpelling, setSpelling } from '../editor/spell';
 import type { SaveSession } from '../editor/session';
 import { RELOAD, attach, peerOf } from '../editor/shared';
 import { useAutoHeight } from '../lib/autoHeight';
@@ -34,6 +35,8 @@ import {
   previewCard,
   registerEditor,
   setLocked,
+  spellKnownKey,
+  spellingOn,
   useApp,
 } from '../store';
 import { touchCapable, touchLike } from '../lib/pointer';
@@ -43,6 +46,7 @@ import { DocBanners } from './Copies';
 import { EditToolbar } from './EditToolbar';
 import { ReadingBar } from './ReadingBar';
 import { Ruler } from './Ruler';
+import { SPELL_SETUP } from './spellMenu';
 
 export function DocPane({ docId, tabKey, locked }: { docId: string; tabKey: string; locked: boolean }) {
   const root = useApp((s) => s.overview!.root);
@@ -163,6 +167,18 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
 
   useEffect(() => setCardNames(editor, names), [editor, names]);
 
+  // 맞춤법 표시: when the accepted words change (cards, word lists, 무시),
+  // results are dropped and the chapter is checked again; lines stay until then.
+  const knownKey = useApp((s) => spellKnownKey(s.overview!.cards, s.spellWords, s.spellIgnored));
+  const lastKnown = useRef<string | null>(null);
+  useEffect(() => {
+    forgetSpelling(knownKey);
+    if (lastKnown.current !== null && lastKnown.current !== knownKey) recheckSpelling(editor);
+    lastKnown.current = knownKey;
+  }, [editor, knownKey]);
+  const spellOn = useApp(spellingOn);
+  useEffect(() => setSpelling(editor, spellOn ? SPELL_SETUP : null), [editor, spellOn]);
+
   const showMarks = useApp((s) => s.view.showMarks);
   useEffect(() => setWhitespaceMarks(editor, showMarks), [editor, showMarks]);
 
@@ -231,6 +247,9 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       tries += 1;
       if (!editor.isDestroyed && editor.view.dom.isConnected) {
         showMatch(editor, jump.block, jump.start, jump.end);
+        if (jump.replace && editor.isEditable) {
+          replaceMatch(editor, { block: jump.block, start: jump.start, end: jump.end, text: jump.replace.text }, jump.replace.with);
+        }
         useApp.setState({ pendingJump: null });
       } else if (tries < 30) {
         timer = setTimeout(attempt, 30);

@@ -9,7 +9,19 @@ import { koreanVoices, loadVoices, pickVoice, sayOnce, speechAvailable } from '.
 import { ACCENTS, PALETTES, previewColors } from '../lib/colors';
 import { keysText } from '../lib/shortcuts';
 import { FONT_LABEL, READ_RATES, type BodyFont, type Theme, type ViewSettings } from '../lib/view';
-import { autoUpdateCheck, checkForUpdateNow, closeDialog, setAutoUpdateCheck, setView, useApp } from '../store';
+import {
+  autoUpdateCheck,
+  checkForUpdateNow,
+  closeDialog,
+  loadSpell,
+  removeSpellDictionary,
+  removeSpellWord,
+  setAutoUpdateCheck,
+  setView,
+  useApp,
+} from '../store';
+import type { SpellPlace } from '../api/types';
+import { SpellOffer } from './SpellTab';
 import { NO_VOICE_HELP, rateLabel } from './ReadingBar';
 
 const QUOTE_STYLES: { id: QuoteStyle; label: string }[] = [
@@ -121,6 +133,7 @@ export function ViewDialog() {
             돌아갑니다. 이 기기에서만 적용됩니다.
           </span>
         </fieldset>
+        <SpellFields view={view} />
         <fieldset className="field">
           <legend className="field-label">화면 밝기</legend>
           <div className="segmented">
@@ -137,6 +150,72 @@ export function ViewDialog() {
         <VersionField />
       </div>
     </Modal>
+  );
+}
+
+/** 맞춤법: the lines on or off, the word lists, and where the dictionary came from. */
+function SpellFields({ view }: { view: ViewSettings }) {
+  const status = useApp((s) => s.spellStatus);
+  const words = useApp((s) => s.spellWords);
+  const inProject = useApp((s) => !!s.overview);
+  useEffect(() => {
+    void loadSpell();
+  }, []);
+  const dict = status?.installed;
+  return (
+    <fieldset className="field spell-fields">
+      <legend className="field-label">맞춤법</legend>
+      {!status ? (
+        <span className="hint">맞춤법 사전을 확인하는 중</span>
+      ) : !dict ? (
+        <SpellOffer status={status} />
+      ) : (
+        <>
+          <label className="check">
+            <input type="checkbox" checked={view.spellcheck} onChange={(e) => setView({ spellcheck: e.target.checked })} />
+            사전에 없는 낱말에 빨간 물결 밑줄 보이기
+          </label>
+          <span className="hint">
+            설정집의 이름과 다른 이름은 조사가 붙어도 맞는 말로 칩니다. 밑줄 친 낱말을 오른쪽 클릭하거나 길게 누르면 고칠 말과 ‘사전에 넣기’가
+            나옵니다. 작품 전체는 오른쪽 칸 ‘맞춤법’ 탭에서 검사합니다.
+          </span>
+          {inProject && <WordList title="이 작품 사전" place="project" words={words.project} />}
+          <WordList title="이 기기 사전 (모든 작품)" place="device" words={words.device} />
+          <details className="spell-license">
+            <summary>사전 출처와 라이선스</summary>
+            <pre>{dict.notice}</pre>
+            <span className="hint">사전 파일과 라이선스 파일 위치: {dict.folder}</span>
+          </details>
+          <div>
+            <button type="button" className="btn small" onClick={removeSpellDictionary}>
+              이 기기에서 사전 지우기
+            </button>
+          </div>
+        </>
+      )}
+    </fieldset>
+  );
+}
+
+function WordList({ title, place, words }: { title: string; place: SpellPlace; words: string[] }) {
+  return (
+    <div className="spell-words">
+      <span className="field-label">
+        {title} · {words.length ? `${words.length}개` : '없음'}
+      </span>
+      {words.length > 0 && (
+        <ul>
+          {words.map((w) => (
+            <li key={w}>
+              {w}
+              <button type="button" className="icon-btn" aria-label={`${w} 빼기`} title="사전에서 빼기" onClick={() => void removeSpellWord(w, place)}>
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

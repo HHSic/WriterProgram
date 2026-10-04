@@ -15,6 +15,7 @@ import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
 import { ReadAloudHighlight } from './readAloud';
 import { SearchHighlight } from './search';
+import { Spelling } from './spell';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -200,6 +201,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     ReadAloudHighlight,
     FocusWriting,
     CardHighlight.configure({ onOpen: hooks.onCardOpen }),
+    Spelling,
     Placeholder.configure({
       placeholder: ({ editor }) => (editor.isEmpty ? '여기에 쓰기 시작하세요' : ''),
     }),

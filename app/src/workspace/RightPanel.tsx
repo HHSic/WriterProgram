@@ -29,6 +29,7 @@ import { AiTab } from './AiTab';
 import { Appearances, CardPreview, CastTab } from './CardPanels';
 import { NotesTab } from './Notes';
 import { SearchTab } from './SearchTab';
+import { SpellTab } from './SpellTab';
 
 type TabList = { id: RightTab; label: string }[];
 
@@ -38,6 +39,7 @@ const CHAPTER_TABS: TabList = [
   { id: 'cast', label: '등장 설정' },
   { id: 'records', label: '기록' },
   { id: 'find', label: '찾기' },
+  { id: 'spell', label: '맞춤법' },
   { id: 'ai', label: 'AI 점검' },
 ];
 const PLANNING_TABS: TabList = [
@@ -45,6 +47,7 @@ const PLANNING_TABS: TabList = [
   { id: 'notes', label: '메모' },
   { id: 'records', label: '기록' },
   { id: 'find', label: '찾기' },
+  { id: 'spell', label: '맞춤법' },
 ];
 const CARD_TABS: TabList = [
   { id: 'cast', label: '등장 위치' },
@@ -122,6 +125,8 @@ export function RightPanel() {
           <CardPreview key={preview} cardId={preview} />
         ) : tab === 'find' ? (
           <SearchTab />
+        ) : tab === 'spell' ? (
+          <SpellTab />
         ) : activeCardId ? (
           tab === 'notes' ? (
             <NotesTab key={activeCardId} on="card" targetId={activeCardId} editor={null} />

@@ -85,7 +85,7 @@ export function changedSpans(tr: Transaction): Span[] {
 }
 
 /** Spans in order, overlapping and touching ones joined. */
-function joined(spans: Span[]): Span[] {
+export function joinSpans(spans: Span[]): Span[] {
   const sorted = [...spans].sort((a, b) => a.from - b.from);
   const out: Span[] = [];
   for (const s of sorted) {
@@ -100,7 +100,7 @@ function joined(spans: Span[]): Span[] {
 export function carrySpans(spans: Span[], tr: Transaction): Span[] {
   if (!tr.docChanged) return spans;
   const moved = spans.map((s) => ({ from: tr.mapping.map(s.from, -1), to: tr.mapping.map(s.to, 1) }));
-  return joined([...moved, ...changedSpans(tr)]);
+  return joinSpans([...moved, ...changedSpans(tr)]);
 }
 
 /** `set` with the decorations of the text blocks touching `spans` worked out again. */

@@ -2,7 +2,21 @@
 
 import type { Editor } from '@tiptap/core';
 import { create } from 'zustand';
-import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, Recovery, RescueFile, SnapshotInfo } from '../api/types';
+import type {
+  AiSettings,
+  AiTask,
+  CopyInfo,
+  Counts,
+  DriveLink,
+  FormatCatalog,
+  Note,
+  Overview,
+  Recovery,
+  RescueFile,
+  SnapshotInfo,
+  SpellStatus,
+  SpellWords,
+} from '../api/types';
 import type { Pane, SplitDir, Target } from '../lib/tabs';
 import { type ViewSettings, loadView } from '../lib/view';
 
@@ -19,7 +33,7 @@ export interface SaveState {
   /** Where the unsaved text was kept when saves kept failing (비상 보관). */
   rescued?: string;
 }
-export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'records' | 'ai';
+export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'spell' | 'records' | 'ai';
 export type FindScope = 'doc' | 'part' | 'all';
 
 /** Asks the find panel to open with a search (from the sidebar or Ctrl+F). */
@@ -43,6 +57,8 @@ export interface Jump {
   block: number;
   start: number;
   end: number;
+  /** Then put `with` in place of `text` there (a spelling suggestion picked in the 맞춤법 panel). */
+  replace?: { text: string; with: string };
 }
 
 export type SettingsTab = 'basic' | 'goal' | 'format';
@@ -204,6 +220,12 @@ interface AppState {
   /** This device's AI settings; null until read. */
   ai: AiSettings | null;
   aiRequest: AiRequest | null;
+  /** The spelling dictionary on this device; null until asked (store/spell.ts). */
+  spellStatus: SpellStatus | null;
+  /** 이 작품 사전 and 이 기기 사전. */
+  spellWords: SpellWords;
+  /** Words passed over with 무시 until the app closes. */
+  spellIgnored: string[];
 }
 
 /** Paths a pass did not remove because too many went at once (crates/sync engine.rs). */
@@ -262,6 +284,9 @@ export const useApp = create<AppState>(() => ({
   reading: null,
   ai: null,
   aiRequest: null,
+  spellStatus: null,
+  spellWords: { project: [], device: [] },
+  spellIgnored: [],
 }));
 
 export const set = useApp.setState;

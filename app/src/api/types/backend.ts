@@ -46,6 +46,7 @@ import type { NewNote, Note } from './notes';
 import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem, RecoverWay, Recovery } from './project';
 import type { RescueContent, RescueFile } from './rescue';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
+import type { SpellIssue, SpellPlace, SpellStatus, SpellDict, SpellWords, SpellWorkCheck } from './spell';
 import type { UpdateInfo, UpdateProgress } from './update';
 
 export interface Backend {
@@ -123,6 +124,19 @@ export interface Backend {
   exchangeApply(root: string, exchangeId: string, decisions: Decisions): Promise<Applied>;
   search(root: string, query: SearchQuery): Promise<SearchResult>;
   replaceAll(root: string, query: SearchQuery, replacement: string): Promise<ReplaceOutcome>;
+  /** The spelling dictionary on this device, and what fetching it would bring. */
+  spellStatus(): Promise<SpellStatus>;
+  /** Fetches the dictionary (the writer agreed first). */
+  spellDownload(): Promise<SpellDict>;
+  spellRemove(): Promise<void>;
+  /** Unknown words in each paragraph text. `known`: names, word lists, ignored words. */
+  spellCheck(texts: string[], known: string[]): Promise<SpellIssue[][]>;
+  spellSuggest(word: string): Promise<string[]>;
+  /** 맞춤법 검사 over the whole work, or over `docIds`. */
+  spellCheckWork(root: string, known: string[], docIds?: string[]): Promise<SpellWorkCheck>;
+  spellWords(root: string): Promise<SpellWords>;
+  spellWordAdd(root: string, word: string, place: SpellPlace): Promise<SpellWords>;
+  spellWordRemove(root: string, word: string, place: SpellPlace): Promise<SpellWords>;
   cardLoad(root: string, cardId: string): Promise<Card>;
   cardCreate(root: string, typeId: string, name: string): Promise<Card>;
   cardSave(root: string, card: Card): Promise<CardSummary>;
