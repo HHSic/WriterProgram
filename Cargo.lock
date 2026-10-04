@@ -4309,6 +4309,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spellbook"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d204abcbdf8e88729306a8d0ca01a79d8a49969fe1f84696909d6dbc4321c1a"
+dependencies = [
+ "foldhash",
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6236,6 +6246,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "similar",
+ "spellbook",
  "tempfile",
  "thiserror 2.0.21",
  "windows-sys 0.61.2",

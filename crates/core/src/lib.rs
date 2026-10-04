@@ -1,6 +1,6 @@
 //! Core of WriterProgram: the project folder format, manuscript files, counts,
-//! records (snapshots), setting cards, notes (메모), trash, manuscript format and
-//! export (txt, docx, HWPX).
+//! records (snapshots), setting cards, notes (메모), trash, manuscript format,
+//! export (txt, docx, HWPX) and spelling (맞춤법 검사).
 //!
 //! Nothing here depends on the UI or on Tauri, so the whole storage layer can be
 //! tested with plain `cargo test` and reused on mobile. The on-disk format is
@@ -32,6 +32,7 @@ pub mod recent;
 pub mod rescue;
 pub mod search;
 pub mod snapshot;
+pub mod spell;
 pub mod store;
 pub mod trash;
 mod xml;

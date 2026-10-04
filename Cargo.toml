@@ -7,3 +7,11 @@ default-members = ["crates/ai", "crates/core", "crates/sync", "app/src-tauri"]
 
 [workspace.package]
 edition = "2024"
+
+# The spell checker reads a 14 MB dictionary (crates/core/src/spell). Built
+# without optimisation that takes about 9 seconds in `tauri dev`.
+[profile.dev.package.spellbook]
+opt-level = 3
+
+[profile.dev.package.hashbrown]
+opt-level = 3

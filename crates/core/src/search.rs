@@ -156,8 +156,13 @@ pub fn find_in_blocks_by(
 }
 
 fn scope(root: &Path, q: &SearchQuery) -> Result<Vec<String>> {
-    match &q.doc_ids {
-        Some(ids) => Ok(ids.clone()),
+    docs_in(root, q.doc_ids.clone())
+}
+
+/// The documents `doc_ids`, or all of the project's in order when none.
+pub(crate) fn docs_in(root: &Path, doc_ids: Option<Vec<String>>) -> Result<Vec<String>> {
+    match doc_ids {
+        Some(ids) => Ok(ids),
         None => Ok(project::doc_ids(&project::load(root)?)),
     }
 }
@@ -199,7 +204,7 @@ pub fn search(root: &Path, q: &SearchQuery) -> Result<SearchResult> {
 
 /// A document in scope: none when its file is missing (it may be on its way
 /// from another device) or cannot be read, which `skipped` counts.
-fn readable(root: &Path, id: &str, skipped: &mut usize) -> Option<(PathBuf, DocFile)> {
+pub(crate) fn readable(root: &Path, id: &str, skipped: &mut usize) -> Option<(PathBuf, DocFile)> {
     let (_, path) = doc::locate(root, id).ok()?;
     match doc::read_doc(&path) {
         Ok(file) => Some((path, file)),

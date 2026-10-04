@@ -28,6 +28,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 similar = { version = "3", default-features = false, features = ["std"] }
+# 맞춤법 검사 (spell/): reads Hunspell dictionaries in pure Rust, MPL-2.0.
+# The Korean dictionary itself is GPL data fetched at run time, never built in.
+spellbook = "0.4"
 thiserror = "2"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 

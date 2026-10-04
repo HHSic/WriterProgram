@@ -1,0 +1,56 @@
+# Test dictionary for crates/core/src/spell, written for this repository in
+# the shape of hunspell-dict-ko (numeric flags with aliases, particles as
+# suffixes, compound rules). It is not hunspell-dict-ko and holds none of its
+# data.
+SET UTF-8
+LANG ko
+FLAG num
+WORDCHARS 0123456789
+AF 7
+AF 30,35
+AF 9,530,532
+AF 9,531,532
+AF 1,14,531,532
+AF 18,30,35
+AF 17
+AF 15
+FORBIDDENWORD 15
+ONLYINCOMPOUND 1
+COMPOUNDMIN 1
+COMPOUNDRULE 2
+COMPOUNDRULE (9)(14)
+COMPOUNDRULE (17)(18)
+TRY 먹웃있사람나무하늘다었는은이
+SFX 30 Y 5
+SFX 30 다 고 .
+SFX 30 다 는 .
+SFX 30 다 며 .
+SFX 30 다 지 .
+SFX 30 지다 져 지다
+SFX 35 Y 3
+SFX 35 다 었다 .
+SFX 35 다 었습니다 .
+SFX 35 지다 졌다 지다
+SFX 530 Y 6
+SFX 530 0 는 .
+SFX 530 0 가 .
+SFX 530 0 를 .
+SFX 530 0 와 .
+SFX 530 0 로 .
+SFX 530 0 야 .
+SFX 531 Y 6
+SFX 531 0 은 .
+SFX 531 0 이 .
+SFX 531 0 을 .
+SFX 531 0 과 .
+SFX 531 0 으로 .
+SFX 531 0 아 .
+SFX 532 Y 8
+SFX 532 0 의 .
+SFX 532 0 에 .
+SFX 532 0 에게 .
+SFX 532 0 도 .
+SFX 532 0 만 .
+SFX 532 0 에서 .
+SFX 532 0 처럼 .
+SFX 532 0 한테 .
