@@ -24,7 +24,7 @@
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수·연재 플랫폼 기준 글자 수(`CountRule`, `Counts::by_rule`), 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝, 시험 `tests/fixtures/counts.json`·`platform-counts.json`). 플랫폼 표와 붙여넣기는 [platforms.md](platforms.md) |
 | `format/` | 원고 서식: `mod.rs`(값과 검사), `heads.rs`(머리말·꼬리말·자리), `paper.rs`(용지·여백·글꼴), `presets.rs`(기본 서식, 내 서식) |
 | `export.rs`, `docx/`, `hwpx/`, `xml.rs` | 내보내기. docx는 `layout.rs`(머리글·꼬리글), `styles.rs`, `body.rs`. HWPX는 `header.rs`(글자·문단 모양, 스타일), `section.rs`(본문, 머리말·꼬리말 조판 부호). `xml.rs`는 둘이 함께 쓰는 이스케이프·zip 묶기·시각 |
-| `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모), `marked/`(교정본 읽기: 글자 모양·변경 추적·편집자 메모) |
+| `import/` | 가져오기: `text.rs`(txt·md), `word.rs`(docx), `hangul.rs`(HWPX), `hwp/`(HWP 5.x 전체 본문), `shape.rs`(문단 길이 환산), `page.rs`(한글 파일의 쪽 모양), 공용 `xml.rs`(XML 읽기)·`para.rs`(문단 마무리), `split.rs`(회차 나누기), `notes.rs`(빠진 자리 메모), `marked/`(교정본 읽기: 글자 모양·변경 추적·편집자 메모) |
 | `corrections/` | 교정본 주고받기 ([corrections.md](corrections.md)): `sent.rs`(보낸 기록), `compare.rs`(문단·어절·글자 비교, 종류 나누기), `review.rs`(교정본과 보낸 원고 비교, 남은 곳을 지금 원고에 다시 놓기 `current_review`), `flat.rs`(회차를 글자 줄로, 자리 옮기기), `apply.rs`(받아들이기·되돌리기). 화면은 `workspace/ExportDialog.tsx`(보내기), `Exchanges.tsx`(목록), `ReviewPane.tsx`(검토 탭), `store/exchange.ts`, `lib/review.ts` |
 | `cards.rs`, `notes.rs`, `search.rs`, `snapshot.rs`, `trash.rs` | 설정집, 메모, 찾기·바꾸기, 기록(창작 과정 보관이면 하루 마지막 기록을 정리하지 않음), 휴지통 |
 | `rescue.rs` | 비상 보관: 작품 폴더에 계속 저장하지 못한 글을 앱 데이터 폴더 `rescue/<작품 id>/`에 쓰기·목록·읽기·`old/`로 치우기. 명령은 `commands/rescue.rs`, 화면은 `store/saves.ts`(쓰기)와 `store/rescue.ts`(작품 열 때 비교 권하기) |

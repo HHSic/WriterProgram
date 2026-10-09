@@ -11,6 +11,8 @@ path = "src/lib.rs"
 
 [dependencies]
 base64 = "0.22"
+cfb = "0.14"
+flate2 = "1"
 chrono = "0.4"
 # Time stamps (RFC 3161, anchor/tsp.rs): reading the authorities' signed
 # replies and checking their signatures. One RustCrypto family (der 0.7).

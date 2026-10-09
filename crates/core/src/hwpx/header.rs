@@ -56,7 +56,9 @@ fn char_pr(id: usize, c: CharShape) -> String {
     format!(
         r##"<hh:charPr id="{id}" height="{height}" textColor="{color}" shadeColor="none" useFontSpace="0" useKerning="0" symMark="{sym}" borderFillIDRef="2">{font}{ratio}{spacing}{rel}{offset}{italic}{bold}<hh:underline type="{underline}" shape="SOLID" color="#000000"/><hh:strikeout shape="{strike}" color="#000000"/><hh:outline type="NONE"/><hh:shadow type="NONE" color="#C0C0C0" offsetX="10" offsetY="10"/></hh:charPr>"##,
         height = c.height,
-        color = c.color,
+        color = s
+            .color
+            .map_or_else(|| c.color.to_string(), |rgb| format!("#{rgb:06X}")),
         font = per_lang("fontRef", c.font),
         ratio = per_lang("ratio", 100),
         spacing = per_lang("spacing", c.spacing),
@@ -71,6 +73,7 @@ fn char_pr(id: usize, c: CharShape) -> String {
 
 #[derive(Clone, Copy)]
 struct ParaShape {
+    page_break: bool,
     align: &'static str,
     heading: (&'static str, u32),
     tab: usize,
@@ -89,6 +92,7 @@ struct ParaShape {
 impl Default for ParaShape {
     fn default() -> Self {
         ParaShape {
+            page_break: false,
             align: "JUSTIFY",
             heading: ("NONE", 0),
             tab: 0,
@@ -120,7 +124,8 @@ fn para_pr(id: usize, p: ParaShape) -> String {
         )
     };
     format!(
-        r#"<hh:paraPr id="{id}" tabPrIDRef="{tab}" condense="{condense}" fontLineHeight="0" snapToGrid="1" suppressLineNumbers="0" checked="0" textDir="LTR"><hh:align horizontal="{align}" vertical="BASELINE"/><hh:heading type="{htype}" idRef="0" level="{hlevel}"/><hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="{non_latin}" widowOrphan="0" keepWithNext="{kwn}" keepLines="0" pageBreakBefore="0" lineWrap="BREAK"/><hh:autoSpacing eAsianEng="0" eAsianNum="0"/><hp:switch><hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar">{case}</hp:case><hp:default>{default}</hp:default></hp:switch><hh:border borderFillIDRef="2" offsetLeft="0" offsetRight="0" offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/></hh:paraPr>"#,
+        r#"<hh:paraPr id="{id}" tabPrIDRef="{tab}" condense="{condense}" fontLineHeight="0" snapToGrid="1" suppressLineNumbers="0" checked="0" textDir="LTR"><hh:align horizontal="{align}" vertical="BASELINE"/><hh:heading type="{htype}" idRef="0" level="{hlevel}"/><hh:breakSetting breakLatinWord="KEEP_WORD" breakNonLatinWord="{non_latin}" widowOrphan="0" keepWithNext="{kwn}" keepLines="0" pageBreakBefore="{page_break}" lineWrap="BREAK"/><hh:autoSpacing eAsianEng="0" eAsianNum="0"/><hp:switch><hp:case hp:required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar">{case}</hp:case><hp:default>{default}</hp:default></hp:switch><hh:border borderFillIDRef="2" offsetLeft="0" offsetRight="0" offsetTop="0" offsetBottom="0" connect="0" ignoreMargin="0"/></hh:paraPr>"#,
+        page_break = u8::from(p.page_break),
         tab = p.tab,
         condense = p.condense,
         align = p.align,
@@ -359,6 +364,13 @@ pub(super) fn header(
     for m in margins {
         // 25– 문단 여백
         paras.push(ParaShape {
+            align: m.align.map_or(body.align, |a| match a {
+                crate::markup::Align::Left => "LEFT",
+                crate::markup::Align::Center => "CENTER",
+                crate::markup::Align::Right => "RIGHT",
+                crate::markup::Align::Justify => "JUSTIFY",
+            }),
+            page_break: m.page_break_before,
             left: (f64::from(m.left) * char_hu(format)).round() as i64,
             right: (f64::from(m.right) * char_hu(format)).round() as i64,
             // The paragraph's own first line; negative is 내어쓰기.

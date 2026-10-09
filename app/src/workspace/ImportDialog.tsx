@@ -1,4 +1,4 @@
-// 가져오기 (S3): txt, md, docx and hwpx files become chapters, in three steps:
+// 가져오기 (S3): txt, md, docx, hwp and hwpx files become chapters, in three steps:
 // pick files, see how they are cut into chapters, confirm where they go.
 // Tables, pictures and footnotes are never imported; the last step says so
 // and asks whether to leave them out or cancel.
@@ -285,7 +285,7 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
           <button type="button" className="import-drop" onClick={() => void pick()}>
             <Icon name="plus" size={18} />
             <strong>파일 고르기</strong>
-            <span>txt · md · docx · 한글(hwpx), 여러 개를 한꺼번에 고를 수 있습니다</span>
+            <span>txt · md · docx · 한글(hwp, hwpx), 여러 개를 한꺼번에 고를 수 있습니다</span>
           </button>
           {paths.length > 0 && (
             <ul className="import-files">
@@ -306,7 +306,7 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
             <p className="hint">한글이나 Word, 메모장에서 쓰던 원고로 새 작품을 만듭니다. 원래 파일은 그대로 둡니다.</p>
           )}
           <p className="hint">
-            표, 그림, 각주는 가져오지 않습니다. 옛 한글 파일(.hwp)은 한글에서 한글 문서(.hwpx)로 저장한 뒤 골라 주세요.
+            표, 그림, 각주는 가져오지 않습니다. HWP 5.x(한글 2002 이후)는 바로 읽습니다. 암호 문서·배포용 문서와 한글 97(HWP 3.x)은 지원하지 않습니다.
           </p>
         </div>
       )}

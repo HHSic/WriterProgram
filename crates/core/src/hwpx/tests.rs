@@ -45,6 +45,7 @@ fn sample() -> Vec<ExportDoc> {
                         left: 2,
                         right: 1,
                         indent: None,
+                        ..ParaAttrs::default()
                     },
                     content: vec![Inline::Text {
                         text: "편지\u{a0}묶음".into(),

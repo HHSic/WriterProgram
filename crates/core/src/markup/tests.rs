@@ -18,6 +18,7 @@ fn pm(left: u8, right: u8, content: Vec<Inline>) -> Block {
             left,
             right,
             indent: None,
+            ..ParaAttrs::default()
         },
         content,
     }
@@ -29,6 +30,7 @@ fn first_line_round_trips() {
             left,
             right: 0,
             indent,
+            ..ParaAttrs::default()
         },
         content: vec![t("문단", &[])],
     };
@@ -262,7 +264,8 @@ fn margins_from_the_editor() {
         ParaAttrs {
             left: 2,
             right: 0,
-            indent: None
+            indent: None,
+            ..ParaAttrs::default()
         }
     );
     assert!(body.content[1].attrs().is_plain());
@@ -271,7 +274,8 @@ fn margins_from_the_editor() {
         ParaAttrs {
             left: 3,
             right: 0,
-            indent: None
+            indent: None,
+            ..ParaAttrs::default()
         }
     );
     let back = serde_json::to_string(&body).unwrap();
@@ -348,6 +352,7 @@ fn random_round_trips() {
                         0 => None,
                         n => Some(n as i8 - 3),
                     },
+                    ..ParaAttrs::default()
                 }
             } else {
                 ParaAttrs::default()
@@ -367,4 +372,44 @@ fn random_round_trips() {
         }
         round_trip(blocks);
     }
+}
+
+#[test]
+fn alignment_page_break_and_overlapping_rgb_marks_round_trip() {
+    let color = Mark::TextColor {
+        attrs: ColorAttrs {
+            color: "#2365B8".into(),
+        },
+    };
+    let blocks = vec![
+        Block::Paragraph {
+            attrs: ParaAttrs {
+                align: Some(Align::Center),
+                page_break_before: true,
+                indent: Some(0),
+                ..Default::default()
+            },
+            content: vec![
+                t("  \t가운데", &[color.clone(), B, D]),
+                t(" 기본", &[]),
+                t(" 색", &[color, U]),
+            ],
+        },
+        Block::para(vec![]),
+    ];
+    let written = round_trip(blocks.clone());
+    assert!(written.contains("data-align=\"center\""));
+    assert!(written.contains("data-page-break=\"1\""));
+    assert!(written.contains("<color rgb=\"#2365B8\">"));
+    let json = serde_json::to_string(&Body::new(blocks.clone())).unwrap();
+    assert_eq!(serde_json::from_str::<Body>(&json).unwrap().content, blocks);
+    let unsafe_color = p(vec![t(
+        "안전",
+        &[Mark::TextColor {
+            attrs: ColorAttrs {
+                color: "\"><script>".into(),
+            },
+        }],
+    )]);
+    assert!(!write_body(&[unsafe_color]).contains("<script>"));
 }

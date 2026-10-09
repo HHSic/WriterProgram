@@ -11,7 +11,7 @@ export function loadBookPreferences(): BookPreferences {
     return {
       device: ['auto', 'phone', 'pc'].includes(value?.device) ? value.device : DEFAULTS.device,
       theme: ['paper', 'light', 'dark'].includes(value?.theme) ? value.theme : DEFAULTS.theme,
-      fontSize: Number.isFinite(value?.fontSize) ? Math.max(14, Math.min(30, value.fontSize)) : DEFAULTS.fontSize,
+      fontSize: Number.isFinite(value?.fontSize) ? Math.max(1, value.fontSize) : DEFAULTS.fontSize,
     };
   } catch { return { ...DEFAULTS }; }
 }

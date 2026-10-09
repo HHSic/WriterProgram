@@ -117,6 +117,7 @@ fn paragraph_margins_become_indents() {
                 left: 2,
                 right: 1,
                 indent: None,
+                ..ParaAttrs::default()
             },
             content: vec![Inline::Text {
                 text: "편지".into(),
@@ -145,6 +146,7 @@ fn own_first_lines_become_indents() {
             left: 0,
             right: 0,
             indent,
+            ..ParaAttrs::default()
         },
         content: vec![Inline::Text {
             text: "문단".into(),

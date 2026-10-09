@@ -222,6 +222,16 @@ pub(super) fn property(
     if in_ppr {
         if let Some(p) = para.as_mut() {
             match name {
+                "jc" => {
+                    p.attrs.align = match val(a, "val") {
+                        Some("center") => Some(crate::markup::Align::Center),
+                        Some("right") => Some(crate::markup::Align::Right),
+                        Some("left") => Some(crate::markup::Align::Left),
+                        Some("both" | "distribute") => Some(crate::markup::Align::Justify),
+                        _ => None,
+                    }
+                }
+                "pageBreakBefore" => p.attrs.page_break_before = flag(a),
                 "pStyle" => p.style = val(a, "val").map(str::to_string),
                 "outlineLvl" => p.outline = val(a, "val").and_then(|v| v.parse().ok()),
                 _ => {}
@@ -235,6 +245,9 @@ pub(super) fn property(
             "u" => run.underline = flag(a),
             "em" => run.dot = flag(a),
             "color" => {
+                run.text_color = val(a, "val")
+                    .and_then(|v| crate::markup::rgb(&format!("#{v}")))
+                    .filter(|v| *v != 0);
                 run.color = val(a, "val")
                     .is_some_and(|c| !matches!(c.to_ascii_lowercase().as_str(), "auto" | "000000"))
             }

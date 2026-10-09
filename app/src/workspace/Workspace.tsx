@@ -11,7 +11,7 @@ import {
   reopenClosedTab,
   setFocusMode,
   setView,
-  saveEverything,
+  saveNow,
   splitView,
   stopReading,
   toggleFocusMode,
@@ -39,7 +39,7 @@ function find(scope: 'doc' | 'all' | undefined, focus: 'find' | 'replace') {
 /** What the window does for each shortcut it handles (the editor handles the rest itself). */
 const WINDOW_KEYS: Partial<Record<ShortcutId, () => void>> = {
   // Writers press Ctrl+S out of habit: save right away instead of waiting.
-  save: () => void saveEverything(),
+  save: () => void saveNow(),
   find: () => find('doc', 'find'),
   findAll: () => find('all', 'find'),
   replace: () => find(undefined, 'replace'),
@@ -86,8 +86,11 @@ export function Workspace() {
         else if (inFocus) setFocusMode(false);
       }
     };
+    const onSave = (e: KeyboardEvent) => { if (matches(e, 'save')) { e.preventDefault(); e.stopPropagation(); void saveNow(); } };
+    window.addEventListener('keydown', onSave, true);
     window.addEventListener('keydown', onKey);
     return () => {
+      window.removeEventListener('keydown', onSave, true);
       window.removeEventListener('keydown', onKey);
       setFocusMode(false);
     };

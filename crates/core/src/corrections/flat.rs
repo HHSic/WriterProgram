@@ -345,6 +345,7 @@ mod tests {
                     left: 2,
                     right: 0,
                     indent: None,
+                    ..ParaAttrs::default()
                 },
                 content: vec![
                     Inline::Text {

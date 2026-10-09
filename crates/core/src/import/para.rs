@@ -3,11 +3,14 @@
 
 use super::text::is_scene;
 use super::{Item, SkipKind};
-use crate::markup::{Inline, Mark, inline_text};
+use crate::markup::{Inline, Mark, ParaAttrs, inline_text};
 
 /// What a run of text looks like.
 #[derive(Default, Clone, Copy)]
 pub(super) struct Run {
+    /// Source font height in HWPUNIT (100 per point), for paragraph dimensions.
+    pub height: f64,
+    pub text_color: Option<u32>,
     pub bold: bool,
     pub italic: bool,
     pub strike: bool,
@@ -23,6 +26,13 @@ pub(super) struct Run {
 impl Run {
     pub(super) fn marks(self) -> Vec<Mark> {
         let mut marks = Vec::new();
+        if let Some(color) = self.text_color {
+            marks.push(Mark::TextColor {
+                attrs: crate::markup::ColorAttrs {
+                    color: format!("#{color:06X}"),
+                },
+            });
+        }
         if self.underline {
             marks.push(Mark::Underline {});
         }
@@ -44,6 +54,10 @@ impl Run {
 
 #[derive(Default)]
 pub(super) struct Para {
+    pub attrs: ParaAttrs,
+    /// Keep literal indentation and spacing in Hancom paragraphs.
+    pub preserve_spaces: bool,
+    pub keep_blank: bool,
     /// docx only: the paragraph style and outline level.
     pub style: Option<String>,
     pub outline: Option<u8>,
@@ -83,7 +97,9 @@ impl Para {
     /// (one line only) or a paragraph; empty paragraphs and 차례 lines
     /// (`toc`) are dropped. What was left out of it follows.
     pub(super) fn close(mut self, level: Option<u8>, toc: bool, items: &mut Vec<Item>) {
-        trim_ends(&mut self.inlines);
+        if !self.preserve_spaces {
+            trim_ends(&mut self.inlines);
+        }
         let text = inline_text(&self.inlines);
         if !text.trim().is_empty() && !toc {
             let single = !text.contains('\n');
@@ -95,8 +111,11 @@ impl Para {
                     text: text.trim().to_string(),
                 });
             } else {
-                items.push(Item::Para(self.inlines));
+                items.push(Item::Para(self.inlines, self.attrs));
             }
+        }
+        if text.trim().is_empty() && self.keep_blank && !toc {
+            items.push(Item::Para(Vec::new(), self.attrs));
         }
         for (kind, n) in self.skips {
             items.push(Item::Skip(kind, n));

@@ -326,7 +326,11 @@ pub(super) fn section(
                             format!(r#"<hp:run charPrIDRef="{id}"><hp:t>{t}</hp:t></hp:run>"#)
                         })
                         .collect();
-                    w.paragraph(para_id(*attrs), page_break, &runs);
+                    w.paragraph(
+                        para_id(*attrs),
+                        page_break || attrs.page_break_before,
+                        &runs,
+                    );
                     add_preview(&plain);
                 }
             }

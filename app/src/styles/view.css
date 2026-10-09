@@ -73,3 +73,5 @@
 .swatch-name {
   white-space: nowrap;
 }
+
+.font-size-input { width: 100px; max-width: 100%; font-variant-numeric: tabular-nums; }

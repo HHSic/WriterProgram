@@ -6,6 +6,7 @@ import type { Editor } from '@tiptap/core';
 import { api } from '../api';
 import type { SnapshotInfo } from '../api/types';
 import { blocksFromJSON } from '../editor/counts';
+import { goToScene } from '../editor/sceneNavigation';
 import { sceneAt, scenesOf, type Scene } from '../editor/outline';
 import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
@@ -195,12 +196,7 @@ function OutlineTab({ editor }: { editor: Editor }) {
     };
   }, [editor]);
 
-  const go = (scene: Scene) => {
-    const pos = Math.min(scene.pos + 1, editor.state.doc.content.size);
-    editor.chain().focus().setTextSelection(pos).run();
-    const dom = editor.view.nodeDOM(scene.pos);
-    if (dom instanceof HTMLElement) dom.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  };
+  const go = (scene: Scene) => goToScene(editor, scene.pos);
 
   if (scenes.length <= 1 && !scenes[0]?.opening) {
     return <p className="empty-note">장면을 나누면 여기에 장면 목록이 생깁니다. 빈 줄에 ***를 쓰고 Enter를 누르세요.</p>;

@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../api';
+import { FontSizeInput } from '../components/FontSizeInput';
 import { Modal } from '../components/Modal';
 import type { QuoteStyle } from '../editor/autoType';
 import { koreanVoices, loadVoices, pickVoice, sayOnce, speechAvailable } from '../editor/readAloud';
@@ -29,6 +30,8 @@ export function ViewDialog() {
     <Modal title="보기 설정" onClose={closeDialog} width={500}>
       <div className="form">
         <p className="hint">이 기기의 작성 화면에만 적용됩니다. 원고 파일과 내보내기 모양은 바뀌지 않습니다.</p>
+        <label className="check"><input type="checkbox" checked={view.pages} onChange={(e) => setView({ pages: e.target.checked })} />페이지 단위로 보기·편집하기</label>
+        <p className="hint">페이지의 용지·여백은 작품의 원고 서식에서 가져오고, 글꼴·크기·간격은 아래 보기 설정을 따릅니다.</p>
         <label className="field">
           <span className="field-label">본문 글꼴</span>
           <select value={view.font} onChange={(e) => setView({ font: e.target.value as BodyFont })}>
@@ -39,7 +42,10 @@ export function ViewDialog() {
             ))}
           </select>
         </label>
-        <Slider label="글자 크기" value={view.fontSize} min={14} max={26} step={1} unit="px" onChange={(fontSize) => setView({ fontSize })} />
+        <label className="field"><span className="field-label">글자 크기 (px)</span>
+          <FontSizeInput label="작성 글자 크기(px)" value={view.fontSize} onChange={(fontSize) => setView({ fontSize })} />
+          <span className="hint">1px부터 입력할 수 있습니다. 최대 제한은 없습니다.</span>
+        </label>
         <Slider
           label="줄 간격"
           value={Math.round(view.lineHeight * 100)}

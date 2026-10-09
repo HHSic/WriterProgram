@@ -15,6 +15,7 @@ const FILE_TYPE_NAMES: Record<string, string> = {
   txt: '텍스트 파일',
   docx: 'Word 문서',
   hwpx: '한글 문서',
+  hwp: '한글 문서 (HWP 5.x)',
   wpm: 'WriterProgram 작품 파일 (.wpm)',
 };
 
@@ -183,7 +184,7 @@ export const tauriBackend: Backend = {
       multiple: !only,
       directory: false,
       title,
-      filters: [only ?? { name: '원고 파일 (txt, md, docx, hwpx)', extensions: ['txt', 'md', 'markdown', 'docx', 'hwpx', 'hwp'] }],
+      filters: [only ?? { name: '원고 파일 (txt, md, docx, hwp, hwpx)', extensions: ['txt', 'md', 'markdown', 'docx', 'hwp', 'hwpx'] }],
     });
     return Array.isArray(picked) ? picked : typeof picked === 'string' ? [picked] : [];
   },

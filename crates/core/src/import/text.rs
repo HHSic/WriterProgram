@@ -120,7 +120,7 @@ impl Reader {
         };
         for lines in paragraphs {
             if let Some(inlines) = self.paragraph(&lines) {
-                self.items.push(Item::Para(inlines));
+                self.items.push(Item::Para(inlines, Default::default()));
             }
         }
         for (kind, n) in std::mem::take(&mut self.pending) {
@@ -263,7 +263,7 @@ mod tests {
         raw.items
             .iter()
             .map(|i| match i {
-                Item::Para(inl) => crate::markup::inline_text(inl),
+                Item::Para(inl, _) => crate::markup::inline_text(inl),
                 Item::Scene => "<scene>".into(),
                 Item::Heading { level, text } => format!("<h{level}>{text}"),
                 Item::Skip(kind, n) => format!("<skip {kind:?} {n}>"),
@@ -333,7 +333,7 @@ mod tests {
             ]
         );
         let bold = raw.items.iter().any(|i| {
-            matches!(i, Item::Para(inl) if inl.iter().any(|x| matches!(x, Inline::Text { marks, .. } if !marks.is_empty())))
+            matches!(i, Item::Para(inl, _) if inl.iter().any(|x| matches!(x, Inline::Text { marks, .. } if !marks.is_empty())))
         });
         assert!(bold);
     }

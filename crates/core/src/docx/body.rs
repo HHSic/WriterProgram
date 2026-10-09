@@ -25,6 +25,9 @@ fn run_props(style: RunStyle) -> String {
     if style.dot {
         props.push_str(r#"<w:em w:val="dot"/>"#);
     }
+    if let Some(color) = style.color {
+        props.push_str(&format!("<w:color w:val=\"{color:06X}\"/>"));
+    }
     if props.is_empty() {
         props
     } else {
@@ -160,8 +163,21 @@ pub(super) fn document(
                     body: text_run(&opts.scene_break, RunStyle::default()),
                 }),
                 Block::Paragraph { attrs, content } => {
+                    if attrs.page_break_before && !ppr.contains("<w:pageBreakBefore/>") {
+                        ppr.push_str("<w:pageBreakBefore/>");
+                    }
                     if !attrs.is_plain() {
                         ppr.push_str(&margin_ind(format, *attrs));
+                    }
+                    if let Some(align) = attrs.align {
+                        ppr.push_str(&format!(
+                            "<w:jc w:val=\"{}\"/>",
+                            if align == crate::markup::Align::Justify {
+                                "both"
+                            } else {
+                                align.name()
+                            }
+                        ));
                     }
                     let mut runs = String::new();
                     for piece in pieces(content) {

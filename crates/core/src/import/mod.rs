@@ -1,4 +1,4 @@
-//! 가져오기: txt, md, docx and hwpx files become chapters.
+//! 가져오기: txt, md, docx, HWP 5.x and hwpx files become chapters.
 //!
 //! A file is read into a flat list of [`Item`]s (paragraphs, scene breaks,
 //! headings, and marks of what cannot be imported). The items are then split
@@ -12,10 +12,12 @@
 //! the chapters it makes are the ones the preview listed.
 
 mod hangul;
+mod hwp;
 pub(crate) mod marked;
 mod notes;
 mod page;
 mod para;
+mod shape;
 mod split;
 mod text;
 mod word;
@@ -34,7 +36,7 @@ use split::{resolve, split};
 
 use crate::count::count_blocks;
 use crate::doc::{self, DocFile, DocMeta, STATUSES};
-use crate::markup::{Block, Inline, plain_text};
+use crate::markup::{Block, Inline, ParaAttrs, plain_text};
 use crate::project::{self, MANUSCRIPT_DIR};
 use crate::store::new_id;
 use crate::{Error, Result, journal};
@@ -106,7 +108,7 @@ impl SkipKind {
 
 /// One thing read from a file, in order.
 pub(crate) enum Item {
-    Para(Vec<Inline>),
+    Para(Vec<Inline>, ParaAttrs),
     Scene,
     Heading { level: u8, text: String },
     Skip(SkipKind, u32),
@@ -154,8 +156,8 @@ fn read_raw(path: &Path, opts: &ImportOptions) -> std::result::Result<Raw, Strin
         "docx" => word::read(&read()?),
         "doc" => Err("옛 Word 형식(.doc)은 읽을 수 없음 · Word에서 docx로 저장해 주세요".into()),
         "hwpx" => hangul::read(&read()?),
-        "hwp" => Err("옛 한글 형식(.hwp)은 읽을 수 없음 · 한글에서 hwpx로 저장해 주세요".into()),
-        _ => Err("가져올 수 없는 파일 형식 (txt, md, docx, hwpx)".into()),
+        "hwp" => hwp::read(path),
+        _ => Err("가져올 수 없는 파일 형식 (txt, md, docx, hwp, hwpx)".into()),
     }
 }
 

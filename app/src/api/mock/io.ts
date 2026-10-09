@@ -40,13 +40,12 @@ const importPreview: Backend['importPreview'] = async (paths, opts) => {
   const files: ImportPreview['files'] = paths.map((path) => {
     const name = path.split('\\').pop() ?? path;
     const kind = name.split('.').pop() ?? '';
-    const bad = kind === 'hwp';
     return {
       name,
       kind,
-      error: bad ? '옛 한글 형식(.hwp)은 읽을 수 없음 · 한글에서 hwpx로 저장해 주세요' : null,
+      error: null,
       encoding: kind === 'txt' ? 'euc-kr' : null,
-      rule: bad ? '' : opts.rule === 'file' ? '파일 하나가 회차 하나' : kind === 'docx' || kind === 'hwpx' ? '제목 서식' : '제N화',
+      rule: opts.rule === 'file' ? '파일 하나가 회차 하나' : ['docx', 'hwpx', 'hwp'].includes(kind) ? '제목 서식' : '제N화',
       chapters: 0,
       page: kind === 'hwpx' ? MOCK_PAGE : null,
     };
@@ -56,7 +55,7 @@ const importPreview: Backend['importPreview'] = async (paths, opts) => {
     if (f.error) return;
     const list: [string, number, SkipTotalsLike][] =
       // A whole 한글 file as one chapter is very long: the preview suggests cutting it.
-      opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), f.kind === 'hwpx' ? 186400 : 9800, none]] : f.kind === 'docx' || f.kind === 'hwpx' ? sample : [['외전 · 그날의 서하', 3120, none]];
+      opts.rule === 'file' ? [[f.name.replace(/\.[^.]+$/, ''), f.kind === 'hwpx' ? 186400 : 9800, none]] : ['docx', 'hwpx', 'hwp'].includes(f.kind) ? sample : [['외전 · 그날의 서하', 3120, none]];
     for (const [title, chars, skipped] of list) {
       chapters.push({ index: chapters.length, file, title, chars, paragraphs: Math.round(chars / 60), snippet: '서하는 매일 밤 열한 시에 서점 문을 닫았다. 할머니가 그랬고, 할머니의 어머니도 그랬다고 했다.', skipped });
     }

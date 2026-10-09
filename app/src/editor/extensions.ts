@@ -6,9 +6,11 @@ import { Plugin } from '@tiptap/pm/state';
 import { Placeholder } from '@tiptap/extensions';
 import StarterKit from '@tiptap/starter-kit';
 import { editorKeys } from '../lib/shortcuts';
+import { ParagraphFormat, TextColor } from './formatting';
 import { AutoType } from './autoType';
 import { CardHighlight } from './cards';
 import { Composition } from './composition';
+import { PageScroll } from './pageScroll';
 import { FocusWriting } from './focus';
 import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
@@ -193,11 +195,14 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     Dot,
     Memo.configure({ onOpen: hooks.onNoteOpen, onAdd: hooks.onNoteAdd }),
     ParagraphMargins,
+    ParagraphFormat,
+    TextColor,
     SpecialSpaces,
     WhitespaceMarks,
     IndentRulesExtension,
     SearchHighlight,
     ReadAloudHighlight,
+    PageScroll,
     FocusWriting,
     CardHighlight.configure({ onOpen: hooks.onCardOpen }),
     Placeholder.configure({

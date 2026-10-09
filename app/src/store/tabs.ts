@@ -213,6 +213,39 @@ export function reorderTab(paneIndex: number, key: string, before: string | null
   if (pane) commit(withPane(panes, paneIndex, moveTab(pane, key, before)));
 }
 
+export function resizeTab(key: string, width: number | undefined) {
+  if (width !== undefined && !Number.isFinite(width)) return;
+  const panes = get().panes.map((p) => ({ ...p, tabs: p.tabs.map((tab) => tab.key === key
+    ? { ...tab, width: width === undefined ? undefined : Math.min(420, Math.max(72, width)) } : tab) }));
+  commit(panes);
+}
+
+/** Moves an open tab to either split pane; flush first because its editor remounts. */
+export async function transferTab(paneIndex: number, key: string, before: string | null) {
+  const initial = get();
+  const source = initial.panes.findIndex((p) => p.tabs.some((t) => t.key === key));
+  const destination = initial.panes[paneIndex];
+  if (source < 0 || !destination) return;
+  if (source === paneIndex) { reorderTab(paneIndex, key, before); return; }
+  const sourceKey = initial.panes[source].key;
+  const project = initial.overview?.root;
+  if (!(await saveEverything())) return;
+  const now = get();
+  if (now.overview?.root !== project) return;
+  const from = now.panes.findIndex((p) => p.key === sourceKey);
+  const to = now.panes.findIndex((p) => p.key === destination.key);
+  if (from < 0 || to < 0 || from === to) return;
+  const tab = now.panes[from].tabs.find((t) => t.key === key);
+  if (!tab) return;
+  const tabs = [...now.panes[to].tabs];
+  const at = before ? tabs.findIndex((t) => t.key === before) : -1;
+  tabs.splice(at < 0 ? tabs.length : at, 0, tab);
+  const panes = now.panes.map((p, i) => i === from ? removeTab(p, key)
+    : i === to ? { ...p, tabs, active: key } : p);
+  // Keep an empty split pane as a drop destination.
+  commit(panes, to);
+}
+
 export async function closeTab(paneIndex: number, key: string) {
   if (!(await saveEverything())) return;
   const { panes, focus } = get();

@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../components/Icon';
 import { openMenu, type MenuItem } from '../components/Menu';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
+import { TEXT_COLORS, type ParagraphAlign } from '../editor/formatting';
 import { firstLineAt, marginsAt } from '../editor/paragraph';
 import { keysText } from '../lib/shortcuts';
 import { addTextNote, openFind, toggleReading, useApp } from '../store';
@@ -49,12 +50,31 @@ export function marginMenu(editor: Editor): MenuItem[] {
   ];
 }
 
+export function formatMenu(editor: Editor): MenuItem[] {
+  const chain = () => editor.chain().focus();
+  return [
+    { heading: '문단 정렬' },
+    ...([['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽'], ['justify', '양쪽']] as [ParagraphAlign, string][]).map(([align, label]) => ({
+      label: `${label} 정렬`, checked: editor.isActive('paragraph', { align }),
+      onSelect: () => { chain().setParagraphAlign(align).run(); },
+    })),
+    { heading: '글자색' },
+    { label: '기본 글자색', onSelect: () => { chain().unsetTextColor().run(); } },
+    ...TEXT_COLORS.map((color, i) => ({ label: ['빨강', '주황', '초록', '파랑', '보라', '갈색', '회색'][i],
+      checked: editor.isActive('textColor', { color }), onSelect: () => { chain().setTextColor(color).run(); } })),
+    { separator: true },
+    { label: `쪽 나눔 넣기 (${keysText('pageBreak')})`, onSelect: () => { chain().insertPageBreak().run(); } },
+    { label: '이 문단 앞 쪽 나눔 없애기', disabled: !editor.isActive('paragraph', { pageBreakBefore: true }), onSelect: () => { chain().removePageBreak().run(); } },
+  ];
+}
+
 export function EditToolbar({ editor }: { editor: Editor }) {
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) => ({
       editable: e.isEditable,
       ...activeMarks(e),
+      centered: e.isActive('paragraph', { align: 'center' }),
       undo: e.can().undo(),
       redo: e.can().redo(),
     }),
@@ -96,6 +116,13 @@ export function EditToolbar({ editor }: { editor: Editor }) {
         return tool(key, b.name, b.glyph, () => toggleMark(editor, key), { on: state[key] });
       })}
       <span className="tool-sep" aria-hidden="true" />
+      {tool('center', '가운데 정렬 (Ctrl+E)', <span>≡</span>, () => chain().setParagraphAlign(state.centered ? null : 'center').run(), { on: state.centered })}
+      <label className="tool color-tool" title="글자색 고르기">
+        <span>가</span><input type="color" aria-label="글자색 고르기" disabled={!state.editable}
+          value={editor.getAttributes('textColor').color ?? '#C0392B'} onChange={(e) => chain().setTextColor(e.target.value).run()} />
+      </label>
+      {tool('colorReset', '기본 글자색으로', <span>가↺</span>, () => chain().unsetTextColor().run())}
+      {tool('pageBreak', '쪽 나눔 넣기 (Ctrl+Enter)', <span>쪽↵</span>, () => chain().insertPageBreak().run())}
       {tool('memo', '고른 글에 메모 달기', <Icon name="note" size={17} />, () => void addTextNote())}
       <button
         type="button"

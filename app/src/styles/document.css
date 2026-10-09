@@ -369,3 +369,17 @@ img.ProseMirror-separator {
   color: var(--blue-strong);
   font-weight: 600;
 }
+
+/* Editable pages: one continuous ProseMirror document, fragmented by columns. */
+.paged-shell { width: min(100%, calc(var(--measure) + 144px)); margin: 0 auto 40vh; }
+.paged-shell .doc-head { padding: 12px; margin-bottom: 12px; }
+.paged-sheet { position: relative; width: 100%; padding: var(--sheet-top, 60px) var(--sheet-right, 60px) var(--sheet-bottom, 60px) var(--sheet-left, 60px); background: var(--surface); border: 1px solid var(--page-border); border-radius: 4px; }
+.paged-viewport { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.paged-sheet .manuscript { min-height: 0; height: var(--sheet-body-height, 700px); column-width: var(--sheet-body-width, 560px); column-gap: 48px; column-fill: auto; }
+.paged-sheet .manuscript p { orphans: 2; widows: 2; }
+.page-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px; margin: 0 0 12px; }
+.sheet-page-number { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--muted); }
+.doc-scroll { scroll-padding-top: 0; }
+.doc-scroll { padding-bottom: var(--scene-scroll-room, 0px); }
+
+.page-navigation { position: sticky; bottom: 0; z-index: 2; padding: 8px; margin-top: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }

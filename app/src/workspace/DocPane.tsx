@@ -42,6 +42,7 @@ import { useNameIndex } from './CardPanels';
 import { DocBanners } from './Copies';
 import { EditToolbar } from './EditToolbar';
 import { ReadingBar } from './ReadingBar';
+import { PagedText } from './PagedText';
 import { Ruler } from './Ruler';
 
 export function DocPane({ docId, tabKey, locked }: { docId: string; tabKey: string; locked: boolean }) {
@@ -240,6 +241,8 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
     return () => clearTimeout(timer);
   }, [jump, docId, tabKey, editor]);
 
+  const view = useApp((s) => s.view);
+  const pageFormat = useApp((s) => s.overview!.project.manuscriptFormat);
   const toolbarMode = useApp((s) => s.view.toolbar);
   const showRuler = useApp((s) => s.view.ruler);
   const toolbar = toolbarMode === 'always' || (toolbarMode === 'auto' && touchCapable());
@@ -248,11 +251,11 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
     <>
       <DocBanners docId={docId} />
       {docLocked && <LockedBanner docId={docId} planning={isPlanning} />}
-      <div className="doc-scroll">
+      <div className={`doc-scroll${view.pages ? ' page-mode' : ''}`}>
         {showRuler && <Ruler editor={editor} planning={isPlanning} />}
-        <article className="page">
+        <article className={view.pages ? 'paged-shell' : 'page'}>
           <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked || docLocked} />
-          <EditorContent editor={editor} />
+          {view.pages ? <PagedText editor={editor} format={pageFormat} view={view} /> : <EditorContent editor={editor} />}
         </article>
         <FormatBubble editor={editor} />
         <ReadingBar editor={editor} />

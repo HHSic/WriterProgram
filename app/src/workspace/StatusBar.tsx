@@ -1,3 +1,4 @@
+import { SaveStatus } from './SaveStatus';
 import { placeNote, usePlaceOf } from '../components/PlacePicker';
 import { num, timeLabel } from '../lib/format';
 import { writtenToday } from '../lib/today';
@@ -61,6 +62,7 @@ export function StatusBar() {
         </>
       )}
       <span className="grow" />
+      <SaveStatus />
       {ov.copies.length > 0 && (
         <button type="button" className="status-link warn" onClick={() => openDialog({ kind: 'copies' })}>
           다른 기기 사본 {ov.copies.length}개

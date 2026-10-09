@@ -154,3 +154,21 @@ it('handles projects with no manuscript instead of reading private planning', as
   expect(document.body.textContent).toContain('읽을 원고가 없습니다');
   expect(mock.load).not.toHaveBeenCalled();
 });
+
+it('allows 1px and arbitrary larger sizes through direct input and reloads the saved preference', async () => {
+  await show();
+  const input = document.querySelector<HTMLInputElement>('[aria-label="읽기 글자 크기(px)"]')!;
+  expect(input.min).toBe('1'); expect(input.max).toBe('');
+  const enter = async (value: string) => act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await enter('1');
+  expect(JSON.parse(localStorage.getItem('wp.bookReader')!).fontSize).toBe(1);
+  expect(button('글자 작게').disabled).toBe(true);
+  await enter('1200');
+  expect(JSON.parse(localStorage.getItem('wp.bookReader')!).fontSize).toBe(1200);
+  expect(button('글자 크게').disabled).toBe(false);
+  const { loadBookPreferences } = await import('../lib/book');
+  expect(loadBookPreferences().fontSize).toBe(1200);
+});

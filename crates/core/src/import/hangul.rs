@@ -4,7 +4,7 @@
 //! italic, underline, strikethrough and 방점. Line breaks and 묶음·고정폭
 //! 빈칸 stay what they are. Tables, pictures, shapes, equations and
 //! footnotes are counted and left out; 머리말·꼬리말 and other controls are
-//! skipped. The old binary format (.hwp) is not read.
+//! skipped. Binary HWP is read by the separate hwp module.
 
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -13,6 +13,7 @@ use zip::ZipArchive;
 
 use super::page::{Found, Line};
 use super::para::{Para, Run};
+use super::shape::Shape;
 use super::xml::{Tok, read_part, val, walk};
 use super::{Item, Raw, SkipKind};
 use crate::format::{HeadAlign, Margins};
@@ -26,13 +27,11 @@ pub(super) fn char_shapes(header: &str) -> HashMap<String, Run> {
     let mut current: Option<(String, Run)> = None;
     let _ = walk(header, |tok| match tok {
         Tok::Start(n, a) if n == "charPr" => {
-            let run = Run {
-                dot: val(&a, "symMark").is_some_and(|m| m != "NONE"),
-                color: val(&a, "textColor").is_some_and(|c| !is_plain_color(c, "#000000")),
-                shade: val(&a, "shadeColor").is_some_and(|c| !is_plain_color(c, "#FFFFFF")),
-                ..Run::default()
-            };
+            let run = char_run(&a);
             current = Some((val(&a, "id").unwrap_or_default().to_string(), run));
+        }
+        Tok::Empty(n, a) if n == "charPr" => {
+            out.insert(val(&a, "id").unwrap_or_default().to_string(), char_run(&a));
         }
         Tok::Start(n, a) | Tok::Empty(n, a) => {
             if let Some((_, run)) = current.as_mut() {
@@ -55,6 +54,21 @@ pub(super) fn char_shapes(header: &str) -> HashMap<String, Run> {
     out
 }
 
+fn char_run(a: &super::xml::Attrs) -> Run {
+    Run {
+        height: val(a, "height")
+            .and_then(|h| h.parse::<f64>().ok())
+            .unwrap_or(1000.0),
+        text_color: val(a, "textColor")
+            .and_then(crate::markup::rgb)
+            .filter(|c| *c != 0),
+        dot: val(a, "symMark").is_some_and(|m| m != "NONE"),
+        color: val(a, "textColor").is_some_and(|c| !is_plain_color(c, "#000000")),
+        shade: val(a, "shadeColor").is_some_and(|c| !is_plain_color(c, "#FFFFFF")),
+        ..Run::default()
+    }
+}
+
 /// Whether a colour attribute means "nothing special": none, or `plain`.
 fn is_plain_color(color: &str, plain: &str) -> bool {
     color.is_empty() || color.eq_ignore_ascii_case("none") || color.eq_ignore_ascii_case(plain)
@@ -75,6 +89,82 @@ pub(super) fn outline_shapes(header: &str) -> HashMap<String, u8> {
             }
         }
         Tok::End(n) if n == "paraPr" => current = None,
+        _ => {}
+    });
+    out
+}
+
+/// Paragraph dimensions. The modern HwpUnitChar case stores physical units;
+/// legacy/default values are doubled. Select a supported case before fallback.
+fn para_shapes(header: &str) -> HashMap<String, Shape> {
+    let mut out = HashMap::new();
+    let mut id: Option<String> = None;
+    let mut preferred = false;
+    let mut branch: Option<bool> = None;
+    let mut margin = false;
+    let mut shape = Shape::default();
+    let mut selected = false;
+    let _ = walk(header, |tok| match tok {
+        Tok::Start(n, a) if n == "paraPr" => {
+            id = val(&a, "id").map(str::to_string);
+            shape = Shape::default();
+            preferred = false;
+            selected = false;
+        }
+        Tok::Start(n, a) if n == "case" => {
+            branch =
+                Some(val(&a, "required-namespace").is_some_and(|v| v.ends_with("/HwpUnitChar")));
+        }
+        Tok::Start(n, _) if n == "default" => branch = None,
+        Tok::End(n) if n == "case" || n == "default" => branch = None,
+        Tok::Start(n, _) if n == "margin" && id.is_some() => {
+            let exact = branch == Some(true);
+            margin = branch != Some(false) && (!selected || exact && !preferred);
+            if margin {
+                shape.indent = 0.0;
+                shape.left = 0.0;
+                shape.right = 0.0;
+                preferred = exact;
+                selected = true;
+            }
+        }
+        Tok::End(n) if n == "margin" => margin = false,
+        Tok::Empty(n, a) | Tok::Start(n, a) if margin => {
+            let value = val(&a, "value")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.0)
+                / if preferred { 1.0 } else { 2.0 };
+            match n.as_str() {
+                "intent" | "indent" => shape.indent = value,
+                "left" => shape.left = value,
+                "right" => shape.right = value,
+                _ => {}
+            }
+        }
+        Tok::Empty(n, a) | Tok::Start(n, a) if id.is_some() && n == "align" => {
+            shape.align = match val(&a, "horizontal") {
+                Some("LEFT") => Some(crate::markup::Align::Left),
+                Some("CENTER") => Some(crate::markup::Align::Center),
+                Some("RIGHT") => Some(crate::markup::Align::Right),
+                Some("JUSTIFY" | "DISTRIBUTE" | "DISTRIBUTE_SPACE") => {
+                    Some(crate::markup::Align::Justify)
+                }
+                _ => None,
+            };
+        }
+        Tok::Empty(n, a) | Tok::Start(n, a) if id.is_some() && n == "breakSetting" => {
+            shape.page_break = val(&a, "pageBreakBefore") == Some("1")
+        }
+        Tok::End(n) if n == "paraPr" => {
+            if let Some(id) = id.take() {
+                out.insert(id, shape);
+            }
+        }
+        Tok::Empty(n, a) if n == "paraPr" => {
+            if let Some(id) = val(&a, "id") {
+                out.insert(id.to_string(), Shape::default());
+            }
+        }
         _ => {}
     });
     out
@@ -270,12 +360,16 @@ fn section(
     chars: &HashMap<String, Run>,
     outlines: &HashMap<String, u8>,
     styles: &HashMap<String, StyleKind>,
+    shapes: &HashMap<String, Shape>,
     items: &mut Vec<Item>,
 ) -> Result<(), String> {
     struct Open {
         para: Para,
         heading: Option<u8>,
         toc: bool,
+        shape: Option<Shape>,
+        height: Option<f64>,
+        page_break: bool,
     }
     // Paragraphs nest in tables and controls; only top-level ones are read,
     // so an open paragraph is kept per depth of `p`.
@@ -284,7 +378,13 @@ fn section(
     let mut in_t = false;
     let mut ignoring = 0usize;
 
-    let close = |open: Open, items: &mut Vec<Item>| open.para.close(open.heading, open.toc, items);
+    let close = |mut open: Open, items: &mut Vec<Item>| {
+        if let Some(shape) = open.shape {
+            open.para.attrs = shape.attrs(open.height.unwrap_or(1000.0));
+        }
+        open.para.attrs.page_break_before |= open.page_break;
+        open.para.close(open.heading, open.toc, items);
+    };
 
     walk(xml, |tok| {
         if ignoring > 0 {
@@ -322,7 +422,13 @@ fn section(
                                 .copied(),
                         };
                         stack.push(Open {
-                            para: Para::default(),
+                            para: Para {
+                                preserve_spaces: true,
+                                ..Para::default()
+                            },
+                            shape: val(&a, "paraPrIDRef").and_then(|p| shapes.get(p)).copied(),
+                            height: None,
+                            page_break: val(&a, "pageBreak") == Some("1"),
                             heading,
                             toc: style == Some(StyleKind::Toc),
                         });
@@ -333,7 +439,17 @@ fn section(
                             .copied()
                             .unwrap_or_default();
                     }
-                    "t" => in_t = true,
+                    "tab" => {
+                        if let Some(open) = stack.last_mut() {
+                            open.para.add_text("\t", run);
+                        }
+                    }
+                    "t" => {
+                        in_t = true;
+                        if let Some(open) = stack.last_mut() {
+                            open.para.keep_blank = true;
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -346,8 +462,9 @@ fn section(
                 }
                 let Some(open) = stack.last_mut() else { return };
                 match n.as_str() {
+                    "t" => open.para.keep_blank = true,
                     "lineBreak" => open.para.inlines.push(Inline::HardBreak {}),
-                    "tab" => open.para.add_text(" ", run),
+                    "tab" => open.para.add_text("\t", run),
                     "nbSpace" => open.para.add_text("\u{A0}", run),
                     "fwSpace" => open.para.add_text("\u{2002}", run),
                     "hyphen" => open.para.add_text("-", run),
@@ -365,6 +482,7 @@ fn section(
             },
             Tok::Text(s) => {
                 if in_t && let Some(open) = stack.last_mut() {
+                    open.height.get_or_insert(run.height);
                     open.para.add_text(&s, run);
                 }
             }
@@ -400,13 +518,14 @@ pub(super) fn read(bytes: &[u8]) -> Result<Raw, String> {
         styles(&header),
     );
     let aligns = para_aligns(&header);
+    let shapes = para_shapes(&header);
     let mut items = Vec::new();
     let mut found = Found::default();
     for (n, (_, name)) in sections.into_iter().enumerate() {
         let xml = read_part(&mut archive, &name)
             .ok_or_else(|| BROKEN.to_string())?
             .map_err(|_| BROKEN.to_string())?;
-        section(&xml, &chars, &outlines, &styles, &mut items)?;
+        section(&xml, &chars, &outlines, &styles, &shapes, &mut items)?;
         pages(&xml, &aligns, n == 0, &mut found);
     }
     let page = found.setup();
@@ -450,13 +569,14 @@ mod tests {
             &char_shapes(header),
             &outline_shapes(header),
             &styles(header),
+            &para_shapes(header),
             &mut items,
         )
         .unwrap();
         let kinds: Vec<String> = items
             .iter()
             .map(|i| match i {
-                Item::Para(inl) => format!("p:{}", inline_text(inl)),
+                Item::Para(inl, _) => format!("p:{}", inline_text(inl)),
                 Item::Heading { level, text } => format!("h{level}:{text}"),
                 Item::Scene => "scene".into(),
                 Item::Skip(k, n) => format!("skip:{}:{n}", k.label()),
@@ -474,7 +594,7 @@ mod tests {
                 "scene",
             ]
         );
-        let Item::Para(inlines) = &items[1] else {
+        let Item::Para(inlines, _) = &items[1] else {
             panic!()
         };
         let Inline::Text { marks, .. } = &inlines[1] else {

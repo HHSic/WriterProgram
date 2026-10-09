@@ -57,6 +57,7 @@ fn chapters() -> Vec<ExportDoc> {
                 left: 3,
                 right: 2,
                 indent: None,
+                ..ParaAttrs::default()
             },
             content: vec![
                 text("서하에게.", &[]),

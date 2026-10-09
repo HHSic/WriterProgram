@@ -154,3 +154,17 @@ fieldset.plain {
   padding: 0;
   border: 0;
 }
+
+/* The divider sizes the panes; tab edges size their labels independently. */
+.panes[class*='split-'] > .pane { flex: calc(1 - var(--pane-ratio)) 1 0; }
+.panes[class*='split-'] > .pane:first-child { flex: var(--pane-ratio) 1 0; }
+.pane-divider { flex: 0 0 7px; background: var(--border); cursor: col-resize; touch-action: none; }
+.split-column > .pane-divider { cursor: row-resize; }
+.pane-divider:hover, .pane-divider:focus-visible { background: var(--accent); outline: none; }
+.resizing-panes, .resizing-panes * { user-select: none !important; }
+.pane.tab-drop { box-shadow: inset 0 0 0 2px var(--accent); }
+.ctab-label { flex: 1; }
+.ctab-resize { position: absolute; right: -1px; top: 2px; bottom: 2px; width: 5px; cursor: col-resize; touch-action: none; z-index: 1; }
+.ctab-resize:hover, .ctab-resize:focus-visible { background: var(--accent); outline: none; }
+.focus-mode .pane-divider { display: none; }
+.focus-mode .panes[class*='split-'] > .pane.focused { flex: 1; }

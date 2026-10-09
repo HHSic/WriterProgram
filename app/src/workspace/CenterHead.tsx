@@ -2,12 +2,12 @@ import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { UNTITLED, docNumber } from '../lib/labels';
 import { keysText } from '../lib/shortcuts';
-import { findDoc, openDialog, openWeb, setFocusMode, splitView, toggleReading, unsplit, useApp, webPages } from '../store';
-import { marginMenu } from './EditToolbar';
+import { findDoc, openDialog, openWeb, setFocusMode, splitView, setView, toggleReading, unsplit, useApp, webPages } from '../store';
+import { formatMenu, marginMenu } from './EditToolbar';
 import { SaveStatus } from './SaveStatus';
 import { openSymbols } from './Symbols';
 import { api } from '../api';
-import { saveEverything, saveProjectFileAs } from '../store';
+import { saveNow, saveProjectFileAs } from '../store';
 
 export function CenterHead() {
   const ov = useApp((s) => s.overview)!;
@@ -19,6 +19,7 @@ export function CenterHead() {
   const target = useApp((s) => s.activeTarget);
   const reviewFile = useApp((s) => (s.activeTarget?.kind === 'review' ? s.reviewFiles[s.activeTarget.id] : undefined));
   const split = useApp((s) => (s.panes.length > 1 ? s.split : null));
+  const pages = useApp((s) => s.view.pages);
   const reading = useApp((s) => s.reading !== null && s.reading.status !== 'noVoice' && s.reading.editor === s.editor);
   const card = activeCardId ? ov.cards.find((c) => c.id === activeCardId) : undefined;
   const place = activeDocId ? findDoc(ov, activeDocId) : null;
@@ -69,6 +70,8 @@ export function CenterHead() {
         )}
       </nav>
       <div className="grow" />
+      {editor && <button type="button" className={`btn${pages ? ' on' : ''}`} aria-pressed={pages}
+        title="연속 보기와 페이지 단위 보기 전환" onClick={() => setView({ pages: !pages })}>쪽 보기</button>}
       <button type="button" className="btn" title="휴대폰·PC 화면으로 책처럼 읽기" onClick={() => openDialog({ kind: 'reader' })}>
         책 미리보기
       </button>
@@ -78,7 +81,7 @@ export function CenterHead() {
       <button type="button" className="btn" title="원고·설정집·메모·기록을 작품 파일 하나에 저장" disabled={!api.isDesktop}
         onClick={(e) => openMenu(e, [
           { label: '작품 파일로 저장 (.wpm)…', onSelect: () => void saveProjectFileAs() },
-          { label: '지금 저장', onSelect: () => void saveEverything() },
+          { label: '지금 저장', onSelect: () => void saveNow() },
           ...(ov.projectFile ? [{ label: '작품 파일 위치 열기', onSelect: () => void api.reveal(ov.projectFile!) }] : []),
         ])}>
         파일
@@ -91,6 +94,8 @@ export function CenterHead() {
       ) : (
         <SaveStatus />
       )}
+      {editor && <button type="button" className="btn" disabled={!editor.isEditable}
+        onClick={(e) => openMenu(e, formatMenu(editor), { title: '글자·문단 서식' })}>서식</button>}
       {activeDocId && (
         <button
           type="button"

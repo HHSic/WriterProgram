@@ -2,7 +2,7 @@
 // stays mounted while open, so switching back keeps its scroll, cursor and
 // undo; only the open one is visible.
 
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type DragEvent, type CSSProperties } from 'react';
 import type { Overview } from '../api/types';
 import { Icon, type IconName } from '../components/Icon';
 import type { MenuItem } from '../components/Menu';
@@ -10,6 +10,7 @@ import { UNTITLED, docNoun, docNumber, withObject } from '../lib/labels';
 import { pressMenu } from '../lib/press';
 import { keysText } from '../lib/shortcuts';
 import type { Tab, Target } from '../lib/tabs';
+import { usePointerResize } from '../lib/usePointerResize';
 import {
   activateTab,
   addDoc,
@@ -18,6 +19,8 @@ import {
   findDoc,
   focusPane,
   reorderTab,
+  transferTab,
+  resizeTab,
   toggleLock,
   unsplit,
   useApp,
@@ -64,10 +67,44 @@ export function Panes() {
   const focus = useApp((s) => s.focus);
   const split = useApp((s) => s.split);
   const multi = panes.length > 1;
+  const project = useApp((s) => s.overview!.project.id);
+  const container = useRef<HTMLDivElement>(null);
+  const startResize = usePointerResize();
+  const storageKey = `wp.paneSize.${project}.${split}`;
+  const [ratio, setRatio] = useState(0.5);
+  useEffect(() => {
+    try { const value = Number(localStorage.getItem(storageKey)); setRatio(value >= 0.15 && value <= 0.85 ? value : 0.5); }
+    catch { setRatio(0.5); }
+  }, [storageKey]);
+  const resize = (value: number) => {
+    const next = Math.max(0.15, Math.min(0.85, value));
+    setRatio(next);
+    try { localStorage.setItem(storageKey, String(next)); } catch { /* Session still works. */ }
+  };
   return (
-    <div className={`panes${multi ? ` split-${split}` : ''}`}>
+    <div ref={container} className={`panes${multi ? ` split-${split}` : ''}`} style={{ '--pane-ratio': ratio } as CSSProperties}>
       {panes.map((pane, i) => (
-        <PaneView key={pane.key} pane={pane} index={i} focused={multi && i === focus} multi={multi} />
+        <Fragment key={pane.key}>
+          {i > 0 && <div className="pane-divider" role="separator" tabIndex={0}
+            aria-label={split === 'row' ? '나눠보기 너비 조절' : '나눠보기 높이 조절'}
+            aria-orientation={split === 'row' ? 'vertical' : 'horizontal'}
+            aria-valuemin={15} aria-valuemax={85} aria-valuenow={Math.round(ratio * 100)}
+            onDoubleClick={() => resize(0.5)}
+            onPointerDown={(e) => {
+              const box = container.current?.getBoundingClientRect();
+              if (!box) return;
+              startResize(e, (pointer) => resize(split === 'row'
+                ? (pointer.clientX - box.left) / Math.max(1, box.width)
+                : (pointer.clientY - box.top) / Math.max(1, box.height)));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Home') { e.preventDefault(); resize(0.5); }
+              if ((split === 'row' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowUp', 'ArrowDown']).includes(e.key)) {
+                e.preventDefault(); resize(ratio + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -0.025 : 0.025));
+              }
+            }} />}
+          <PaneView pane={pane} index={i} focused={multi && i === focus} multi={multi} />
+        </Fragment>
       ))}
     </div>
   );
@@ -76,10 +113,19 @@ export function Panes() {
 function PaneView({ pane, index, focused, multi }: { pane: Pane; index: number; focused: boolean; multi: boolean }) {
   const kind = useApp((s) => s.overview!.project.kind);
   const showBar = multi || pane.tabs.length > 1;
+  const [dropping, setDropping] = useState(false);
+  useEffect(() => {
+    const clear = () => setDropping(false);
+    window.addEventListener('dragend', clear); window.addEventListener('drop', clear);
+    return () => { window.removeEventListener('dragend', clear); window.removeEventListener('drop', clear); };
+  }, []);
   return (
     <section
-      className={`pane${focused ? ' focused' : ''}${pane.locked ? ' locked' : ''}`}
+      className={`pane${focused ? ' focused' : ''}${pane.locked ? ' locked' : ''}${dropping ? ' tab-drop' : ''}`}
       aria-label={multi ? `${index === 0 ? '첫째' : '둘째'} 창` : undefined}
+      onDragOver={(e) => { if (e.dataTransfer.types.includes(TAB_DRAG)) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropping(true); } }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false); }}
+      onDrop={(e) => { const key = e.dataTransfer.getData(TAB_DRAG); if (key) { e.preventDefault(); void transferTab(index, key, null); } setDropping(false); }}
       onMouseDownCapture={() => focusPane(index)}
       onFocusCapture={() => focusPane(index)}
     >
@@ -128,6 +174,7 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
   useApp((s) => s.reviewFiles);
   const [dropBefore, setDropBefore] = useState<string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
+  const startResize = usePointerResize();
 
   // Keep the open tab in sight when there are more tabs than room.
   useEffect(() => {
@@ -162,7 +209,8 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
     e.preventDefault();
     setDropBefore(null);
     const key = e.dataTransfer.getData(TAB_DRAG);
-    if (key) reorderTab(index, key, before);
+    e.stopPropagation();
+    if (key) void transferTab(index, key, before);
   };
 
   return (
@@ -190,6 +238,7 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
               tabIndex={on ? 0 : -1}
               aria-selected={on}
               title={label}
+              style={tab.width ? { width: tab.width, maxWidth: tab.width } : undefined}
               draggable
               className={`ctab${on ? ' on' : ''}${dropBefore === tab.key ? ' drop-before' : ''}`}
               onClick={() => activateTab(index, tab.key)}
@@ -224,6 +273,17 @@ function TabBar({ pane, index, multi }: { pane: Pane; index: number; multi: bool
               }}
               onDragEnd={() => setDropBefore(null)}
             >
+              <span className="ctab-resize" role="separator" tabIndex={0} aria-orientation="vertical"
+                aria-label={`${label} 탭 너비 조절`} title="끌어서 탭 너비 조절 · 두 번 누르면 원래 너비"
+                aria-valuemin={72} aria-valuemax={420} aria-valuenow={Math.round(tab.width ?? 200)}
+                draggable={false} onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => { e.stopPropagation(); resizeTab(tab.key, undefined); }}
+                onPointerDown={(e) => { const x = e.clientX; const width = e.currentTarget.parentElement!.getBoundingClientRect().width;
+                  startResize(e, (pointer) => resizeTab(tab.key, width + pointer.clientX - x)); }}
+                onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Home') {
+                  e.preventDefault(); e.stopPropagation(); resizeTab(tab.key, e.key === 'Home' ? undefined : (tab.width ?? 200) + (e.key === 'ArrowLeft' ? -10 : 10));
+                } }} />
               <Icon name={icon} size={13} />
               <span className="ctab-label">{label}</span>
               <button

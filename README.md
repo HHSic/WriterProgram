@@ -65,3 +65,5 @@ npm test
 - [화면 설계](docs/screens.md), [영역과 데이터](docs/layout-data.md), [화면 용어](docs/terminology.md)
 - [코드 구조와 파일 형식](docs/architecture.md)
 - [퇴고 점검 엔진](docs/revise-engine.md), [맞춤법 검사기 라이선스](docs/spellcheck-license.md)
+
+한글 가져오기 범위는 [한글 원고 가져오기](docs/import-hancom.md), 편집 기능은 [페이지·서식·저장](docs/editor-pages.md)을 참고한다.

@@ -75,7 +75,12 @@ pub enum Block {
 /// negative) or flush (0). Without one the paragraph follows the manuscript
 /// format's indent and its rules (indent.rs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ParaAttrs {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub align: Option<Align>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub page_break_before: bool,
     #[serde(default, deserialize_with = "margin")]
     pub left: u8,
     #[serde(default, deserialize_with = "margin")]
@@ -95,8 +100,39 @@ impl ParaAttrs {
     pub const MAX_INDENT: i8 = 10;
 
     pub fn is_plain(&self) -> bool {
-        self.left == 0 && self.right == 0 && self.indent.is_none()
+        self.left == 0
+            && self.right == 0
+            && self.indent.is_none()
+            && self.align.is_none()
+            && !self.page_break_before
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Align {
+    Left,
+    Center,
+    Right,
+    Justify,
+}
+impl Align {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Left => "left",
+            Self::Center => "center",
+            Self::Right => "right",
+            Self::Justify => "justify",
+        }
+    }
+}
+
+/// Only six-digit RGB colours are allowed in document markup and exports.
+pub fn rgb(color: &str) -> Option<u32> {
+    let hex = color.strip_prefix('#')?;
+    (hex.len() == 6 && hex.bytes().all(|c| c.is_ascii_hexdigit()))
+        .then(|| u32::from_str_radix(hex, 16).ok())
+        .flatten()
 }
 
 /// Reads a first-line indent leniently, like `margin`; null is none.
@@ -136,6 +172,7 @@ pub enum Inline {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Mark {
     Memo { attrs: MemoAttrs },
+    TextColor { attrs: ColorAttrs },
     Underline {},
     Dot {},
     Strike {},
@@ -148,9 +185,17 @@ pub struct MemoAttrs {
     pub id: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ColorAttrs {
+    pub color: String,
+}
+
 impl Mark {
     fn is_tag(&self) -> bool {
-        matches!(self, Mark::Memo { .. } | Mark::Underline {} | Mark::Dot {})
+        matches!(
+            self,
+            Mark::Memo { .. } | Mark::TextColor { .. } | Mark::Underline {} | Mark::Dot {}
+        )
     }
 }
 

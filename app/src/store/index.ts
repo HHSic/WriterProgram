@@ -4,9 +4,9 @@
 export type { Pane, SplitDir, Target } from '../lib/tabs';
 export { useApp } from './state';
 export type { HeldRemovals, Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast, CornerNote, AiRequest } from './state';
-export { findDoc, allManuscript, saveEverything, confirmClose, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
+export { findDoc, allManuscript, saveEverything, saveNow, confirmClose, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
 export type { DocPlace } from './ui';
-export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
+export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, transferTab, resizeTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
 export { enterProject, loadCatalog, updateProject, applyFormat, openProject, recoverProject, leaveProject, refreshOverview } from './project';
 export { pickProjectFile, saveProjectFileAs, finishProjectFile } from './wpm';
 export { selectDoc, mendDoc, addDoc, setStatus, setLocked, setTarget, renameDoc, moveDoc, trashDoc, addPart, renamePart, removePart } from './docs';

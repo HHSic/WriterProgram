@@ -180,7 +180,13 @@ fn unsupported_files_say_why() {
     fs::write(&hwp, b"x").unwrap();
     fs::write(&bad, b"not a zip").unwrap();
     let preview = import::preview(&[hwp, bad], &ImportOptions::default());
-    assert!(preview.files[0].error.as_deref().unwrap().contains("hwpx"));
+    assert!(
+        preview.files[0]
+            .error
+            .as_deref()
+            .unwrap()
+            .contains("손상됨")
+    );
     assert!(preview.files[1].error.is_some());
     assert!(preview.chapters.is_empty());
 }
@@ -402,4 +408,159 @@ fn hwpx_pages_can_become_the_format() {
     assert!(got.page_numbers);
     // The type stays the project's own.
     assert_eq!(got.font, "dotum");
+}
+
+#[test]
+fn hwpx_keeps_supported_units_literal_spaces_tabs_empty_lines_and_paragraph_shape() {
+    use writer_core::markup::{Align, ColorAttrs, ParaAttrs};
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("문단.hwpx");
+    let mut zip = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+    zip.start_file("Contents/header.xml", SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all(br##"<head><charPr id="0" height="1000" textColor="#2365B8"/><paraPr id="0"><align horizontal="CENTER"/><breakSetting pageBreakBefore="1"/><switch><case required-namespace="http://www.hancom.co.kr/hwpml/2016/HwpUnitChar"><margin><intent value="2000"/><left value="3000"/><right value="1000"/></margin></case><default><margin><intent value="-12000"/><left value="20000"/></margin></default></switch></paraPr><paraPr id="1"><switch><case required-namespace="unsupported"><margin><intent value="99999"/></margin></case><default><margin><intent value="-4000"/><left value="4000"/><right value="2000"/></margin></default></switch></paraPr><paraPr id="2"/></head>"##).unwrap();
+    zip.start_file("Contents/section0.xml", SimpleFileOptions::default())
+        .unwrap();
+    zip.write_all("<sec><p paraPrIDRef=\"0\"><run charPrIDRef=\"0\"><t>  <tab/>가운데</t></run></p><p paraPrIDRef=\"1\"><run charPrIDRef=\"0\"><t>내어쓰기</t></run></p><p paraPrIDRef=\"2\"><run charPrIDRef=\"0\"><t/></run></p><p paraPrIDRef=\"2\"><run charPrIDRef=\"0\"><t>들여쓰기 없음</t></run></p></sec>".as_bytes()).unwrap();
+    zip.finish().unwrap();
+    let options = ImportOptions {
+        rule: SplitRule::File,
+        ..Default::default()
+    };
+    let root = new_project(dir.path());
+    let result = import::commit(
+        &root,
+        &[path],
+        &options,
+        &CommitSpec {
+            part_id: None,
+            after: None,
+            picks: vec![Pick {
+                index: 0,
+                title: "문단".into(),
+            }],
+            leave_notes: false,
+            status: None,
+            page_setup: false,
+        },
+    )
+    .unwrap();
+    let saved = doc::load(&root, &result.docs[0]).unwrap();
+    assert_eq!(saved.body.len(), 4);
+    assert_eq!(
+        saved.body[0].attrs(),
+        ParaAttrs {
+            left: 3,
+            right: 1,
+            indent: Some(2),
+            align: Some(Align::Center),
+            page_break_before: true
+        }
+    );
+    assert_eq!(saved.body[0].lines(), ["  \t가운데"]);
+    assert_eq!(saved.body[1].attrs().indent, Some(-2));
+    assert_eq!(
+        (saved.body[1].attrs().left, saved.body[1].attrs().right),
+        (2, 1)
+    );
+    assert_eq!(saved.body[3].attrs().indent, Some(0));
+    assert!(
+        matches!(&saved.body[0], Block::Paragraph { content, .. } if matches!(&content[0], Inline::Text { marks, .. } if marks.contains(&Mark::TextColor { attrs: ColorAttrs { color: "#2365B8".into() } })))
+    );
+}
+
+#[test]
+fn colour_alignment_and_explicit_page_break_round_trip_through_formatted_exports() {
+    use writer_core::export::{self, DocOptions, ExportItem, FileKind};
+    use writer_core::markup::{Align, ColorAttrs, ParaAttrs};
+    let dir = tempfile::tempdir().unwrap();
+    let root = new_project(dir.path());
+    let id = project::add_doc(
+        &root,
+        &project::NewDoc {
+            title: "서식".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    doc::save_body(
+        &root,
+        &id,
+        vec![Block::Paragraph {
+            attrs: ParaAttrs {
+                align: Some(Align::Center),
+                page_break_before: true,
+                indent: Some(-2),
+                left: 3,
+                right: 1,
+            },
+            content: vec![Inline::Text {
+                text: "색과 문단".into(),
+                marks: vec![
+                    Mark::Bold {},
+                    Mark::TextColor {
+                        attrs: ColorAttrs {
+                            color: "#2365B8".into(),
+                        },
+                    },
+                ],
+            }],
+        }],
+        chrono::Duration::minutes(10),
+        Default::default(),
+    )
+    .unwrap();
+    let format = writer_core::format::builtin("submission-a4").unwrap();
+    let items = [ExportItem {
+        doc_id: id,
+        heading: String::new(),
+        file_name: String::new(),
+    }];
+    let opts = DocOptions {
+        include_titles: false,
+        scene_break: "◆".into(),
+    };
+    let options = ImportOptions {
+        rule: SplitRule::File,
+        ..Default::default()
+    };
+    for (kind, name) in [(FileKind::Hwpx, "서식.hwpx"), (FileKind::Docx, "서식.docx")] {
+        let files = export::export_file(
+            &root,
+            &items,
+            &opts,
+            &format,
+            kind,
+            &dir.path().join(name),
+            false,
+        )
+        .unwrap();
+        let result = import::commit(
+            &root,
+            &files,
+            &options,
+            &CommitSpec {
+                part_id: None,
+                after: None,
+                picks: vec![Pick {
+                    index: 0,
+                    title: name.into(),
+                }],
+                leave_notes: false,
+                status: None,
+                page_setup: false,
+            },
+        )
+        .unwrap();
+        let saved = doc::load(&root, &result.docs[0]).unwrap();
+        let attrs = saved.body[0].attrs();
+        assert_eq!(attrs.align, Some(Align::Center));
+        assert!(attrs.page_break_before);
+        if matches!(kind, FileKind::Hwpx) {
+            assert_eq!((attrs.left, attrs.right, attrs.indent), (3, 1, Some(-2)));
+        }
+        assert!(
+            matches!(&saved.body[0], Block::Paragraph { content, .. } if matches!(&content[0], Inline::Text { marks, .. } if marks.contains(&Mark::TextColor { attrs: ColorAttrs { color: "#2365B8".into() } }) && marks.contains(&Mark::Bold {})))
+        );
+    }
 }

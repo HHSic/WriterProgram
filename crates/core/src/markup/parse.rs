@@ -40,6 +40,31 @@ pub(super) fn parse_para_open(chars: &[char]) -> Option<(ParaAttrs, usize)> {
             return Some((attrs, i + 1));
         }
         let rest = &chars[i.min(chars.len())..];
+        if starts_with(rest, " data-align=\"") {
+            i += " data-align=\"".len();
+            let value: String = chars[i..]
+                .iter()
+                .take_while(|c| **c != '\"')
+                .take(8)
+                .collect();
+            attrs.align = Some(match value.as_str() {
+                "left" => super::Align::Left,
+                "center" => super::Align::Center,
+                "right" => super::Align::Right,
+                "justify" => super::Align::Justify,
+                _ => return None,
+            });
+            if chars.get(i + value.len()) != Some(&'\"') {
+                return None;
+            }
+            i += value.len() + 1;
+            continue;
+        }
+        if starts_with(rest, " data-page-break=\"1\"") {
+            attrs.page_break_before = true;
+            i += " data-page-break=\"1\"".len();
+            continue;
+        }
         let (key, len) = if starts_with(rest, " data-left=\"") {
             ('l', " data-left=\"".len())
         } else if starts_with(rest, " data-right=\"") {
@@ -125,23 +150,43 @@ enum TagOp {
     CloseUnderline,
     CloseDot,
     CloseMemo,
+    CloseColor,
 }
 
 /// A tag and what reading it does.
 type TagRule = (&'static str, fn() -> TagOp);
 
 fn match_tag(chars: &[char]) -> Option<(TagOp, usize)> {
-    let fixed: [TagRule; 5] = [
+    let fixed: [TagRule; 6] = [
         ("<u>", || TagOp::Open(Mark::Underline {})),
         ("</u>", || TagOp::CloseUnderline),
         ("<span class=\"dot\">", || TagOp::Open(Mark::Dot {})),
         ("</span>", || TagOp::CloseDot),
         ("</mark>", || TagOp::CloseMemo),
+        ("</color>", || TagOp::CloseColor),
     ];
     for (tag, op) in fixed {
         if starts_with(chars, tag) {
             return Some((op(), tag.chars().count()));
         }
+    }
+    const COLOR: &str = "<color rgb=\"";
+    if starts_with(chars, COLOR) {
+        let at = COLOR.len();
+        let value: String = chars.get(at..at + 7)?.iter().collect();
+        if let Some(color) = super::rgb(&value)
+            && starts_with(chars.get(at + 7..)?, "\">")
+        {
+            return Some((
+                TagOp::Open(Mark::TextColor {
+                    attrs: super::ColorAttrs {
+                        color: format!("#{color:06X}"),
+                    },
+                }),
+                at + 9,
+            ));
+        }
+        return None;
     }
     const MEMO: &str = "<mark data-memo=\"";
     if starts_with(chars, MEMO) {
@@ -251,6 +296,9 @@ impl InlineParser {
                         self.flush();
                         match op {
                             TagOp::Open(mark) => self.tags.push(mark),
+                            TagOp::CloseColor => {
+                                self.remove_last(|m| matches!(m, Mark::TextColor { .. }))
+                            }
                             TagOp::CloseUnderline => self.remove_last(|m| *m == Mark::Underline {}),
                             TagOp::CloseDot => self.remove_last(|m| *m == Mark::Dot {}),
                             TagOp::CloseMemo => {

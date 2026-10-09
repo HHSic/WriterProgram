@@ -130,11 +130,17 @@ impl PageMetrics {
 
     /// Body lines of one chapter, without its title.
     pub fn body_lines(&self, blocks: &[Block]) -> u32 {
-        let mut lines = 0;
+        self.flow_lines(blocks, 0)
+    }
+
+    fn flow_lines(&self, blocks: &[Block], mut lines: u32) -> u32 {
         for block in &crate::indent::apply(blocks, self.indent, self.rules) {
             match block {
                 Block::SceneBreak {} => lines += if self.blank_line_between { 1 } else { 3 },
                 Block::Paragraph { attrs, .. } => {
+                    if attrs.page_break_before && !lines.is_multiple_of(self.lines_per_page) {
+                        lines = lines.div_ceil(self.lines_per_page) * self.lines_per_page;
+                    }
                     // Margins are whole characters, letter spacing included.
                     let sides = f64::from(attrs.left) + f64::from(attrs.right);
                     let width = (self.width - sides * (1.0 + self.tracking)).max(1.0);
@@ -154,7 +160,7 @@ impl PageMetrics {
     /// Pages of one chapter when it starts on a new page.
     pub fn chapter_pages(&self, blocks: &[Block], with_title: bool) -> u32 {
         let title = if with_title { TITLE_LINES_NEW_PAGE } else { 0 };
-        (self.body_lines(blocks) + title)
+        self.flow_lines(blocks, title)
             .div_ceil(self.lines_per_page)
             .max(1)
     }
@@ -174,8 +180,7 @@ impl PageMetrics {
             let title = if with_titles { TITLE_LINES } else { 0 };
             let lines: u32 = chapters
                 .into_iter()
-                .map(|blocks| self.body_lines(blocks) + title)
-                .sum();
+                .fold(0, |lines, blocks| self.flow_lines(blocks, lines + title));
             lines.div_ceil(self.lines_per_page).max(1)
         }
     }
@@ -189,6 +194,24 @@ mod tests {
 
     fn para(n: usize) -> Block {
         Block::text(&"가".repeat(n))
+    }
+
+    #[test]
+    fn explicit_page_boundaries_count_in_chapters_and_continuous_documents() {
+        let mut format = crate::format::builtin("submission-a4").unwrap();
+        let mut page = Block::text("새 쪽");
+        if let Block::Paragraph { attrs, .. } = &mut page {
+            attrs.page_break_before = true;
+        }
+        let blocks = vec![Block::text("첫 쪽"), page];
+        let metrics = PageMetrics::of(&format).unwrap();
+        assert_eq!(metrics.chapter_pages(&blocks, false), 2);
+        format.chapter_new_page = false;
+        let metrics = PageMetrics::of(&format).unwrap();
+        assert_eq!(
+            metrics.pages([blocks.as_slice(), &[Block::text("마지막")]], false),
+            2
+        );
     }
 
     #[test]
@@ -218,6 +241,7 @@ mod tests {
                 left: 4,
                 right: 2,
                 indent: None,
+                ..ParaAttrs::default()
             },
             content: vec![Inline::Text {
                 text: text.clone(),

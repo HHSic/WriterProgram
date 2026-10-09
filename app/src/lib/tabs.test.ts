@@ -85,4 +85,11 @@ describe('tabs', () => {
     expect(fromSaved({ panes: 'nope' }, () => true)).toBeNull();
     expect(fromSaved(null, () => true)).toBeNull();
   });
+  it('restores tab widths alongside their targets after missing tabs are removed', () => {
+    const pane = makePane([doc('gone'), doc('kept')]);
+    pane.tabs[0].width = 100; pane.tabs[1].width = 270;
+    const restored = fromSaved(toSaved([pane], 0, 'row'), (t) => t.id !== 'gone')!;
+    expect(restored.panes[0].tabs[0].width).toBe(270);
+  });
+
 });

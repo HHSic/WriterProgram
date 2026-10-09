@@ -89,10 +89,13 @@ fn is_title_line(re: &Regex, line: &str) -> bool {
 /// Headings become plain paragraphs, for rules that do not cut at them.
 fn demote(item: Item) -> Item {
     match item {
-        Item::Heading { text, .. } => Item::Para(vec![Inline::Text {
-            text,
-            marks: vec![],
-        }]),
+        Item::Heading { text, .. } => Item::Para(
+            vec![Inline::Text {
+                text,
+                marks: vec![],
+            }],
+            Default::default(),
+        ),
         other => other,
     }
 }
@@ -103,7 +106,7 @@ fn count_pattern(items: &[Item], re: &Regex) -> (usize, bool) {
     let mut first = None;
     for item in items {
         let line = match item {
-            Item::Para(inl) => split_first_line(inl).0,
+            Item::Para(inl, _) => split_first_line(inl).0,
             Item::Heading { text, .. } => text.clone(),
             _ => continue,
         };
@@ -193,7 +196,7 @@ pub(super) fn split(items: Vec<Item>, how: &Split, stem: &str, file: usize) -> V
             let mut out = Vec::with_capacity(items.len());
             for item in items.into_iter().map(demote) {
                 match item {
-                    Item::Para(inl) => {
+                    Item::Para(inl, attrs) => {
                         let (line, rest) = split_first_line(&inl);
                         if is_title_line(re, &line) {
                             out.push(Item::Heading {
@@ -201,10 +204,10 @@ pub(super) fn split(items: Vec<Item>, how: &Split, stem: &str, file: usize) -> V
                                 text: line.trim().to_string(),
                             });
                             if !inline_text(&rest).trim().is_empty() {
-                                out.push(Item::Para(rest));
+                                out.push(Item::Para(rest, attrs));
                             }
                         } else {
-                            out.push(Item::Para(inl));
+                            out.push(Item::Para(inl, attrs));
                         }
                     }
                     other => out.push(other),
@@ -239,7 +242,10 @@ pub(super) fn split(items: Vec<Item>, how: &Split, stem: &str, file: usize) -> V
         }
         let chapter = titled.last_mut().unwrap_or(&mut lead);
         match item {
-            Item::Para(inl) => chapter.body.push(Block::para(inl)),
+            Item::Para(inl, attrs) => chapter.body.push(Block::Paragraph {
+                attrs,
+                content: inl,
+            }),
             Item::Scene => chapter.body.push(Block::SceneBreak {}),
             Item::Skip(kind, count) => {
                 let at = chapter.body.len();

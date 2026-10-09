@@ -100,6 +100,10 @@ fn open_tag(mark: &Mark) -> String {
         Mark::Memo { attrs } => format!("<mark data-memo=\"{}\">", memo_id(&attrs.id)),
         Mark::Underline {} => "<u>".into(),
         Mark::Dot {} => "<span class=\"dot\">".into(),
+        Mark::TextColor { attrs } => format!(
+            "<color rgb=\"#{:06X}\">",
+            super::rgb(&attrs.color).unwrap_or(0)
+        ),
         _ => unreachable!("not a tag mark"),
     }
 }
@@ -109,6 +113,7 @@ fn close_tag(mark: &Mark) -> String {
         Mark::Memo { .. } => "</mark>".into(),
         Mark::Underline {} => "</u>".into(),
         Mark::Dot {} => "</span>".into(),
+        Mark::TextColor { .. } => "</color>".into(),
         _ => unreachable!("not a tag mark"),
     }
 }
@@ -132,6 +137,12 @@ fn para_open(attrs: ParaAttrs) -> String {
     }
     if let Some(indent) = attrs.indent {
         tag.push_str(&format!(" data-indent=\"{indent}\""));
+    }
+    if let Some(align) = attrs.align {
+        tag.push_str(&format!(" data-align=\"{}\"", align.name()));
+    }
+    if attrs.page_break_before {
+        tag.push_str(" data-page-break=\"1\"");
     }
     tag.push('>');
     tag

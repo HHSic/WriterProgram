@@ -50,6 +50,17 @@ export async function saveEverything(closing = false): Promise<boolean> {
   return true;
 }
 
+/** Explicit save gives feedback only after every pending file has reached disk. */
+export async function saveNow() {
+  try {
+    if (!(await saveEverything())) return;
+    if (Object.keys(get().conflicts).length) {
+      showToast({ text: '다른 기기에서 바뀐 원고가 있어 확인이 필요합니다', tone: 'error' }); return;
+    }
+    showToast({ text: unsavedKeys().length ? '새로 고친 내용을 저장 중입니다' : '저장됨' });
+  } catch (error) { toastError('저장하지 못함', error); }
+}
+
 /**
  * The window is about to close: finish every save, and when some writing
  * still could not be saved, ask the writer (workspace/CloseAskDialog.tsx).

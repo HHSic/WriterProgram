@@ -223,3 +223,9 @@
   font-size: 11px;
   color: var(--text-2);
 }
+
+.manuscript p[data-align='center'], .manuscript p[data-align='right'] { text-indent: 0; }
+.manuscript p[data-page-break='1'] { break-before: column; }
+.doc-scroll:not(.page-mode) .manuscript p[data-page-break='1'] { border-top: 1px dashed var(--border-strong); padding-top: 1.5em; }
+.color-tool { position: relative; }
+.color-tool input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }

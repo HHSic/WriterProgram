@@ -35,6 +35,8 @@ export interface ViewSettings {
   /** 눈금자 over the page (paragraph margins and first line). Off: the
    * margins are set in 원고 서식, a paragraph's own in the 문단 여백 menu. */
   ruler: boolean;
+  /** Continuous scroll or editable pages following paper proportions. */
+  pages: boolean;
   /** 소리 내어 읽기: speed, 0.7 to 1.5 times normal. */
   readRate: number;
   /** 소리 내어 읽기: voiceURI of the chosen Korean voice; empty takes the first one. */
@@ -81,6 +83,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   showMarks: false,
   toolbar: 'auto',
   ruler: false,
+  pages: false,
   readRate: 1,
   readVoice: '',
   focusDim: true,
@@ -94,7 +97,10 @@ const KEY = 'wp.view';
 export function loadView(): ViewSettings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULT_VIEW, ...(JSON.parse(raw) as Partial<ViewSettings>) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<ViewSettings>;
+      return { ...DEFAULT_VIEW, ...saved, fontSize: Number.isFinite(saved?.fontSize) ? Math.max(1, saved.fontSize!) : DEFAULT_VIEW.fontSize };
+    }
   } catch {
     // Storage can be unavailable; the defaults are fine.
   }

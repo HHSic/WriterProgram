@@ -1,3 +1,5 @@
+import { FontSizeInput } from '../components/FontSizeInput';
+import { validColor } from '../editor/formatting';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { JSONContent } from '@tiptap/core';
 import { api } from '../api';
@@ -64,11 +66,11 @@ export function ReaderDialog() {
           </select>
         </label>
         <div className="reader-type-controls" role="group" aria-label="읽기 글자 크기">
-          <button type="button" className="btn" aria-label="글자 작게" disabled={preferences.fontSize <= 14}
-            onClick={() => update({ fontSize: Math.max(14, preferences.fontSize - 2) })}>가−</button>
-          <output aria-label="글자 크기">{preferences.fontSize}px</output>
-          <button type="button" className="btn" aria-label="글자 크게" disabled={preferences.fontSize >= 30}
-            onClick={() => update({ fontSize: Math.min(30, preferences.fontSize + 2) })}>가+</button>
+          <button type="button" className="btn" aria-label="글자 작게" disabled={preferences.fontSize <= 1}
+            onClick={() => update({ fontSize: Math.max(1, preferences.fontSize - 2) })}>가−</button>
+          <FontSizeInput label="읽기 글자 크기(px)" value={preferences.fontSize} onChange={(fontSize) => update({ fontSize })} /><span>px</span>
+          <button type="button" className="btn" aria-label="글자 크게"
+            onClick={() => update({ fontSize: preferences.fontSize + 2 })}>가+</button>
         </div>
         <label>배경 <select aria-label="읽기 배경" value={preferences.theme}
           onChange={(e) => update({ theme: e.target.value as BookPreferences['theme'] })}>
@@ -97,6 +99,8 @@ function inline(node: JSONContent, key: number): ReactNode {
     else if (mark.type === 'italic') text = <em>{text}</em>;
     else if (mark.type === 'strike') text = <s>{text}</s>;
     else if (mark.type === 'underline') text = <u>{text}</u>;
+    else if (mark.type === 'textColor' && validColor(mark.attrs?.color)) text = <span style={{ color: mark.attrs.color }}>{text}</span>;
+    else if (mark.type === 'dot') text = <span className="dot">{text}</span>;
   }
   return <span key={key}>{text}</span>;
 }
@@ -187,7 +191,13 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
             <h3>{heading}</h3>
             {(body.content ?? []).map((node, i) => node.type === 'sceneBreak'
               ? <div className="reader-scene" key={i} role="separator" aria-label="장면 나눔">***</div>
-              : <p key={i}>{node.content?.length ? node.content.map(inline) : '\u00a0'}</p>)}
+              : <p key={i} style={{ textAlign: ['left', 'center', 'right', 'justify'].includes(node.attrs?.align) ? node.attrs?.align : undefined,
+                breakBefore: node.attrs?.pageBreakBefore ? 'column' : undefined,
+                marginLeft: `${Math.max(0, Math.min(20, Number(node.attrs?.left) || 0))}em`,
+                marginRight: `${Math.max(0, Math.min(20, Number(node.attrs?.right) || 0))}em`,
+                textIndent: node.attrs?.align === 'center' || node.attrs?.align === 'right' ? 0 : node.attrs?.indent == null ? undefined : `${Math.max(-10, Math.min(10, Number(node.attrs.indent) || 0))}em`,
+                paddingLeft: Number(node.attrs?.indent) < 0 ? `${Math.min(10, -Number(node.attrs?.indent))}em` : undefined,
+              }}>{node.content?.length ? node.content.map(inline) : '\u00a0'}</p>)}
           </article>
         </div>
       </div>

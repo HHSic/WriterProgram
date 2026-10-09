@@ -56,7 +56,7 @@ export type Dialog =
   /** 교정본 주고받기: chapters sent to editors and corrected files taken back. */
   | { kind: 'exchanges' }
   /**
-   * 가져오기: txt, md, docx, hwpx into chapters, into `partId` when given.
+   * 가져오기: txt, md, docx, hwp, hwpx into chapters, into `partId` when given.
    * With `newProject` (시작 화면 "원고 가져오기") the chapters go into a new project.
    */
   | { kind: 'import'; partId?: string; newProject?: boolean }
