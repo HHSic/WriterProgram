@@ -36,6 +36,7 @@ export function Modal({
   dismissOnBackdrop = false,
   dirty = false,
   className = '',
+  onEscape,
 }: {
   title: string;
   onClose: () => void;
@@ -47,13 +48,15 @@ export function Modal({
   /** There are changes not applied yet: ask before closing with Esc or the close button. */
   dirty?: boolean;
   className?: string;
+  /** Override Escape, for example to leave fullscreen before closing a reader. */
+  onEscape?: () => void;
 }) {
   const id = useId();
   const panel = useRef<HTMLDivElement>(null);
   const [asking, setAsking] = useState(false);
   // Read the latest props from the key handler, which is set up once.
-  const latest = useRef({ onClose, dirty, asking });
-  latest.current = { onClose, dirty, asking };
+  const latest = useRef({ onClose, dirty, asking, onEscape });
+  latest.current = { onClose, dirty, asking, onEscape };
 
   const requestClose = () => {
     if (latest.current.dirty) setAsking(true);
@@ -77,6 +80,7 @@ export function Modal({
       e.stopPropagation();
       e.preventDefault();
       if (latest.current.asking) setAsking(false);
+      else if (latest.current.onEscape) latest.current.onEscape();
       else requestRef.current();
     };
     window.addEventListener('keydown', onKey, true);

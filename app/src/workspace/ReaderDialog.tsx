@@ -1,15 +1,18 @@
-import { FontSizeInput } from '../components/FontSizeInput';
 import { validColor } from '../editor/formatting';
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { JSONContent } from '@tiptap/core';
 import { api } from '../api';
 import type { DocData } from '../api/types';
 import { Modal } from '../components/Modal';
-import { BOOK_GAP, bookColumns, bookLayout, loadBookPreferences, saveBookPreferences, type BookPreferences } from '../lib/book';
+import { BOOK_GAP, MM_TO_PX, bookColumns, bookLayout, loadBookPreferences, saveBookPreferences, type BookPreferences } from '../lib/book';
+import { useReaderFullscreen } from '../lib/useReaderFullscreen';
+import { ReaderSettings } from './ReaderSettings';
 import { UNTITLED, docNumber } from '../lib/labels';
 import { allManuscript, closeDialog, saveEverything, useApp } from '../store';
 
 export function ReaderDialog() {
+  const container = useRef<HTMLDivElement>(null);
+  const screen = useReaderFullscreen(container);
   const ov = useApp((s) => s.overview)!;
   const activeDocId = useApp((s) => s.activeDocId);
   const chapters = allManuscript(ov);
@@ -50,33 +53,18 @@ export function ReaderDialog() {
   const update = (patch: Partial<BookPreferences>) => setPreferences((old) => ({ ...old, ...patch }));
 
   return (
-    <Modal title="책 미리보기" className="reader-modal" width={1160} onClose={closeDialog}
+    <Modal title="책 미리보기" className="reader-modal" width={1160} onClose={closeDialog} onEscape={() => { if (screen.fullscreen) void screen.toggle(); else closeDialog(); }}
       footer={<><span className="hint grow">원고를 고치려면 편집 화면으로 돌아가세요.</span><button type="button" className="btn" onClick={closeDialog}>편집으로 돌아가기</button></>}>
       <div className="reader-controls">
-        <div className="segmented" role="group" aria-label="읽기 화면">
-          {([['auto', '자동'], ['phone', '휴대폰'], ['pc', 'PC']] as const).map(([id, label]) => (
-            <button type="button" key={id} className={`btn${preferences.device === id ? ' on' : ''}`}
-              aria-pressed={preferences.device === id} onClick={() => update({ device: id })}>{label}</button>
-          ))}
-        </div>
         <label className="reader-chapter-select">목차
           <select aria-label="읽을 원고" value={chapterId} disabled={!chapters.length}
             onChange={(e) => goChapter(chapters.findIndex((c) => c.id === e.target.value))}>
             {chapters.map((c, i) => <option key={c.id} value={c.id}>{docNumber(ov.project.kind, i + 1)} · {c.title || UNTITLED}</option>)}
           </select>
         </label>
-        <div className="reader-type-controls" role="group" aria-label="읽기 글자 크기">
-          <button type="button" className="btn" aria-label="글자 작게" disabled={preferences.fontSize <= 1}
-            onClick={() => update({ fontSize: Math.max(1, preferences.fontSize - 2) })}>가−</button>
-          <FontSizeInput label="읽기 글자 크기(px)" value={preferences.fontSize} onChange={(fontSize) => update({ fontSize })} /><span>px</span>
-          <button type="button" className="btn" aria-label="글자 크게"
-            onClick={() => update({ fontSize: preferences.fontSize + 2 })}>가+</button>
-        </div>
-        <label>배경 <select aria-label="읽기 배경" value={preferences.theme}
-          onChange={(e) => update({ theme: e.target.value as BookPreferences['theme'] })}>
-          <option value="paper">종이</option><option value="light">밝게</option><option value="dark">어둡게</option>
-        </select></label>
       </div>
+      <div className="reader-layout" ref={container} data-fullscreen={screen.fullscreen}>
+      <main className="reader-main">
       <div className="reader-project-title">{ov.project.title}</div>
       {!chapters.length ? <p className="reader-message">읽을 원고가 없습니다. 원고를 먼저 만들어 주세요.</p>
         : error ? <div className="reader-message" role="alert"><p>{error}</p><button type="button" className="btn" onClick={() => setRetry((n) => n + 1)}>다시 시도</button></div>
@@ -85,6 +73,9 @@ export function ReaderDialog() {
           heading={`${docNumber(ov.project.kind, chapterIndex + 1)} · ${loaded.data.meta.title || UNTITLED}`}
           hasPrevious={chapterIndex > 0} hasNext={chapterIndex < chapters.length - 1}
           onPrevious={() => goChapter(chapterIndex - 1, true)} onNext={() => goChapter(chapterIndex + 1)} />}
+      </main>
+      <ReaderSettings preferences={preferences} update={update} fullscreen={screen.fullscreen} onFullscreen={() => void screen.toggle()} error={screen.error} />
+      </div>
     </Modal>
   );
 }
@@ -109,10 +100,13 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
   body: JSONContent; heading: string; preferences: BookPreferences; enterAtEnd: boolean;
   hasPrevious: boolean; hasNext: boolean; onPrevious: () => void; onNext: () => void;
 }) {
+  const stage = useRef<HTMLDivElement>(null);
+  const paper = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const article = useRef<HTMLElement>(null);
   const [layout, setLayout] = useState({ columns: 1, pages: 1, spreads: 1, step: 1 });
   const [spread, setSpread] = useState(0);
+  const [size, setSize] = useState({ width: preferences.pageWidth * MM_TO_PX, height: preferences.pageHeight * MM_TO_PX, scale: 1 });
   const reading = useRef({ layout, spread });
   reading.current = { layout, spread };
   const firstLayout = useRef(true);
@@ -121,18 +115,27 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
   useLayoutEffect(() => {
     const view = viewport.current;
     const content = article.current;
-    if (!view || !content) return;
+    const frame = stage.current;
+    const sheet = paper.current;
+    if (!view || !content || !frame || !sheet) return;
     let alive = true;
     const measure = () => {
       if (!alive || !view.clientWidth) return;
+      const columns = bookColumns(frame.clientWidth || view.clientWidth, preferences.device);
+      const paperWidth = preferences.pageWidth * MM_TO_PX * columns;
+      const paperHeight = preferences.pageHeight * MM_TO_PX;
+      sheet.style.width = `${paperWidth}px`;
+      sheet.style.height = `${paperHeight}px`;
       const width = view.clientWidth;
-      const columns = bookColumns(width, preferences.device);
+      const scale = Math.min(1, (frame.clientWidth || paperWidth) / paperWidth, (frame.clientHeight || paperHeight) / paperHeight);
+      setSize({ width: paperWidth, height: paperHeight, scale });
       content.style.columnWidth = `${(width - BOOK_GAP * (columns - 1)) / columns}px`;
       // The final paragraph may fragment over several columns. Its final
       // rectangle gives the actual last page, even for an odd desktop spread.
-      const left = content.getBoundingClientRect().left;
+      const bounds = content.getBoundingClientRect();
+      const renderedScale = content.clientWidth && bounds.width ? bounds.width / content.clientWidth : 1;
       const rects = [...(content.lastElementChild?.getClientRects() ?? [])];
-      const extent = rects.length ? Math.max(...rects.map((r) => r.right - left)) : content.scrollWidth;
+      const extent = rects.length ? Math.max(...rects.map((r) => (r.right - bounds.left) / renderedScale)) : content.scrollWidth;
       const next = bookLayout(width, extent, columns);
       const old = reading.current;
       const page = old.spread * old.layout.columns;
@@ -146,10 +149,11 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
     measure();
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     observer?.observe(view);
+    observer?.observe(frame);
     window.addEventListener('resize', measure);
     void document.fonts?.ready.then(measure);
     return () => { alive = false; observer?.disconnect(); window.removeEventListener('resize', measure); };
-  }, [preferences.device, preferences.fontSize, enterAtEnd]);
+  }, [preferences.device, preferences.fontSize, preferences.pageWidth, preferences.pageHeight, enterAtEnd]);
 
   const previous = () => { if (spread > 0) setSpread(spread - 1); else if (hasPrevious) onPrevious(); };
   const next = () => { if (spread < layout.spreads - 1) setSpread(spread + 1); else if (hasNext) onNext(); };
@@ -174,7 +178,10 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
   return (
     <div className={`reader-book reader-${preferences.device}`} data-reader-theme={preferences.theme}
       style={{ '--reader-font-size': `${preferences.fontSize}px` } as CSSProperties}>
-      <div className="reader-paper" data-columns={layout.columns}>
+      <div className="reader-stage" ref={stage}>
+      <div className="reader-sized-spread" style={{ width: size.width * size.scale, height: size.height * size.scale }}>
+      <div className="reader-paper" ref={paper} data-columns={layout.columns}
+        style={{ width: size.width, height: size.height, transform: `scale(${size.scale})` }}>
         <div className="reader-viewport" tabIndex={0} aria-label="책 본문" ref={viewport}
           onClick={() => viewport.current?.focus()}
           onPointerDown={(e) => { if (e.pointerType === 'touch' || e.pointerType === 'pen') pointer.current = { x: e.clientX, y: e.clientY }; }}
@@ -201,12 +208,14 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
           </article>
         </div>
       </div>
+      </div>
+      </div>
       <nav className="reader-navigation" aria-label="책 넘기기">
         <button type="button" className="btn" disabled={spread === 0 && !hasPrevious} onClick={previous}>이전</button>
         <span role="status" aria-live="polite">{firstPage === lastPage ? firstPage : `${firstPage}–${lastPage}`} / {layout.pages}쪽</span>
         <button type="button" className="btn" disabled={spread === layout.spreads - 1 && !hasNext} onClick={next}>다음</button>
       </nav>
-      <p className="reader-key-hint">← → 키로 넘기기 · 터치 화면에서는 좌우로 밀기</p>
+      <p className="reader-key-hint">한 쪽 {preferences.pageWidth} × {preferences.pageHeight} mm · ← → 키로 넘기기 · 화면 맞춤 {Math.round(size.scale * 100)}%</p>
     </div>
   );
 }

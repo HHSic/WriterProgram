@@ -8,7 +8,9 @@ import { ReaderDialog } from './ReaderDialog';
 const mock = vi.hoisted(() => ({
   state: { overview: null as Overview | null, activeDocId: 'second' },
   load: vi.fn(), save: vi.fn(), close: vi.fn(),
+  window: { isFullscreen: vi.fn(), setFullscreen: vi.fn() },
 }));
+vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => mock.window }));
 vi.mock('../api', () => ({ api: { docLoad: mock.load } }));
 vi.mock('../store', () => ({ useApp: (select: (s: typeof mock.state) => unknown) => select(mock.state),
   allManuscript: (ov: Overview) => ov.parts.flatMap((p) => p.docs), saveEverything: mock.save, closeDialog: mock.close }));
@@ -34,6 +36,8 @@ beforeEach(() => {
     parts: [{ docs: [{ id: 'first', title: '첫 장' }, { id: 'second', title: '둘째 장' }] }],
     planning: [{ id: 'private', title: '비밀 기획' }] } as unknown as Overview;
   mock.save.mockResolvedValue(true);
+  mock.window.isFullscreen.mockResolvedValue(false);
+  mock.window.setFullscreen.mockResolvedValue(undefined);
   mock.load.mockImplementation(async (_root: string, id: string) => data(id));
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
     return this.classList.contains('reader-viewport') ? width : 0;
@@ -46,7 +50,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
   const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
 });
-afterEach(() => { act(() => root.unmount()); document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { act(() => root.unmount()); document.body.replaceChildren(); delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function show() { await act(async () => { root.render(<ReaderDialog />); }); }
 function button(label: string) {
   const found = [...document.querySelectorAll('button')].find((b) => b.textContent === label || b.getAttribute('aria-label') === label);
@@ -143,9 +147,100 @@ it('stores reading appearance locally and leaves the original document intact', 
     select.value = 'dark'; select.dispatchEvent(new Event('change', { bubbles: true }));
   });
   expect(document.querySelector('.reader-book')?.getAttribute('data-reader-theme')).toBe('dark');
-  expect(JSON.parse(localStorage.getItem('wp.bookReader')!)).toEqual({ device: 'phone', theme: 'dark', fontSize: 20 });
+  expect(JSON.parse(localStorage.getItem('wp.bookReader')!)).toEqual({ device: 'phone', theme: 'dark', fontSize: 20, pageWidth: 148, pageHeight: 210 });
   expect(JSON.stringify(source)).toBe(original);
   await click('편집으로 돌아가기'); expect(mock.close).toHaveBeenCalledOnce();
+});
+
+it('sets actual millimetre page dimensions from the right settings and repaginates without editing the manuscript', async () => {
+  const source = data('second'); const original = JSON.stringify(source); mock.load.mockResolvedValue(source);
+  await show(); await click('다음'); await click('다음');
+  pages = 3;
+  await act(async () => {
+    const select = document.querySelector<HTMLSelectElement>('[aria-label="미리보기 종이 크기"]')!;
+    expect(select.closest('aside')?.getAttribute('aria-label')).toBe('책 미리보기 설정');
+    select.value = 'A4'; select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(status()).toBe('3 / 3쪽');
+  const paper = document.querySelector<HTMLElement>('.reader-paper')!;
+  expect(parseFloat(paper.style.width)).toBeCloseTo(210 * 96 / 25.4 * 2);
+  expect(parseFloat(paper.style.height)).toBeCloseTo(297 * 96 / 25.4);
+  await click('가로·세로 바꾸기');
+  expect(JSON.parse(localStorage.getItem('wp.bookReader')!)).toMatchObject({ pageWidth: 297, pageHeight: 210 });
+  const { loadBookPreferences } = await import('../lib/book');
+  expect(loadBookPreferences()).toMatchObject({ pageWidth: 297, pageHeight: 210 });
+  expect(JSON.stringify(source)).toBe(original);
+});
+
+it('leaves native fullscreen on Escape before closing the preview and restores the window on close', async () => {
+  (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+  await show(); await click('전체화면');
+  expect(mock.window.setFullscreen).toHaveBeenCalledWith(true);
+  expect(document.querySelector('.reader-layout')?.getAttribute('data-fullscreen')).toBe('true');
+  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(mock.window.setFullscreen).toHaveBeenLastCalledWith(false);
+  expect(mock.close).not.toHaveBeenCalled();
+  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(mock.close).toHaveBeenCalledOnce();
+  await click('전체화면');
+  act(() => root.render(null));
+  expect(mock.window.setFullscreen).toHaveBeenLastCalledWith(false);
+});
+
+it('keeps a pre-existing fullscreen window and shows fullscreen failures without closing', async () => {
+  (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+  mock.window.isFullscreen.mockResolvedValue(true);
+  await show(); await click('전체화면'); await click('전체화면 나가기');
+  expect(mock.window.setFullscreen).not.toHaveBeenCalledWith(false);
+  mock.window.setFullscreen.mockRejectedValueOnce(new Error('창 전환 실패'));
+  await click('전체화면');
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('창 전환 실패');
+  expect(document.querySelector('.reader-layout')?.getAttribute('data-fullscreen')).toBe('false');
+  expect(mock.close).not.toHaveBeenCalled();
+});
+
+it('observes browser fullscreen exit and releases only the preview fullscreen when unmounted', async () => {
+  const elementDescriptor = Object.getOwnPropertyDescriptor(document, 'fullscreenElement');
+  const requestDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'requestFullscreen');
+  const exitDescriptor = Object.getOwnPropertyDescriptor(document, 'exitFullscreen');
+  let element: Element | null = null;
+  const exit = vi.fn(async () => { element = null; document.dispatchEvent(new Event('fullscreenchange')); });
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element });
+  Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', { configurable: true, value: async function (this: HTMLElement) {
+    element = this; document.dispatchEvent(new Event('fullscreenchange'));
+  } });
+  Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
+  try {
+    await show(); await click('전체화면');
+    expect(element).toBe(document.querySelector('.reader-modal'));
+    await act(async () => { element = null; document.dispatchEvent(new Event('fullscreenchange')); });
+    expect(button('전체화면').getAttribute('aria-pressed')).toBe('false');
+    expect(mock.close).not.toHaveBeenCalled();
+    await click('전체화면');
+    act(() => root.render(null));
+    expect(exit).toHaveBeenCalledOnce();
+  } finally {
+    act(() => root.render(null));
+    if (elementDescriptor) Object.defineProperty(document, 'fullscreenElement', elementDescriptor);
+    else delete (document as unknown as Record<string, unknown>).fullscreenElement;
+    if (requestDescriptor) Object.defineProperty(HTMLElement.prototype, 'requestFullscreen', requestDescriptor);
+    else delete (HTMLElement.prototype as unknown as Record<string, unknown>).requestFullscreen;
+    if (exitDescriptor) Object.defineProperty(document, 'exitFullscreen', exitDescriptor);
+    else delete (document as unknown as Record<string, unknown>).exitFullscreen;
+  }
+});
+
+it('loads older preferences with paper defaults and persists a custom millimetre width', async () => {
+  localStorage.setItem('wp.bookReader', JSON.stringify({ fontSize: 1200, device: 'phone', theme: 'dark' }));
+  await show();
+  const input = document.querySelector<HTMLInputElement>('[aria-label="책 가로(mm)"]')!;
+  expect(input.value).toBe('148');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '182.5');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(JSON.parse(localStorage.getItem('wp.bookReader')!)).toMatchObject({ pageWidth: 182.5, pageHeight: 210, fontSize: 1200 });
+  expect(document.querySelector<HTMLSelectElement>('[aria-label="미리보기 종이 크기"]')?.value).toBe('custom');
 });
 
 it('handles projects with no manuscript instead of reading private planning', async () => {

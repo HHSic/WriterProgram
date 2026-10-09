@@ -1,9 +1,11 @@
 /** Reading preferences stay on this device; the manuscript is never changed. */
 export type BookDevice = 'auto' | 'phone' | 'pc';
 export type BookTheme = 'paper' | 'light' | 'dark';
-export interface BookPreferences { device: BookDevice; theme: BookTheme; fontSize: number }
+export interface BookPreferences { device: BookDevice; theme: BookTheme; fontSize: number; pageWidth: number; pageHeight: number }
 const KEY = 'wp.bookReader';
-const DEFAULTS: BookPreferences = { device: 'auto', theme: 'paper', fontSize: 18 };
+const DEFAULTS: BookPreferences = { device: 'auto', theme: 'paper', fontSize: 18, pageWidth: 148, pageHeight: 210 };
+export const BOOK_PAPERS = [{ name: 'A4', width: 210, height: 297 }, { name: 'A5', width: 148, height: 210 }, { name: 'B5', width: 176, height: 250 }] as const;
+export const MM_TO_PX = 96 / 25.4;
 
 export function loadBookPreferences(): BookPreferences {
   try {
@@ -12,6 +14,8 @@ export function loadBookPreferences(): BookPreferences {
       device: ['auto', 'phone', 'pc'].includes(value?.device) ? value.device : DEFAULTS.device,
       theme: ['paper', 'light', 'dark'].includes(value?.theme) ? value.theme : DEFAULTS.theme,
       fontSize: Number.isFinite(value?.fontSize) ? Math.max(1, value.fontSize) : DEFAULTS.fontSize,
+      pageWidth: Number.isFinite(value?.pageWidth) ? Math.max(20, value.pageWidth) : DEFAULTS.pageWidth,
+      pageHeight: Number.isFinite(value?.pageHeight) ? Math.max(20, value.pageHeight) : DEFAULTS.pageHeight,
     };
   } catch { return { ...DEFAULTS }; }
 }
@@ -22,7 +26,7 @@ export function saveBookPreferences(value: BookPreferences) {
 
 export const BOOK_GAP = 48;
 export function bookColumns(width: number, device: BookDevice): number {
-  return device !== 'phone' && width >= 640 ? 2 : 1;
+  return device === 'pc' || (device === 'auto' && width >= 640) ? 2 : 1;
 }
 
 export function bookLayout(width: number, extent: number, columns: number) {
