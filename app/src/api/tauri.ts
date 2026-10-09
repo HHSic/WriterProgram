@@ -108,6 +108,9 @@ export const tauriBackend: Backend = {
     };
   },
   driveStatus: () => invoke('drive_status'),
+  driveRegistrationGet: (provider) => invoke('drive_registration_get', { provider }),
+  driveRegistrationSave: (provider, registration) => invoke('drive_registration_save', { provider, registration }),
+  driveRegistrationOpen: (provider) => invoke('drive_registration_open', { provider }),
   journalSettings: () => invoke('journal_settings'),
   journalSet: (patch) =>
     invoke('journal_set', {

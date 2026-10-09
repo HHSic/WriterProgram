@@ -25,6 +25,7 @@ use crate::paths::apps_file;
 pub mod connect;
 pub mod keyring;
 pub mod projects;
+pub mod registration;
 
 pub(crate) fn secrets() -> Arc<dyn Secrets> {
     Arc::new(keyring::KeyringSecrets)

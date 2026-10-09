@@ -1,9 +1,9 @@
 // Google Drive, OneDrive and Dropbox: connecting, and linking a project to a drive folder.
 
-import type { Backend, DriveInfo, DriveLink, DriveProvider } from '../types';
+import type { Backend, DriveInfo, DriveLink, DriveProvider, DriveRegistration } from '../types';
 import { now, overview, project, projects, touchRecent, wait } from './state';
 
-/** Drives in the browser preview: all "registered", none connected. */
+/** The preview has two built-in registrations and one to try the wizard. */
 const drives: DriveInfo[] = [
   { provider: 'google', label: 'Google Drive', registered: true, account: null, connectedAt: null },
   { provider: 'onedrive', label: 'OneDrive', registered: true, account: null, connectedAt: null },
@@ -11,12 +11,30 @@ const drives: DriveInfo[] = [
 ];
 const links = new Map<string, DriveLink>();
 let connecting = false;
+const registrations = new Map<DriveProvider, DriveRegistration>([
+  ['google', {clientId: 'preview.apps.googleusercontent.com', clientSecret: 'preview-secret'}],
+  ['onedrive', {clientId: '00000000-0000-0000-0000-000000000001'}],
+]);
 
 function drive(provider: DriveProvider): DriveInfo {
   return drives.find((d) => d.provider === provider)!;
 }
 
 export const driveMethods = {
+  async driveRegistrationGet(provider) {
+    const registration = registrations.get(provider);
+    return registration ? {...registration} : null;
+  },
+  async driveRegistrationSave(provider, registration) {
+    if (connecting || drive(provider).account) throw '연결을 끊은 뒤 등록 정보를 바꿔 주세요.';
+    if (!registration.clientId.trim() || (provider === 'google' && !registration.clientSecret?.trim())) throw '등록 정보를 입력해 주세요.';
+    registrations.set(provider, {...registration, clientId: registration.clientId.trim()});
+    drive(provider).registered = true;
+  },
+  async driveRegistrationOpen(provider) {
+    const urls = {google: 'https://console.cloud.google.com/', onedrive: 'https://entra.microsoft.com/', dropbox: 'https://www.dropbox.com/developers/apps'};
+    window.open(urls[provider], '_blank', 'noopener,noreferrer');
+  },
   async driveStatus() {
     return {
       drives: drives.map((d) => ({ ...d, account: d.account ? { ...d.account } : null })),

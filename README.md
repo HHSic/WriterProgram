@@ -19,6 +19,9 @@
 작업 화면의 **공유**에서 연결된 Google Drive·OneDrive·Dropbox에 선택한 원고의 읽기용 문서 사본을 올리고 링크를 복사한다.
 앱에서 드라이브 계정을 연결한 사용자만 생성·종료할 수 있다. [링크 공유](docs/sharing.md)에 권한과 사용 방법을 정리했다.
 
+**기기 간 맞추기 → 드라이브 연결 마법사**는 Google Drive·OneDrive·Dropbox의 앱 등록 안내, 등록 정보 입력·저장, 브라우저 로그인과 연결 확인을 제공한다.
+JSON 파일을 직접 만들지 않아도 된다. 이미 앱이 등록된 드라이브는 바로 로그인한다. [드라이브 연결 안내](docs/drive-apps.md).
+
 Windows 설치판은 [GitHub Releases](https://github.com/HHSic/WriterProgram/releases/latest)에서 받는다.
 설치된 앱은 하루 한 번 새 버전을 확인하고, 사용자가 업데이트를 선택하면 저장·서명 검증 후 설치한다.
 정식 버전 태그를 올리면 설치 파일과 업데이트 파일을 검증한 뒤 자동 공개한다. [배포와 자동 업데이트](docs/release.md).

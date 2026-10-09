@@ -8,6 +8,7 @@ import type { DriveInfo, DriveProject, DriveProvider, DriveStatus } from '../api
 import { Modal } from '../components/Modal';
 import { placeNote, usePlaceOf } from '../components/PlacePicker';
 import { errorText, timeLabel } from '../lib/format';
+import { DriveWizard } from './DriveWizard';
 import { closeDialog, enterProject, linkProject, openDialog, syncNow, toastError, unlinkProject, useApp } from '../store';
 
 /** The drives and their connections, read once and on demand. */
@@ -22,21 +23,7 @@ function useDrives(): [DriveStatus | null, () => void] {
 
 export function DrivesDialog() {
   const [status, reload] = useDrives();
-  const [connecting, setConnecting] = useState<DriveProvider | null>(null);
-  const [error, setError] = useState<{ provider: DriveProvider; text: string } | null>(null);
-
-  const connect = async (d: DriveInfo) => {
-    setError(null);
-    setConnecting(d.provider);
-    try {
-      await api.driveConnect(d.provider);
-    } catch (e) {
-      setError({ provider: d.provider, text: errorText(e) });
-    } finally {
-      setConnecting(null);
-      reload();
-    }
-  };
+  const [wizard, setWizard] = useState<{ initial: DriveInfo | null } | null>(null);
 
   const disconnect = (d: DriveInfo) =>
     openDialog({
@@ -56,15 +43,16 @@ export function DrivesDialog() {
       },
     });
 
-  const anyRegistered = status?.drives.some((d) => d.registered);
+  if (wizard && status) return <DriveWizard drives={status.drives} initial={wizard.initial} onClose={() => { setWizard(null); reload(); }} />;
 
   return (
     <Modal title="기기 간 맞추기" onClose={closeDialog} width={580}>
       <div className="form">
         <p className="dialog-text">
-          휴대폰이나 다른 컴퓨터에서 이어 쓰려면 드라이브를 연결하세요. 드라이브에 이 앱 전용 폴더를 만들어 작품을 맞춥니다.
+          다른 기기에서 이어 쓰거나 공유 링크를 만들려면 드라이브를 연결하세요. 드라이브에 이 앱 전용 폴더를 만들어 작품을 맞춥니다.
           컴퓨터끼리는 작품을 OneDrive 같은 폴더에 두기만 해도 됩니다.
         </p>
+        <button type="button" className="btn primary" disabled={!status} onClick={() => setWizard({initial: null})}>드라이브 연결 마법사</button>
         <ul className="drive-list">
           {status?.drives.map((d) => (
             <li key={d.provider} className="drive-item">
@@ -74,30 +62,22 @@ export function DrivesDialog() {
                 <span className="meta">
                   {d.account
                     ? `${d.account.name || d.account.email} · ${d.account.email}`
-                    : connecting === d.provider
-                      ? '브라우저에서 로그인하고 허용을 누르세요'
-                      : d.registered
+                    : d.registered
                         ? '연결 안 됨'
-                        : '준비 중 (앱 등록 전)'}
+                        : '처음 연결 · 마법사에서 설정하세요'}
                 </span>
-                {error?.provider === d.provider && <span className="warn-text">{error.text}</span>}
               </div>
               {d.account ? (
                 <button type="button" className="btn small" onClick={() => disconnect(d)}>
                   연결 끊기
                 </button>
-              ) : connecting === d.provider ? (
-                <button type="button" className="btn small" onClick={() => void api.driveCancel()}>
-                  그만두기
-                </button>
               ) : (
                 <button
                   type="button"
                   className="btn small primary"
-                  disabled={!d.registered || connecting !== null}
-                  onClick={() => void connect(d)}
+                  onClick={() => setWizard({initial: d})}
                 >
-                  연결
+                  {d.registered ? '연결' : '연결 설정'}
                 </button>
               )}
             </li>
@@ -108,11 +88,7 @@ export function DrivesDialog() {
           <li>연결 정보는 이 PC의 자격 증명 관리자에만 보관합니다.</li>
           <li>드라이브의 다른 파일은 보지 않습니다. 이 앱이 만든 폴더만 씁니다.</li>
         </ul>
-        {status && !anyRegistered && (
-          <small className="hint">
-            드라이브마다 앱 등록을 마치면 연결할 수 있습니다. 등록 정보는 {status.appsFile}에 넣습니다.
-          </small>
-        )}
+        <small className="hint">처음 연결할 때는 마법사가 앱 등록과 계정 로그인을 안내합니다.</small>
       </div>
     </Modal>
   );

@@ -1,8 +1,8 @@
 //! Connecting a drive: which drives can sign in and who is signed in,
 //! signing in through the drive's page, and forgetting a drive.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{AppHandle, State};
@@ -18,6 +18,30 @@ use crate::paths::{apps_file, registry_file};
 pub struct DriveState {
     /// Set to stop a sign-in waiting for the browser.
     cancel: Arc<AtomicBool>,
+    pub(super) connecting: Arc<AtomicBool>,
+    pub(super) settings: Mutex<()>,
+}
+
+struct SignInGuard(Arc<AtomicBool>);
+
+impl Drop for SignInGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Relaxed);
+    }
+}
+
+impl DriveState {
+    fn begin_sign_in(&self) -> Res<SignInGuard> {
+        let _lock = self
+            .settings
+            .lock()
+            .map_err(|_| "드라이브 설정을 열지 못함")?;
+        if self.connecting.swap(true, Ordering::Relaxed) {
+            return Err("이미 드라이브에 로그인하고 있습니다.".into());
+        }
+        self.cancel.store(false, Ordering::Relaxed);
+        Ok(SignInGuard(self.connecting.clone()))
+    }
 }
 
 #[derive(Serialize)]
@@ -68,14 +92,15 @@ pub async fn drive_connect(
     drives: State<'_, DriveState>,
     provider: Provider,
 ) -> Res<Account> {
+    let guard = drives.begin_sign_in()?;
     let ids = AppIds::load(&apps_file(&app)?);
     let id = ids
         .get(provider)
         .cloned()
         .ok_or_else(|| format!("{} 앱 등록 전이라 아직 연결할 수 없음", provider.label()))?;
     let cancel = drives.cancel.clone();
-    cancel.store(false, Ordering::Relaxed);
     blocking(move || {
+        let _guard = guard;
         let opener = app.clone();
         let connection = accounts::sign_in(
             provider,
@@ -135,4 +160,23 @@ pub async fn drive_disconnect(app: AppHandle, provider: Provider) -> Res<()> {
     registry.connections.retain(|c| c.provider != provider);
     registry.links.retain(|_, l| l.provider != provider);
     registry.save(&file).map_err(fail)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_login_cannot_reset_cancellation_and_failure_releases_the_slot() {
+        let state = DriveState::default();
+        let first = state.begin_sign_in().unwrap();
+        state.cancel.store(true, Ordering::Relaxed);
+        assert!(state.begin_sign_in().is_err());
+        assert!(state.cancel.load(Ordering::Relaxed));
+        drop(first);
+        let next = state.begin_sign_in().unwrap();
+        assert!(!state.cancel.load(Ordering::Relaxed));
+        drop(next);
+        assert!(!state.connecting.load(Ordering::Relaxed));
+    }
 }

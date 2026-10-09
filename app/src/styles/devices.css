@@ -382,6 +382,23 @@
   color: var(--muted);
 }
 
+.drive-wizard h3 { margin: 0; font-size: 15px; }
+.drive-wizard-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  list-style: none;
+  padding: 0 0 12px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+.drive-wizard-steps [aria-current='step'] { color: var(--text); font-weight: 600; }
+.drive-wizard-guide { padding-left: 22px; margin: 0; font-size: 13px; line-height: 1.7; }
+.drive-wizard-guide li + li { margin-top: 10px; }
+.drive-wizard-guide li { overflow-wrap: anywhere; }
+
 .drive-import + .drive-import {
   margin-top: 12px;
 }

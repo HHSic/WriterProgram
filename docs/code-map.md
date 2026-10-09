@@ -10,6 +10,8 @@
 
 ## Rust
 
+**드라이브 연결 마법사**: `workspace/Drives.tsx`의 진입 버튼 → `workspace/DriveWizard.tsx`(등록 안내·입력·로그인·완료) → `api` → `src-tauri/src/drives/registration.rs`(등록값 읽기·검사·원자적 저장·회사 콘솔 열기)와 `connect.rs`(기존 PKCE 로그인, 중복 로그인 방지). 등록 파일의 다른 드라이브 설정은 보존하고 로그인 중 또는 연결된 드라이브의 등록값 변경을 막는다. 안내는 [drive-apps.md](drive-apps.md).
+
 ### `crates/core` (writer-core): 화면과 무관한 모든 것
 
 | 모듈 | 하는 일 |

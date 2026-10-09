@@ -12,6 +12,7 @@ import type {
   DriveProject,
   DriveProvider,
   DriveStatus,
+  DriveRegistration,
   Place,
   SyncChoices,
   SyncOutcome,
@@ -165,6 +166,9 @@ export interface Backend {
    */
   watchProject(root: string, onChange: (changes: Change[]) => void): () => void;
   driveStatus(): Promise<DriveStatus>;
+  driveRegistrationGet(provider: DriveProvider): Promise<DriveRegistration | null>;
+  driveRegistrationSave(provider: DriveProvider, registration: DriveRegistration): Promise<void>;
+  driveRegistrationOpen(provider: DriveProvider): Promise<void>;
   /** This device's creation journal settings (its id is made the first time). */
   journalSettings(): Promise<JournalSettings>;
   /** Turns the journal on or off on this device, notes the first-use notice as seen, or allows daily time stamps. */

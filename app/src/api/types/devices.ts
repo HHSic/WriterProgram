@@ -54,6 +54,13 @@ export interface DriveStatus {
   appsFile: string;
 }
 
+/** OAuth app registration on this device; unrelated to an account password. */
+export interface DriveRegistration {
+  clientId: string;
+  clientSecret?: string | null;
+  redirectPort?: number | null;
+}
+
 /** A project kept in step with a folder on a drive. */
 export interface DriveLink {
   provider: DriveProvider;
