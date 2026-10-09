@@ -104,6 +104,50 @@ pub fn stand_in(provider: Provider) -> Endpoints {
     stand_in_on(provider, 0)
 }
 
+/// Exercise sharing using a pre-connected Session; never run OAuth or a
+/// separate sharing server. Denial simulates missing scope / tenant policy.
+pub fn share_stand_in(provider: Provider, policy: &str) -> Endpoints {
+    let policy = policy.to_owned();
+    let mut g = Google::new();
+    let mut o = OneDrive::default();
+    let mut d = Dropbox::default();
+    let room = Room::default();
+    let base = serve_on(
+        0,
+        Box::new(move |req| {
+            assert_eq!(req.header("authorization"), Some("Bearer share-test"));
+            let creating = req.path.ends_with("/permissions")
+                || req.path.ends_with("/createLink")
+                || req
+                    .path
+                    .ends_with("/sharing/create_shared_link_with_settings");
+            if creating && policy == "deny" {
+                return json_reply(403, json!({"error":"sharing_not_allowed"}));
+            }
+            if creating && policy == "invalid" {
+                return json_reply(
+                    200,
+                    match provider {
+                        Provider::Google => json!({"type":"anyone", "role":"writer"}),
+                        Provider::Onedrive => {
+                            json!({"link":{"type":"edit", "scope":"anonymous", "webUrl":"https://evil.example/link"}})
+                        }
+                        Provider::Dropbox => {
+                            json!({"url":"https://evil.example/link", "link_permissions":{"resolved_visibility":{".tag":"public"}}})
+                        }
+                    },
+                );
+            }
+            match provider {
+                Provider::Google => g.handle(req, &room),
+                Provider::Onedrive => o.handle(req, &room),
+                Provider::Dropbox => d.handle(req, &room),
+            }
+        }),
+    );
+    Endpoints::at(provider, &base)
+}
+
 /// Sets how full the stand-in at `ends` is.
 pub fn set_room(ends: &Endpoints, room: Room) {
     let addr = ends

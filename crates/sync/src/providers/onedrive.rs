@@ -8,9 +8,71 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::{Account, Session, Space, drive_error, path_in};
+
 use crate::http::{Body, enc};
 use crate::remote::{Put, Remote, RemoteFile};
+use crate::sharing::{self, Published};
 use crate::{Error, Result};
+
+pub(crate) fn publish_share(s: &Session, name: &str, bytes: &[u8]) -> Result<Published> {
+    let mut remote = open(s, sharing::FOLDER, true)?;
+    if !matches!(remote.put(name, bytes, None)?, Put::Done(_)) {
+        return Err(Error::Drive(
+            "공유 파일 이름이 겹쳤습니다. 다시 시도하세요".into(),
+        ));
+    }
+    let result = (|| {
+        let file = s.call(
+            "GET",
+            &format!("{}?$select=id", remote.url(name)),
+            &[],
+            &|| Body::Empty,
+        )?;
+        if !file.ok() {
+            return Err(drive_error("공유 사본을 찾지 못함", &file));
+        }
+        let id = file.json::<Item>()?.id;
+        let reply = s.call(
+            "POST",
+            &format!("{}/me/drive/items/{}/createLink", s.ends.api, enc(&id)),
+            &[],
+            &|| Body::Json(json!({"type":"view", "scope":"anonymous"})),
+        )?;
+        if !reply.ok() {
+            return Err(sharing::refused());
+        }
+        let value: serde_json::Value = reply.json()?;
+        if value["link"]["type"] != "view" || value["link"]["scope"] != "anonymous" {
+            return Err(sharing::refused());
+        }
+        let url = value["link"]["webUrl"]
+            .as_str()
+            .ok_or_else(sharing::refused)?
+            .to_owned();
+        sharing::checked_url(s.provider, &url)?;
+        Ok(Published { url })
+    })();
+    if result.is_err() {
+        let clean = s.call("DELETE", &remote.url(name), &[], &|| Body::Empty);
+        if !clean.is_ok_and(|r| r.ok() || r.status == 404) {
+            return Err(Error::Drive(format!(
+                "링크를 만들지 못했습니다. 드라이브의 '{}'에서 '{name}' 사본을 확인해 지워 주세요",
+                sharing::FOLDER
+            )));
+        }
+    }
+    result
+}
+
+pub(crate) fn revoke_share(s: &Session, name: &str) -> Result<()> {
+    let remote = open(s, sharing::FOLDER, false)?;
+    let reply = s.call("DELETE", &remote.url(name), &[], &|| Body::Empty)?;
+    if reply.ok() || reply.status == 404 {
+        Ok(())
+    } else {
+        Err(drive_error("공유 사본을 지우지 못함", &reply))
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

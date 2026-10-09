@@ -16,4 +16,5 @@ export type * from './notes';
 export type * from './project';
 export type * from './rescue';
 export type * from './search-export';
+export type * from './share';
 export type * from './update';

@@ -96,6 +96,16 @@ pub fn create(root: &Path, doc: &DocFile, kind: &str, name: &str) -> Result<Snap
     }
     let dir = dir(root, &doc.meta.id);
     let mut at = Utc::now();
+    // The stamp has millisecond precision. Different kinds must not share
+    // it, or their names sort by kind instead of the order they were kept.
+    // Also preserve that order after a clock adjustment or a synced record.
+    if let Some(previous) = stems(root, &doc.meta.id)?
+        .first()
+        .and_then(|id| parse_stamp(id))
+        && at.timestamp_millis() <= previous.timestamp_millis()
+    {
+        at = previous + Duration::milliseconds(1);
+    }
     let (id, path) = loop {
         let id = format!("{}.{kind}", stamp(at));
         let path = dir.join(format!("{id}.md"));
@@ -384,4 +394,42 @@ pub fn remove_all(root: &Path, doc_id: &str) -> Result<()> {
     let dir = dir(root, doc_id);
     remove_dir_all_retry(&dir, 4, std::time::Duration::from_millis(40))
         .map_err(|e| Error::io(&dir, e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::doc::DocMeta;
+    use crate::markup::Block;
+
+    #[test]
+    fn different_kinds_keep_creation_order_when_the_clock_is_behind() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        let old = DocFile {
+            meta: DocMeta::new("doc1", "원고"),
+            body: vec![Block::text("이전 글")],
+        };
+        let later = Utc::now() + Duration::minutes(1);
+        let old_id = format!("{}.this-device", stamp(later));
+        doc::write_doc_file(&dir(root, "doc1").join(format!("{old_id}.md")), &old).unwrap();
+
+        let new = DocFile {
+            meta: old.meta,
+            body: vec![Block::text("불러오기 전 글")],
+        };
+        let kept = keep_unless_same(root, &new, "before-reload")
+            .unwrap()
+            .unwrap();
+        assert!(
+            kept.id > old_id,
+            "newest first must follow creation, not kind names"
+        );
+        assert_eq!(list(root, "doc1").unwrap()[0].id, kept.id);
+        assert!(
+            keep_unless_same(root, &new, "before-reload")
+                .unwrap()
+                .is_none()
+        );
+    }
 }

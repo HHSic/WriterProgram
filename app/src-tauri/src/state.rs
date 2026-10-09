@@ -13,9 +13,21 @@ pub struct AppState {
     pub own: Arc<OwnWrites>,
     /// The open project's folder watcher.
     watching: Mutex<Option<Watching>>,
+    startup_file: Mutex<Option<String>>,
 }
 
 impl AppState {
+    pub fn set_startup_file(&self, path: String) {
+        *self.startup_file.lock().unwrap_or_else(|p| p.into_inner()) = Some(path);
+    }
+
+    pub fn take_startup_file(&self) -> Option<String> {
+        self.startup_file
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
+    }
+
     pub fn write(&self) -> MutexGuard<'_, ()> {
         self.lock
             .lock()

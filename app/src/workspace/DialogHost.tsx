@@ -18,6 +18,8 @@ import { RemovalsDialog } from './RemovalsDialog';
 import { ShortcutsDialog } from './ShortcutsDialog';
 import { ProjectSettingsDialog } from './settings/ProjectSettingsDialog';
 import { SymbolsDialog } from './Symbols';
+import { ShareDialog } from './ShareDialog';
+import { ReaderDialog } from './ReaderDialog';
 import { TrashDialog } from './TrashDialog';
 import { ViewDialog } from './ViewDialog';
 import { useApp } from '../store';
@@ -42,6 +44,10 @@ export function DialogHost() {
       return <ViewDialog />;
     case 'symbols':
       return <SymbolsDialog />;
+    case 'share':
+      return <ShareDialog />;
+    case 'reader':
+      return <ReaderDialog />;
     case 'shortcuts':
       return <ShortcutsDialog />;
     case 'newProject':

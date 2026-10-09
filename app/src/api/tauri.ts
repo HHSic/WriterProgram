@@ -1,22 +1,37 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke as nativeInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type { Backend, Change, PageEvent, UpdateProgress } from './types';
+import { PROJECT_MUTATIONS, projectMutated } from './projectChanges';
+
+async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const result = await nativeInvoke<T>(command, args);
+  if (PROJECT_MUTATIONS.has(command) && typeof args?.root === 'string') projectMutated(args.root);
+  return result;
+}
 
 const FILE_TYPE_NAMES: Record<string, string> = {
   txt: '텍스트 파일',
   docx: 'Word 문서',
   hwpx: '한글 문서',
+  wpm: 'WriterProgram 작품 파일 (.wpm)',
 };
 
 export const tauriBackend: Backend = {
   isDesktop: true,
+  shareList: (root) => invoke('share_list', { root }),
+  shareCreate: (root, docIds, provider) => invoke('share_create', { root, docIds, provider }),
+  shareRevoke: (root, id) => invoke('share_revoke', { root, id }),
   recentList: () => invoke('recent_list'),
   recentRemove: (path) => invoke('recent_remove', { path }),
   defaultLocation: () => invoke('default_location'),
   projectCreate: (opts) => invoke('project_create', { opts }),
   projectOpen: (path) => invoke('project_open', { path }),
+  projectFileOpen: (path) => invoke('project_file_open', { path }),
+  projectFileSave: (root, dest) => invoke('project_file_save', { root, dest: dest ?? null }),
+  projectFileStartup: () => invoke('project_file_startup'),
+  projectFileRescue: (root) => invoke('project_file_rescue', { root }),
   projectOverview: (root) => invoke('project_overview', { root }),
   projectRecovery: (path) => invoke('project_recovery', { path }),
   projectRecover: (path, way) => invoke('project_recover', { path, way }),

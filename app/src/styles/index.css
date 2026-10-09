@@ -30,3 +30,5 @@
 @import './lock.css'; /* 완료 회차 잠금: tree lock, banner, find results. */
 @import './focus.css'; /* 집중 모드: hidden columns, the page alone, faded paragraphs, the way out. */
 @import './shortcuts.css'; /* 단축키 list; quote choice in 보기 설정. */
+@import './share.css';
+@import './reader.css';

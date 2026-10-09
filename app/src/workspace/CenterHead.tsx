@@ -6,6 +6,8 @@ import { findDoc, openDialog, openWeb, setFocusMode, splitView, toggleReading, u
 import { marginMenu } from './EditToolbar';
 import { SaveStatus } from './SaveStatus';
 import { openSymbols } from './Symbols';
+import { api } from '../api';
+import { saveEverything, saveProjectFileAs } from '../store';
 
 export function CenterHead() {
   const ov = useApp((s) => s.overview)!;
@@ -67,6 +69,20 @@ export function CenterHead() {
         )}
       </nav>
       <div className="grow" />
+      <button type="button" className="btn" title="휴대폰·PC 화면으로 책처럼 읽기" onClick={() => openDialog({ kind: 'reader' })}>
+        책 미리보기
+      </button>
+      <button type="button" className="btn" title="선택한 원고를 링크 하나로 공유" onClick={() => openDialog({ kind: 'share' })}>
+        공유
+      </button>
+      <button type="button" className="btn" title="원고·설정집·메모·기록을 작품 파일 하나에 저장" disabled={!api.isDesktop}
+        onClick={(e) => openMenu(e, [
+          { label: '작품 파일로 저장 (.wpm)…', onSelect: () => void saveProjectFileAs() },
+          { label: '지금 저장', onSelect: () => void saveEverything() },
+          ...(ov.projectFile ? [{ label: '작품 파일 위치 열기', onSelect: () => void api.reveal(ov.projectFile!) }] : []),
+        ])}>
+        파일
+      </button>
       {conflict ? (
         <span className="save-state conflict" role="status" title="다른 기기에서 고친 내용과 달라 저장을 멈춤">
           <span className="dot-mark" />
@@ -121,7 +137,7 @@ export function CenterHead() {
         type="button"
         className="icon-btn"
         aria-label="문자표"
-        title={`문자표: 특수 문자와 빈칸 넣기 (${keysText('symbols')})`}
+        title={`문자표: 텍스트 이모티콘, 특수 문자와 빈칸 넣기 (${keysText('symbols')})`}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => openSymbols()}
       >

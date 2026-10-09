@@ -9,6 +9,7 @@ use tauri_plugin_opener::OpenerExt;
 use writer_core::project::{self, NewProject, Overview, ProjectInfo, ProjectPatch, Sizes};
 use writer_core::recent::{self, RecentItem};
 
+use super::wpm::{FileOverview, with_file};
 use crate::error::{Res, fail};
 use crate::paths::recent_file;
 use crate::state::AppState;
@@ -48,16 +49,16 @@ pub async fn project_open(
     app: AppHandle,
     state: State<'_, AppState>,
     path: String,
-) -> Res<Overview> {
+) -> Res<FileOverview> {
     let _write = state.write();
     let overview = project::open(Path::new(&path)).map_err(fail)?;
     let _ = recent::touch(&recent_file(&app)?, &overview);
-    Ok(overview)
+    with_file(&app, overview)
 }
 
 #[tauri::command]
-pub async fn project_overview(root: String) -> Res<Overview> {
-    project::overview(Path::new(&root)).map_err(fail)
+pub async fn project_overview(app: AppHandle, root: String) -> Res<FileOverview> {
+    with_file(&app, project::overview(Path::new(&root)).map_err(fail)?)
 }
 
 #[tauri::command]
@@ -111,7 +112,7 @@ pub async fn reveal(app: AppHandle, path: String) -> Res<()> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveOutcome {
-    overview: Overview,
+    overview: FileOverview,
     left_behind: bool,
 }
 
@@ -126,13 +127,15 @@ pub async fn project_move(
     // A watched folder cannot be renamed on Windows.
     state.watch(None);
     let _write = state.write();
+    let old = std::fs::canonicalize(&root).map_err(|e| e.to_string())?;
     let moved = project::relocate(Path::new(&root), Path::new(&dest)).map_err(fail)?;
     let overview = project::open(Path::new(&moved.root)).map_err(fail)?;
+    super::wpm::move_link(&app, &old.to_string_lossy(), &overview.root)?;
     let recent = recent_file(&app)?;
     let _ = recent::remove(&recent, &root);
     let _ = recent::touch(&recent, &overview);
     Ok(MoveOutcome {
-        overview,
+        overview: with_file(&app, overview)?,
         left_behind: moved.left_behind,
     })
 }

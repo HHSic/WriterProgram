@@ -12,6 +12,7 @@ import { loadLink, stopAutoSync } from './drives';
 import { loadJournal, stampOnClosing } from './journal';
 import { loadAi } from './ai';
 import { offerRescues } from './rescue';
+import { startProjectFile, stopProjectFile, finishProjectFile } from './wpm';
 
 // ---------------------------------------------------------------------------
 // Projects
@@ -34,6 +35,7 @@ export function enterProject(ov: Overview) {
     liveCounts: null,
     selection: null,
   });
+  startProjectFile(ov);
   const layout = initialLayout(ov);
   commit(layout.panes, layout.focus, layout.split);
   api.setWindowTitle(`${ov.project.title} · WriterProgram`);
@@ -83,7 +85,7 @@ export async function applyFormat(format: ManuscriptFormat) {
 
 export async function openProject(path: string): Promise<boolean> {
   try {
-    enterProject(await api.projectOpen(path));
+    enterProject(await (/\.wpm$/i.test(path) ? api.projectFileOpen(path) : api.projectOpen(path)));
     return true;
   } catch (e) {
     // A damaged project.json gets the recovery screen instead of an error line.
@@ -116,6 +118,8 @@ export async function leaveProject() {
     await api.journalFlush(root).catch(() => {});
     await stampOnClosing(root);
   }
+  if (!(await finishProjectFile())) return;
+  stopProjectFile();
   stopWatching();
   stopAutoSync();
   set({

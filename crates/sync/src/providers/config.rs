@@ -192,6 +192,8 @@ pub fn client(provider: Provider, app: &AppId, ends: &Endpoints) -> Client {
                 "files.content.write",
                 "files.metadata.read",
                 "account_info.read",
+                "sharing.read",
+                "sharing.write",
             ],
             &[("token_access_type", "offline")],
             "localhost",

@@ -1,0 +1,12 @@
+.share-selection { border: 0; padding: 0; margin: 0; min-width: 0; }
+.share-selection legend { font-weight: 600; margin-bottom: 8px; }
+.share-chapters, .share-links { list-style: none; margin: 10px 0; padding: 0; }
+.share-chapters { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.share-chapters label { display: flex; gap: 10px; align-items: center; padding: 8px 12px; }
+.share-chapters span { overflow-wrap: anywhere; }
+.share-chapters input { flex-shrink: 0; }
+.share-result { display: flex; flex-direction: column; gap: 8px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.share-result input { width: 100%; }
+.share-links { display: flex; flex-direction: column; gap: 12px; }
+.share-links li { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.share-links strong, .share-links .meta { display: block; overflow-wrap: anywhere; }

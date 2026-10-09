@@ -43,6 +43,8 @@ export interface PartView {
 
 export interface Overview {
   root: string;
+  /** Linked native file; absent for projects saved only as folders. */
+  projectFile?: string | null;
   project: ProjectInfo;
   parts: PartView[];
   planning: DocSummary[];

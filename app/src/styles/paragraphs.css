@@ -160,6 +160,39 @@
   background: var(--hover);
 }
 
+.emoticon-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.emoticon-categories button[aria-pressed='true'] {
+  background: var(--hover);
+  border-color: var(--border-strong);
+  font-weight: 600;
+}
+
+.symbol-grid.emoticon-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(112px, 100%), 1fr));
+}
+
+.emoticon-grid .symbol {
+  padding: 0 8px;
+  font-size: 16px;
+  white-space: pre;
+}
+
+.symbol-grid.unicode-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(190px, 100%), 1fr));
+}
+
+.unicode-grid .symbol {
+  height: auto;
+  min-height: 38px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .space-list {
   list-style: none;
   margin: 0;

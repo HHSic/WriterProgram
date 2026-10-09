@@ -30,5 +30,6 @@ pub mod oauth;
 pub mod providers;
 pub mod remote;
 pub mod secrets;
+pub mod sharing;
 
 pub use error::{Error, Result};

@@ -3,8 +3,9 @@
 
 use std::path::Path;
 
+use super::wpm::{FileOverview, with_file};
 use tauri::{AppHandle, State};
-use writer_core::project::{self, Overview, Recovery, Way};
+use writer_core::project::{self, Recovery, Way};
 use writer_core::recent;
 
 use crate::error::{Res, fail};
@@ -25,11 +26,11 @@ pub async fn project_recover(
     state: State<'_, AppState>,
     path: String,
     way: Way,
-) -> Res<Overview> {
+) -> Res<FileOverview> {
     let _write = state.write();
     let root = Path::new(&path);
     project::recover(root, way).map_err(fail)?;
     let overview = project::open(root).map_err(fail)?;
     let _ = recent::touch(&recent_file(&app)?, &overview);
-    Ok(overview)
+    with_file(&app, overview)
 }

@@ -6,6 +6,13 @@
 type Flusher = () => Promise<void>;
 
 const flushers = new Set<Flusher>();
+const afterFlushers = new Set<Flusher>();
+
+/** Packages must capture text after all editor/card/note saves finish. */
+export function registerAfterFlusher(fn: Flusher): () => void {
+  afterFlushers.add(fn);
+  return () => { afterFlushers.delete(fn); };
+}
 
 export function registerFlusher(fn: Flusher): () => void {
   flushers.add(fn);
@@ -15,6 +22,12 @@ export function registerFlusher(fn: Flusher): () => void {
 }
 
 export async function flushAll(): Promise<void> {
+  await flushEdits();
+  await Promise.all([...afterFlushers].map((fn) => fn()));
+}
+
+/** Save As can recover a package failure after saving all underlying text. */
+export async function flushEdits(): Promise<void> {
   await Promise.all([...flushers].map((fn) => fn()));
 }
 

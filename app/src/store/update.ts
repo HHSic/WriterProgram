@@ -6,9 +6,11 @@ import { api } from '../api';
 import type { UpdateInfo } from '../api/types';
 import { set } from './state';
 import { closeDialog, openDialog, saveEverything, showToast, toastError } from './ui';
+import { finishProjectFile } from './wpm';
 
 const CHECKED_KEY = 'wp.update.checked';
 const AUTO_KEY = 'wp.update.auto';
+let installing = false;
 
 /** Whether the app looks for new versions by itself (once a day). */
 export function autoUpdateCheck(): boolean {
@@ -36,15 +38,15 @@ export async function checkForUpdateDaily() {
   if (!api.isDesktop || !autoUpdateCheck()) return;
   try {
     if (localStorage.getItem(CHECKED_KEY) === today()) return;
-    localStorage.setItem(CHECKED_KEY, today());
   } catch {
     // Without storage, check every start.
   }
   try {
     const found = await api.updateCheck();
+    try { localStorage.setItem(CHECKED_KEY, today()); } catch { /* The check still succeeded. */ }
     if (found) offerUpdate(found);
   } catch {
-    // Offline or GitHub unreachable: try again tomorrow, quietly.
+    // A failed request must not count as today's completed check.
   }
 }
 
@@ -73,7 +75,7 @@ function confirmUpdate(found: UpdateInfo) {
   openDialog({
     kind: 'confirm',
     title: `새 버전 ${found.version}`,
-    message: `지금 쓰는 ${found.current}을 ${found.version}으로 바꿉니다. 원고를 모두 저장한 뒤 앱이 잠시 닫혔다가 새 버전으로 다시 열립니다.${notes}`,
+    message: `지금 쓰는 ${found.current}을 ${found.version}으로 바꿉니다. 원고와 작품 파일을 모두 저장한 뒤 앱이 잠시 닫혔다가 새 버전으로 다시 열립니다.${notes}`,
     confirm: '저장하고 바꾸기',
     onConfirm: async () => {
       closeDialog();
@@ -83,20 +85,29 @@ function confirmUpdate(found: UpdateInfo) {
 }
 
 async function installUpdate() {
-  if (!(await saveEverything())) return;
-  const stop = api.onUpdateProgress((p) => {
-    const share = p.total ? ` ${Math.min(99, Math.round((p.received / p.total) * 100))}%` : '';
-    set({ busy: `새 버전을 받는 중${share}` });
-  });
-  set({ busy: '새 버전을 받는 중' });
+  if (installing) return;
+  installing = true;
+  let stop = () => {};
+  // Prevent edits while the final saves and package are being captured.
+  set({ busy: '업데이트 전에 원고를 저장하는 중' });
   try {
+    if (!(await saveEverything(true))) return;
+    await api.journalFlush(null).catch(() => {});
+    if (!(await finishProjectFile())) {
+      showToast({ text: '작품 파일을 저장하지 못해 업데이트를 중단했습니다. 저장 상태를 확인하세요.', tone: 'error' });
+      return;
+    }
+    stop = api.onUpdateProgress((p) => {
+      const share = p.total ? ` ${Math.min(99, Math.round((p.received / p.total) * 100))}%` : '';
+      set({ busy: `새 버전을 받는 중${share}` });
+    });
+    set({ busy: '새 버전을 받는 중' });
     await api.updateInstall();
-    // Only reached where the installer does not close the app, or in a dry run.
-    set({ busy: null });
   } catch (e) {
-    set({ busy: null });
     toastError('새 버전으로 바꾸지 못함', e);
   } finally {
     stop();
+    installing = false;
+    set({ busy: null });
   }
 }

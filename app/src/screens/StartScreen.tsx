@@ -5,7 +5,7 @@ import { Icon } from '../components/Icon';
 import { openMenu } from '../components/Menu';
 import { num, shortPath, timeLabel } from '../lib/format';
 import { KIND_LABEL } from '../lib/labels';
-import { openDialog, openProject, toastError } from '../store';
+import { openDialog, openProject, pickProjectFile, toastError } from '../store';
 
 export function StartScreen() {
   const [items, setItems] = useState<RecentItem[] | null>(null);
@@ -50,6 +50,9 @@ export function StartScreen() {
           <p>한 편을 끝까지 쓰는 곳</p>
         </div>
         <div className="row">
+          <button type="button" className="btn" onClick={() => void pickProjectFile()} disabled={!api.isDesktop}>
+            작품 파일 열기…
+          </button>
           <button type="button" className="btn ghost" onClick={() => openDialog({ kind: 'driveImport' })}>
             드라이브에서 가져오기
           </button>

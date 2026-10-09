@@ -31,6 +31,9 @@ export function startMockBackend(): Backend {
   if (typeof window !== 'undefined') (window as unknown as { __otherDevice: typeof otherDevice }).__otherDevice = otherDevice;
   return {
     isDesktop: false,
+    shareList: async () => [],
+    shareCreate: async () => { throw '온라인 공유는 설치형 앱에서 쓸 수 있습니다'; },
+    shareRevoke: async () => { throw '온라인 공유는 설치형 앱에서 쓸 수 있습니다'; },
     ...projectMethods,
     ...docMethods,
     ...ioMethods,

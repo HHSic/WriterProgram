@@ -50,7 +50,7 @@
 
 1. [Dropbox App Console](https://www.dropbox.com/developers/apps) → Create app.
    - Scoped access, 접근 범위 **App folder**, 이름 WriterProgram (작가 Dropbox의 `앱/WriterProgram` 폴더 이름이 됨).
-2. Permissions 탭: `account_info.read`, `files.metadata.read`, `files.content.read`, `files.content.write` → Submit.
+2. Permissions 탭: `account_info.read`, `files.metadata.read`, `files.content.read`, `files.content.write`, `sharing.read`, `sharing.write` → Submit. 공유 권한 추가 전에 연결했던 계정은 끊고 다시 연결해 새 동의를 받는다.
 3. Settings 탭:
    - OAuth 2 Redirect URIs에 `http://localhost:53682/` 추가 (Dropbox는 포트까지 똑같아야 해서 이 번호를 쓴다).
    - Allow public clients (Implicit Grant & PKCE): Allow.

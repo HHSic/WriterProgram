@@ -39,7 +39,7 @@ pub(crate) async fn blocking<T: Send + 'static>(
         .map_err(|e| e.to_string())?
 }
 
-fn session(app: &AppHandle, registry: &Registry, provider: Provider) -> Res<Session> {
+pub(crate) fn session(app: &AppHandle, registry: &Registry, provider: Provider) -> Res<Session> {
     let ids = AppIds::load(&apps_file(app)?);
     let id = ids
         .get(provider)

@@ -35,6 +35,26 @@ impl Dropbox {
                 200,
                 json!({ "used": room.elsewhere + self.stored(), "allocation": { ".tag": "individual", "allocated": room.total.unwrap_or(0) } }),
             ),
+            "/2/sharing/create_shared_link_with_settings" => {
+                let arg = req.json();
+                let path = arg["path"].as_str().unwrap().to_lowercase();
+                assert!(self.files.contains_key(&path));
+                assert_eq!(arg["settings"]["requested_visibility"], "public");
+                assert_eq!(arg["settings"]["access"], "viewer");
+                json_reply(
+                    200,
+                    json!({"url":"https://www.dropbox.com/scl/fi/test/shared.docx?dl=0", "link_permissions":{"resolved_visibility":{".tag":"public"}}}),
+                )
+            }
+            "/2/sharing/revoke_shared_link" => {
+                assert!(
+                    req.json()["url"]
+                        .as_str()
+                        .unwrap()
+                        .starts_with("https://www.dropbox.com/")
+                );
+                json_reply(200, Value::Null)
+            }
             "/2/users/get_current_account" => json_reply(
                 200,
                 json!({ "name": { "display_name": "윤서하" }, "email": "writer@example.com" }),
@@ -129,7 +149,9 @@ impl Dropbox {
                 match self.files.get(&lower) {
                     None => conflict("path_lookup/not_found/.."),
                     Some((_, _, r))
-                        if Some(format!("r{r}").as_str()) != arg["parent_rev"].as_str() =>
+                        if arg["parent_rev"]
+                            .as_str()
+                            .is_some_and(|rev| rev != format!("r{r}")) =>
                     {
                         conflict("path_write/conflict/..")
                     }

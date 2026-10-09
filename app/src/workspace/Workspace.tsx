@@ -1,6 +1,5 @@
 import { useEffect, type CSSProperties } from 'react';
 import { keyInComposition } from '../editor/composition';
-import { flushAll } from '../lib/flush';
 import { keysText, matches, shortcutOf, type ShortcutId } from '../lib/shortcuts';
 import { viewStyle } from '../lib/view';
 import {
@@ -12,6 +11,7 @@ import {
   reopenClosedTab,
   setFocusMode,
   setView,
+  saveEverything,
   splitView,
   stopReading,
   toggleFocusMode,
@@ -39,7 +39,7 @@ function find(scope: 'doc' | 'all' | undefined, focus: 'find' | 'replace') {
 /** What the window does for each shortcut it handles (the editor handles the rest itself). */
 const WINDOW_KEYS: Partial<Record<ShortcutId, () => void>> = {
   // Writers press Ctrl+S out of habit: save right away instead of waiting.
-  save: () => void flushAll(),
+  save: () => void saveEverything(),
   find: () => find('doc', 'find'),
   findAll: () => find('all', 'find'),
   replace: () => find(undefined, 'replace'),

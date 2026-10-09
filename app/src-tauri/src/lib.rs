@@ -9,6 +9,12 @@ mod watch;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let state = state::AppState::default();
+    if let Some(path) = std::env::args()
+        .skip(1)
+        .find(|arg| arg.to_ascii_lowercase().ends_with(".wpm"))
+    {
+        state.set_startup_file(path);
+    }
     let own = state.own.clone();
     writer_core::store::on_write(move |path, bytes| own.record(path, bytes));
     drives::keyring::init_secrets();
@@ -24,6 +30,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::share::share_list,
+            commands::share::share_create,
+            commands::share::share_revoke,
             commands::update::app_version,
             commands::update::update_check,
             commands::update::update_install,
@@ -40,6 +49,10 @@ pub fn run() {
             commands::project::default_location,
             commands::project::project_create,
             commands::project::project_open,
+            commands::wpm::project_file_open,
+            commands::wpm::project_file_save,
+            commands::wpm::project_file_startup,
+            commands::wpm::project_file_rescue,
             commands::project::project_overview,
             commands::project::project_update,
             commands::project::part_add,

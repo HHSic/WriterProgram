@@ -97,6 +97,19 @@ impl OneDrive {
     pub fn handle(&mut self, req: &Request, room: &Room) -> Response {
         let base = "/v1.0";
         let path = req.path.strip_prefix(base).unwrap_or(&req.path).to_string();
+        if let Some(id) = path
+            .strip_prefix("/me/drive/items/")
+            .and_then(|s| s.strip_suffix("/createLink"))
+        {
+            assert!(self.items.contains_key(id));
+            assert_eq!(req.method, "POST");
+            assert_eq!(req.json()["type"], "view");
+            assert_eq!(req.json()["scope"], "anonymous");
+            return json_reply(
+                201,
+                json!({"id":"reader-link", "link":{"type":"view", "scope":"anonymous", "webUrl":format!("https://1drv.ms/w/s!{id}")}}),
+            );
+        }
         if path == "/me/drive" {
             // Microsoft lists Files.Read as the least permission for this;
             // with only the app folder it may be refused.
@@ -218,7 +231,12 @@ impl OneDrive {
                     let Some(id) = self.resolve(&item_path, false) else {
                         return json_reply(404, json!({}));
                     };
-                    if req.header("if-match") != Some(self.etag(&id).as_str()) {
+                    // Graph accepts unconditional deletion; sync supplies an
+                    // If-Match, while deleting an isolated sharing copy does not.
+                    if req
+                        .header("if-match")
+                        .is_some_and(|tag| tag != self.etag(&id))
+                    {
                         return json_reply(412, json!({}));
                     }
                     self.items.remove(&id);

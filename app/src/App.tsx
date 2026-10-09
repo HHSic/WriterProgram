@@ -6,7 +6,8 @@ import { ToastHost } from './components/ToastHost';
 import { installJournal } from './editor/journal';
 import { applyColors } from './lib/colors';
 import { StartScreen } from './screens/StartScreen';
-import { checkForUpdateDaily, confirmClose, stampOnClosing, useApp } from './store';
+import { checkForUpdateDaily, confirmClose, finishProjectFile, openProject, stampOnClosing, toastError, useApp } from './store';
+import { rescueAll, unsavedKeys } from './store/saves';
 import { CloseAskDialog } from './workspace/CloseAskDialog';
 import { DialogHost } from './workspace/dialogs';
 import { Workspace } from './workspace/Workspace';
@@ -58,13 +59,23 @@ export function App() {
     // it was still gathering.
     api.onCloseRequested(async () => {
       if (!(await confirmClose())) return false;
+      const keptInRescue = unsavedKeys().length > 0;
       await api.journalFlush(null).catch(() => {});
       // The day's last writing gets its date proof before the app goes.
       const root = useApp.getState().overview?.root;
       if (root) await stampOnClosing(root);
+      if (!(await finishProjectFile())) {
+        if (keptInRescue && await rescueAll()) return true;
+        return confirmClose();
+      }
       return true;
     });
     installJournal();
+    if (api.isDesktop) {
+      void api.projectFileStartup().then((path) => {
+        if (path) void openProject(path);
+      }).catch((e) => toastError('작품 파일을 열지 못함', e));
+    }
     // A new version, looked for once a day a little after start.
     const timer = window.setTimeout(() => void checkForUpdateDaily(), 8000);
     return () => window.clearTimeout(timer);

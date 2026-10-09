@@ -7,6 +7,7 @@ import type { Editor } from '@tiptap/core';
 import { Modal } from '../components/Modal';
 import { FIXED_SPACE, FULL_WIDTH_SPACE, NO_BREAK_SPACE } from '../editor/paragraph';
 import { keysText } from '../lib/shortcuts';
+import emoticons from '../lib/text-emoticons.json';
 import { closeDialog, openDialog, useApp } from '../store';
 
 const RECENT_KEY = 'wp.recentSymbols';
@@ -123,11 +124,18 @@ export function SymbolsDialog() {
   const [recent, setRecent] = useState(loadRecent);
   const [group, setGroup] = useState(() => (loadRecent().length ? 'recent' : GROUPS[0].id));
   const [last, setLast] = useState<string | null>(null);
+  const [emotion, setEmotion] = useState(emoticons[0].id);
   const [failed, setFailed] = useState(false);
+  const selectedEmotion = emoticons.find((g) => g.id === emotion);
   const shown = useMemo(
-    () => (group === 'recent' ? recent : (GROUPS.find((g) => g.id === group)?.chars ?? [])),
-    [group, recent],
+    () => (group === 'recent' ? recent : group === 'emoticons'
+      ? (emoticons.find((g) => g.id === emotion)?.items ?? [])
+      : (GROUPS.find((g) => g.id === group)?.chars ?? [])),
+    [group, recent, emotion],
   );
+  const wide = group === 'emoticons' || shown.some((c) => [...c].length > 1);
+  const longFaces = emotion === 'unicode-faces' && group === 'emoticons'
+    || shown.some((c) => [...c].length > 12);
 
   const put = (char: string) => {
     if (!insertInto(char)) {
@@ -152,6 +160,9 @@ export function SymbolsDialog() {
     >
       <div className="symbols">
         <nav className="symbol-groups" aria-label="문자 묶음">
+          <button type="button" className={group === 'emoticons' ? 'on' : ''} aria-pressed={group === 'emoticons'} onClick={() => setGroup('emoticons')}>
+            텍스트 이모티콘
+          </button>
           {recent.length > 0 && (
             <button type="button" className={group === 'recent' ? 'on' : ''} onClick={() => setGroup('recent')}>
               최근 쓴 문자
@@ -167,6 +178,22 @@ export function SymbolsDialog() {
           </button>
         </nav>
         <div className="symbol-body">
+          {group === 'emoticons' && (
+            <>
+              <div className="emoticon-categories" role="group" aria-label="이모티콘 종류">
+                {emoticons.map((g) => (
+                  <button key={g.id} type="button" className="btn" aria-pressed={emotion === g.id} onClick={() => setEmotion(g.id)}>
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+              <p className="symbol-note">
+                {selectedEmotion?.unicode
+                  ? '유니코드 기호와 문자를 사용합니다. 한글에서 일부 글자가 네모로 보이거나 결합 기호의 위치가 달라질 수 있으니 글꼴을 확인하세요.'
+                  : '한글과 일반 기호로 만든 이모티콘입니다. 기호의 모양은 글꼴에 따라 달라질 수 있습니다.'}
+              </p>
+            </>
+          )}
           {group === 'spaces' ? (
             <ul className="space-list">
               {SPACES.map((s) => (
@@ -179,7 +206,7 @@ export function SymbolsDialog() {
               ))}
             </ul>
           ) : (
-            <div className="symbol-grid" role="group" aria-label="문자">
+            <div className={`symbol-grid${wide ? ' emoticon-grid' : ''}${longFaces ? ' unicode-grid' : ''}`} role="group" aria-label={group === 'emoticons' ? '텍스트 이모티콘' : '문자'}>
               {shown.map((c) => {
                 const space = SPACES.find((s) => s.char === c);
                 return (
@@ -187,7 +214,7 @@ export function SymbolsDialog() {
                     key={c}
                     type="button"
                     className={`symbol${space ? ' space' : ''}`}
-                    title={space ? space.name : `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`}
+                    title={space ? space.name : [...c].length > 1 ? c : `U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`}
                     onClick={() => put(c)}
                   >
                     {space ? space.name.replace(' 빈칸', '') : c}

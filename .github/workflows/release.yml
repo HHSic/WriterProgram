@@ -1,7 +1,5 @@
-# Builds the Windows installer when a version tag is pushed (v0.1.0,
-# v0.1.0-beta.1, …) and puts it in a draft GitHub release together with
-# latest.json, which the app's updater reads. Publishing the draft makes it
-# the "latest" release the installed apps see (docs/release.md).
+# Builds a stable Windows installer, checks the uploaded updater signature,
+# then publishes the release for installed apps (docs/release.md).
 #
 # Secrets: TAURI_SIGNING_PRIVATE_KEY (the updater key, minisign) and
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD. The public half is in tauri.conf.json.
@@ -12,15 +10,33 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable version tag, for example v0.1.2'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -32,14 +48,34 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
 
+      - name: Check version, release notes and signing configuration
+        id: version
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo 'TAURI_SIGNING_PRIVATE_KEY must be configured before releasing.'
+            exit 1
+          fi
+          node scripts/prepare-release.mjs "$RELEASE_TAG"
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > "$RUNNER_TEMP/writer-release-state.txt"; then
+            read -r draft < "$RUNNER_TEMP/writer-release-state.txt"
+            if [ "$draft" != 'true' ]; then
+              echo 'This release is already public. Create a new version instead of replacing it.'
+              exit 1
+            fi
+          fi
+
       - name: Install the app's packages
         run: npm --prefix app ci
 
       - name: Check before building
         run: |
           npm --prefix app run build
-          cargo test --workspace
-          npm --prefix app run typecheck
+          cargo fmt -p writer-core -p writer-sync -p writer-app -p writer-ai --check
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
           npm --prefix app test
 
       - name: Build, sign and draft the release
@@ -50,9 +86,25 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: app
-          tagName: ${{ github.ref_name }}
-          releaseName: WriterProgram ${{ github.ref_name }}
-          releaseBody: '바뀐 것을 여기에 적어 주세요. 이 글이 앱의 새 버전 안내에 그대로 보입니다.'
+          tagName: ${{ steps.version.outputs.tag }}
+          releaseName: WriterProgram ${{ steps.version.outputs.tag }}
+          releaseBody: ${{ steps.version.outputs.notes }}
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
+
+      - name: Verify uploaded installer and updater metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "$RELEASE_TAG" --dir target/release-verification --clobber \
+            --pattern latest.json --pattern '*.exe' --pattern '*.exe.sig'
+          cargo run --locked -p writer-app --example verify_release -- \
+            "$RELEASE_TAG" target/release-verification
+
+      - name: Publish installer and automatic update
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "$RELEASE_TAG" --draft=false --latest \
+            --notes-file "docs/releases/$RELEASE_TAG.md"

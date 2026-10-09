@@ -6,9 +6,82 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::{Account, Session, Space, drive_error, space_full};
+
 use crate::http::{Body, header_json};
 use crate::remote::{Put, Remote, RemoteFile};
+use crate::sharing::{self, Published};
 use crate::{Error, Result};
+
+pub(crate) fn publish_share(s: &Session, name: &str, bytes: &[u8]) -> Result<Published> {
+    let mut remote = open(s, sharing::FOLDER, true)?;
+    if !matches!(remote.put(name, bytes, None)?, Put::Done(_)) {
+        return Err(Error::Drive(
+            "공유 파일 이름이 겹쳤습니다. 다시 시도하세요".into(),
+        ));
+    }
+    let result = (|| {
+        let reply = rpc(
+            s,
+            "sharing/create_shared_link_with_settings",
+            json!({"path":remote.full(name), "settings":{"requested_visibility":"public", "access":"viewer"}}),
+        )?;
+        if !reply.ok() {
+            return Err(sharing::refused());
+        }
+        let value: Value = reply.json()?;
+        if value["link_permissions"]["resolved_visibility"][".tag"] != "public" {
+            return Err(sharing::refused());
+        }
+        if value["link_permissions"]["link_access_level"][".tag"]
+            .as_str()
+            .is_some_and(|access| access != "viewer")
+        {
+            return Err(sharing::refused());
+        }
+        let url = value["url"]
+            .as_str()
+            .ok_or_else(sharing::refused)?
+            .to_owned();
+        sharing::checked_url(s.provider, &url)?;
+        Ok(Published { url })
+    })();
+    if result.is_err() {
+        let clean = rpc(s, "files/delete_v2", json!({"path":remote.full(name)}));
+        if !clean.is_ok_and(|r| r.ok()) {
+            return Err(Error::Drive(format!(
+                "링크를 만들지 못했습니다. 드라이브의 '{}'에서 '{name}' 사본을 확인해 지워 주세요",
+                sharing::FOLDER
+            )));
+        }
+    }
+    result
+}
+
+pub(crate) fn revoke_share(s: &Session, name: &str, url: &str) -> Result<()> {
+    let revoked = rpc(s, "sharing/revoke_shared_link", json!({"url":url}))?;
+    if !revoked.ok()
+        && !revoked.json::<Value>().is_ok_and(|v| {
+            v["error_summary"]
+                .as_str()
+                .is_some_and(|s| s.contains("shared_link_not_found"))
+        })
+    {
+        return Err(sharing::refused());
+    }
+    let path = format!("/{}/{name}", sharing::FOLDER);
+    let reply = rpc(s, "files/delete_v2", json!({"path":path}))?;
+    if reply.ok()
+        || reply.json::<Value>().is_ok_and(|v| {
+            v["error_summary"]
+                .as_str()
+                .is_some_and(|s| s.contains("not_found"))
+        })
+    {
+        Ok(())
+    } else {
+        Err(drive_error("공유 사본을 지우지 못함", &reply))
+    }
+}
 
 #[derive(Deserialize)]
 struct Name {

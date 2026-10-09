@@ -27,7 +27,7 @@ export const SHORTCUTS = {
   sceneBreak: { group: '쓰기', label: '장면 나눔 넣기', keys: ['Enter'], note: '빈 줄에 ***를 쓰고' },
   noBreakSpace: { group: '쓰기', label: '묶음 빈칸', keys: ['Mod-Shift-Space', 'Alt-Space'] },
   fixedSpace: { group: '쓰기', label: '고정폭 빈칸', keys: ['Alt-Shift-Space'] },
-  symbols: { group: '쓰기', label: '문자표 (특수 문자)', keys: ['Mod-F10'] },
+  symbols: { group: '쓰기', label: '문자표 (특수 문자·텍스트 이모티콘)', keys: ['Mod-F10'] },
   note: { group: '쓰기', label: '고른 글에 메모 달기', keys: ['Mod-Alt-m'] },
   readAloud: { group: '쓰기', label: '소리 내어 읽기 / 멈춤', keys: ['Mod-Shift-r'] },
   focusMode: { group: '쓰기', label: '집중 모드 켜고 끄기', keys: ['F11'], note: 'Esc로도 나감' },

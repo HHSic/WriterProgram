@@ -13,6 +13,10 @@ fn config_file(app: &AppHandle, name: &str) -> Res<PathBuf> {
         .map_err(|e| e.to_string())
 }
 
+pub fn share_file(app: &AppHandle) -> Res<PathBuf> {
+    config_file(app, "share-links.json")
+}
+
 /// Projects opened lately, for the start screen.
 pub fn recent_file(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "recent.json")

@@ -193,6 +193,28 @@ impl Google {
             return json_reply(200, self.meta(id));
         }
         if let Some(id) = path.strip_prefix(&format!("{api}/files/")) {
+            if let Some(file) = id.strip_suffix("/permissions") {
+                assert!(self.files.contains_key(file));
+                assert_eq!(req.method, "POST");
+                let permission = req.json();
+                assert_eq!(permission["type"], "anyone");
+                assert_eq!(permission["role"], "reader");
+                assert_eq!(permission["allowFileDiscovery"], false);
+                return json_reply(
+                    200,
+                    json!({"id":"reader-link", "type":"anyone", "role":"reader"}),
+                );
+            }
+            if req.method == "DELETE" {
+                return json_reply(
+                    if self.files.remove(id).is_some() {
+                        204
+                    } else {
+                        404
+                    },
+                    json!({}),
+                );
+            }
             let Some(f) = self.files.get_mut(id) else {
                 return json_reply(404, json!({}));
             };

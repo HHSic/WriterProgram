@@ -4,6 +4,10 @@
 
 원칙: **영역 하나 = 폴더나 파일 하나.** 큰 파일은 `mod.rs`(Rust)나 `index.ts`(TypeScript)가 바깥 이름을 그대로 다시 내보내므로, 파일을 나눠도 부르는 쪽 경로(`writer_core::hwpx::hwpx_bytes`, `../store`, `../api/types`)는 바뀌지 않는다.
 
+**링크 공유**: `crates/core/src/share.rs` → `crates/sync/src/sharing.rs`·`providers/` → `app/src-tauri/src/commands/share.rs` → `app/src/workspace/ShareDialog.tsx`. 이미 연결된 드라이브의 공유 API를 재사용한다. 사용 방법은 [sharing.md](sharing.md).
+
+**책 미리보기**: `workspace/ReaderDialog.tsx`는 저장 후 기존 `docLoad`로 회차를 불러와 읽기 전용으로 표시한다. `lib/book.ts`는 한 쪽·두 쪽 계산과 기기별 읽기 설정, `styles/reader.css`는 책 화면을 맡는다. 사용 방법과 배포 범위는 [book-reader.md](book-reader.md).
+
 ## Rust
 
 ### `crates/core` (writer-core): 화면과 무관한 모든 것
@@ -12,6 +16,7 @@
 |---|---|
 | `project/` | 작품 폴더: `mod.rs`(project.json 읽기·쓰기), `create.rs`(새 작품·문서 파일), `structure.rs`(부·회차 순서 바꾸기), `overview.rs`(목록과 요약), `relocate.rs`(작품 옮기기), `size.rs`(작품 크기, 오래된 자동 기록 정리, 디스크 남은 공간), `backup.rs`(project.json 하루 백업), `recover.rs`(깨진 project.json 되살리기, 화면 `screens/RecoverDialog.tsx`) |
 | `doc.rs`, `store.rs` | 문서 파일(앞머리 + 본문, 완료 회차 잠금 `locked`), 원자적 저장, id, 시각 문자열, 이름 바꾸기·지우기 재시도, 정리 결과(`Cleanup`) |
+| `wpm.rs` | 작품 파일(.wpm): 버전이 있는 ZIP 묶음, 원자적 저장, 안전한 풀기, 전체 작품과 복합 이모지 왕복 시험(`tests/wpm.rs`). 명령은 `commands/wpm.rs`(파일과 작업 폴더 연결, 비상 보관, 실행 시 파일), 화면은 `store/wpm.ts`(자동 저장·다시 시도·닫기), `api/projectChanges.ts`(저장할 변화), `lib/flush.ts`(원고 저장 뒤 파일 묶기) |
 | `mend.rs` | 읽을 수 없는 회차(빈 파일, 다른 글자 방식, 깨진 앞머리) 알아보기와 고쳐 열기. 화면 `workspace/MendDialog.tsx`, `UnreadableItem.tsx`, 명령 `commands/mend.rs` |
 | `markup/` | 본문 표기 ↔ 블록: `parse.rs`(읽기), `write.rs`(쓰기), `mod.rs`(타입, `inline_text`) |
 | `count.rs`, `layout.rs`, `indent.rs` | 글자 수·원고지 매수·연재 플랫폼 기준 글자 수(`CountRule`, `Counts::by_rule`), 예상 쪽수, 첫 줄 들여쓰기 규칙 (화면 `app/src/editor/counts.ts`, `indent.ts`와 짝, 시험 `tests/fixtures/counts.json`·`platform-counts.json`). 플랫폼 표와 붙여넣기는 [platforms.md](platforms.md) |

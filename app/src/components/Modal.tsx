@@ -35,6 +35,7 @@ export function Modal({
   width = 480,
   dismissOnBackdrop = false,
   dirty = false,
+  className = '',
 }: {
   title: string;
   onClose: () => void;
@@ -45,6 +46,7 @@ export function Modal({
   dismissOnBackdrop?: boolean;
   /** There are changes not applied yet: ask before closing with Esc or the close button. */
   dirty?: boolean;
+  className?: string;
 }) {
   const id = useId();
   const panel = useRef<HTMLDivElement>(null);
@@ -111,13 +113,13 @@ export function Modal({
 
   return (
     <div
-      className="overlay"
+      className={`overlay${className ? ` ${className}-overlay` : ''}`}
       onMouseDown={(e) => {
         if (dismissOnBackdrop && e.target === e.currentTarget) requestClose();
       }}
     >
       <div
-        className="modal"
+        className={`modal ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-label={title}

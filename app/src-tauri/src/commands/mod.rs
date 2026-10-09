@@ -17,5 +17,7 @@ pub mod proof;
 pub mod recover;
 pub mod rescue;
 pub mod search;
+pub mod share;
 pub mod sync_folder;
 pub mod update;
+pub mod wpm;

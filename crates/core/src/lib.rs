@@ -31,9 +31,11 @@ pub mod proof;
 pub mod recent;
 pub mod rescue;
 pub mod search;
+pub mod share;
 pub mod snapshot;
 pub mod store;
 pub mod trash;
+pub mod wpm;
 mod xml;
 
 pub use error::{Error, Result};

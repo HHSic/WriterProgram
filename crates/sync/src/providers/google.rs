@@ -10,9 +10,78 @@ use serde::Deserialize;
 use serde_json::json;
 
 use super::{Account, Session, Space, drive_error, path_in};
+
 use crate::http::{Body, enc};
 use crate::remote::{Put, Remote, RemoteFile, split};
+use crate::sharing::{self, Published};
 use crate::{Error, Result};
+
+pub(crate) fn publish_share(s: &Session, name: &str, bytes: &[u8]) -> Result<Published> {
+    let mut remote = open(s, sharing::FOLDER, true)?;
+    if !matches!(remote.put(name, bytes, None)?, Put::Done(_)) {
+        return Err(Error::Drive(
+            "공유 파일 이름이 겹쳤습니다. 다시 시도하세요".into(),
+        ));
+    }
+    let (id, _) = remote
+        .item(name)?
+        .ok_or_else(|| Error::Drive("공유 사본을 찾지 못함".into()))?;
+    let result = (|| {
+        let reply = s.call(
+            "POST",
+            &format!(
+                "{}/files/{}/permissions?fields=id,type,role",
+                s.ends.api,
+                enc(&id)
+            ),
+            &[],
+            &|| Body::Json(json!({"type":"anyone", "role":"reader", "allowFileDiscovery":false})),
+        )?;
+        if !reply.ok() {
+            return Err(sharing::refused());
+        }
+        let permission: serde_json::Value = reply.json()?;
+        if permission["type"] != "anyone" || permission["role"] != "reader" {
+            return Err(sharing::refused());
+        }
+        let url = format!("https://drive.google.com/file/d/{}/view", enc(&id));
+        sharing::checked_url(s.provider, &url)?;
+        Ok(Published { url })
+    })();
+    if result.is_err() {
+        let clean = s.call(
+            "DELETE",
+            &format!("{}/files/{}", s.ends.api, enc(&id)),
+            &[],
+            &|| Body::Empty,
+        );
+        if !clean.is_ok_and(|r| r.ok() || r.status == 404) {
+            return Err(Error::Drive(format!(
+                "링크를 만들지 못했습니다. 드라이브의 '{}'에서 '{name}' 사본을 확인해 지워 주세요",
+                sharing::FOLDER
+            )));
+        }
+    }
+    result
+}
+
+pub(crate) fn revoke_share(s: &Session, name: &str) -> Result<()> {
+    let mut remote = open(s, sharing::FOLDER, false)?;
+    let Some((id, _)) = remote.item(name)? else {
+        return Ok(());
+    };
+    let reply = s.call(
+        "DELETE",
+        &format!("{}/files/{}", s.ends.api, enc(&id)),
+        &[],
+        &|| Body::Empty,
+    )?;
+    if reply.ok() || reply.status == 404 {
+        Ok(())
+    } else {
+        Err(drive_error("공유 사본을 지우지 못함", &reply))
+    }
+}
 
 const FOLDER: &str = "application/vnd.google-apps.folder";
 pub const APP_FOLDER: &str = "WriterProgram";
@@ -336,7 +405,13 @@ impl Remote for GoogleRemote<'_> {
                 let (dirs, name) = split(path);
                 let parent = self.folder_id(&dirs)?;
                 let boundary = "writerprogram-part-7f3a9c";
-                let meta = json!({ "name": name, "parents": [parent] }).to_string();
+                let mut meta = json!({ "name": name, "parents": [parent] });
+                if name.ends_with(".docx") {
+                    meta["mimeType"] = json!(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    );
+                }
+                let meta = meta.to_string();
                 let mut body = format!(
                     "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{boundary}\r\nContent-Type: application/octet-stream\r\n\r\n"
                 )

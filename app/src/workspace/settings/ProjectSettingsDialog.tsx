@@ -9,7 +9,7 @@ import { Modal } from '../../components/Modal';
 import { useChanged } from '../../lib/useChanged';
 import { placeNote, usePlaceOf } from '../../components/PlacePicker';
 import { KIND_LABEL, docNoun } from '../../lib/labels';
-import { closeDialog, openDialog, toastError, updateProject, useApp, type SettingsTab } from '../../store';
+import { closeDialog, openDialog, saveProjectFileAs, toastError, updateProject, useApp, type SettingsTab } from '../../store';
 import { ProjectDriveField } from '../Drives';
 import { FormatEditor } from './FormatEditor';
 import { JournalField } from './JournalField';
@@ -39,7 +39,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
   const [platform, setPlatform] = useState<Platform | null>(project.platform);
   const [busy, setBusy] = useState(false);
   const dirty = useChanged({ title, kind, penName, sceneBreak, goal, format, keepDaily, platform });
-  const where = usePlaceOf(ov.root);
+  const where = usePlaceOf(ov.projectFile ?? ov.root);
 
   const save = async () => {
     if (busy) return;
@@ -127,14 +127,14 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
           <div className="field">
             <span className="field-label">저장 위치</span>
             <div className="row">
-              <input readOnly value={ov.root} className="grow" aria-label="저장 위치" />
+              <input readOnly value={ov.projectFile ?? ov.root} className="grow" aria-label="저장 위치" />
               {api.isDesktop && (
-                <button type="button" className="btn" onClick={() => void api.reveal(ov.root).catch((e) => toastError('폴더를 열지 못함', e))}>
-                  폴더 열기
+                <button type="button" className="btn" onClick={() => void api.reveal(ov.projectFile ?? ov.root).catch((e) => toastError('저장 위치를 열지 못함', e))}>
+                  위치 열기
                 </button>
               )}
-              <button type="button" className="btn" onClick={() => openDialog({ kind: 'move' })}>
-                옮기기…
+              <button type="button" className="btn" onClick={() => ov.projectFile ? void saveProjectFileAs() : openDialog({ kind: 'move' })}>
+                {ov.projectFile ? '다른 이름으로 저장…' : '옮기기…'}
               </button>
             </div>
             {where !== undefined && (

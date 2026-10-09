@@ -62,6 +62,8 @@ export type Dialog =
   | { kind: 'import'; partId?: string; newProject?: boolean }
   | { kind: 'view' }
   | { kind: 'symbols' }
+  | { kind: 'share' }
+  | { kind: 'reader' }
   /** 단축키: every keyboard shortcut (lib/shortcuts.ts). */
   | { kind: 'shortcuts' }
   /**

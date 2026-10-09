@@ -35,6 +35,8 @@ export interface SaveTarget {
   pending: () => boolean;
   /** What to keep in the rescue folder when saves keep failing. */
   rescue?: () => { item: string; content: RescueContent } | null;
+  /** A compound target can keep a complete, independently openable file. */
+  rescueFile?: () => Promise<string>;
 }
 
 interface Entry {
@@ -172,6 +174,11 @@ export async function rescue(key: string): Promise<string | null> {
   let path: string | null = null;
   entry.rescuedAt = Date.now();
   for (const target of entry.targets) {
+    if (target.rescueFile) {
+      try { path = await target.rescueFile(); }
+      catch { return null; }
+      continue;
+    }
     const what = target.rescue?.();
     if (!what) continue;
     try {

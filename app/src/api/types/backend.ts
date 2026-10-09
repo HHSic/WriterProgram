@@ -47,15 +47,25 @@ import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, Rec
 import type { RescueContent, RescueFile } from './rescue';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
 import type { UpdateInfo, UpdateProgress } from './update';
+import type { ShareLink } from './share';
 
 export interface Backend {
   /** True in the desktop app, false in the browser preview. */
   isDesktop: boolean;
+  shareList(root: string): Promise<ShareLink[]>;
+  shareCreate(root: string, docIds: string[], provider: DriveProvider): Promise<ShareLink>;
+  shareRevoke(root: string, id: string): Promise<void>;
   recentList(): Promise<RecentItem[]>;
   recentRemove(path: string): Promise<void>;
   defaultLocation(): Promise<string>;
   projectCreate(opts: NewProject): Promise<Overview>;
   projectOpen(path: string): Promise<Overview>;
+  /** Opens a .wpm in a durable working folder and keeps it linked for saving. */
+  projectFileOpen(path: string): Promise<Overview>;
+  /** Save As with dest; otherwise updates the linked .wpm. */
+  projectFileSave(root: string, dest?: string): Promise<string>;
+  projectFileStartup(): Promise<string | null>;
+  projectFileRescue(root: string): Promise<string>;
   projectOverview(root: string): Promise<Overview>;
   /** What can bring a damaged project.json back; null when it is fine. */
   projectRecovery(path: string): Promise<Recovery | null>;

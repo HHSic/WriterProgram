@@ -50,6 +50,14 @@ export const projectMethods = {
     touchRecent(path);
     return overview(path);
   },
+  async projectFileOpen() {
+    throw '작품 파일(.wpm)은 설치형 앱에서 열 수 있습니다';
+  },
+  async projectFileSave() {
+    throw '작품 파일(.wpm)은 설치형 앱에서 저장할 수 있습니다';
+  },
+  async projectFileStartup() { return null; },
+  async projectFileRescue() { throw '작품 파일의 비상 보관은 설치형 앱에서 쓸 수 있습니다'; },
   async projectOverview(root) {
     return overview(root);
   },
