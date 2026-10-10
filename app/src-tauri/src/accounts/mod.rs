@@ -15,11 +15,11 @@ use writer_sync::oauth::{self, Client, Listener};
 use crate::drives::{blocking, secrets};
 use crate::error::{Res, fail};
 use crate::paths::{account_config_file, account_session_file};
-use client::{Config, Identity, Login, SettingsWrite, Snapshot, Tokens};
+use client::{Config, Identity, Login, Session, SettingsWrite, Snapshot};
 
 #[derive(Default)]
 pub struct AccountState {
-    lock: Arc<Mutex<Option<Tokens>>>,
+    lock: Arc<Mutex<Option<Session>>>,
     cancel: Arc<AtomicBool>,
     connecting: Arc<AtomicBool>,
 }
@@ -103,14 +103,14 @@ fn connection(app: &AppHandle, expected: &str) -> Res<(Config, Identity)> {
 fn access(
     config: &Config,
     identity: &Identity,
-    cache: &mut Option<Tokens>,
+    cache: &mut Option<Session>,
     force: bool,
 ) -> Res<String> {
     if !force
-        && let Some(tokens) = cache
-        && tokens.expires > chrono::Utc::now().timestamp() + 30
+        && let Some(session) = cache
+        && let Some(token) = session.access_for(config, identity)
     {
-        return Ok(tokens.access.clone());
+        return Ok(token.to_owned());
     }
     let key = secret_key(config, identity);
     let refresh = secrets()
@@ -129,13 +129,13 @@ fn access(
     }
     secrets().set(&key, &tokens.refresh).map_err(fail)?;
     let token = tokens.access.clone();
-    *cache = Some(tokens);
+    *cache = Some(Session::new(config, identity, tokens));
     Ok(token)
 }
 fn rpc(
     app: &AppHandle,
     expected: &str,
-    cache: &mut Option<Tokens>,
+    cache: &mut Option<Session>,
     name: &str,
     body: Value,
 ) -> Res<Value> {
@@ -244,7 +244,7 @@ pub async fn account_login(
         if let Err(error)=save(&account_session_file(&app)?,&Remembered{url:config.url.clone(),identity:identity.clone()}) {
             let _=secrets().delete(&key);return Err(error);
         }
-        *cache=Some(tokens);Ok(LoginResult{account:Some(identity),confirmation_required:false})
+        *cache=Some(Session::new(&config,&identity,tokens));Ok(LoginResult{account:Some(identity),confirmation_required:false})
     }).await
 }
 #[tauri::command]
@@ -265,11 +265,13 @@ pub async fn account_logout(app: AppHandle, state: State<'_, AccountState>) -> R
                 .delete(&secret_key(&config, &identity))
                 .map_err(fail)?;
             save(&account_session_file(&app)?, &Value::Null)?;
-            if let Some(tokens) = cache.as_ref() {
+            if let Some(session) = cache.as_ref()
+                && let Some(token) = session.access_for(&config, &identity)
+            {
                 let _ = client::call(
                     &config,
                     "/auth/v1/logout?scope=local",
-                    Some(&tokens.access),
+                    Some(token),
                     Some(json!({})),
                 );
             }

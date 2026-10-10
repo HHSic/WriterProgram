@@ -60,6 +60,24 @@ pub struct Tokens {
     pub refresh: String,
     pub expires: i64,
 }
+/// Another app instance can change the remembered account; bind cached tokens too.
+pub struct Session {
+    key: String,
+    pub tokens: Tokens,
+}
+impl Session {
+    pub fn new(config: &Config, identity: &Identity, tokens: Tokens) -> Self {
+        Self {
+            key: account_key(config, identity),
+            tokens,
+        }
+    }
+    pub fn access_for(&self, config: &Config, identity: &Identity) -> Option<&str> {
+        (self.key == account_key(config, identity)
+            && self.tokens.expires > chrono::Utc::now().timestamp() + 30)
+            .then_some(self.tokens.access.as_str())
+    }
+}
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Login {
@@ -281,6 +299,22 @@ mod tests {
             account_key(&first, &identity),
             account_key(&second, &identity)
         );
+        let session = Session::new(
+            &first,
+            &identity,
+            Tokens {
+                access: "test-access".into(),
+                refresh: "test-refresh".into(),
+                expires: chrono::Utc::now().timestamp() + 3600,
+            },
+        );
+        assert_eq!(session.access_for(&first, &identity), Some("test-access"));
+        assert_eq!(session.access_for(&second, &identity), None);
+        let changed = Identity {
+            id: "u2".into(),
+            ..identity
+        };
+        assert_eq!(session.access_for(&first, &changed), None);
     }
     #[test]
     fn password_grant_stays_native_and_signup_can_require_confirmation() {
