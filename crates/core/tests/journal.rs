@@ -94,6 +94,7 @@ fn saves_records_and_imports_are_journaled_without_text() {
             })
             .collect(),
         leave_notes: false,
+        import_notes: true,
         status: None,
         page_setup: false,
     };

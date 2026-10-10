@@ -117,3 +117,14 @@ npm --prefix app test
 | 끌어서 옮기기 (Sidebar, 탭, 개요 표) | 마우스와 길게 누르기 메뉴가 엮여 있어 dnd-kit로 바꾸면 위험이 크다 |
 
 나중에 할 일: `copies/`의 파일 이름 바꾸기에는 재시도가 없다(동기화 프로그램이 파일을 잡고 있으면 실패할 수 있음. `trash.rs`는 `store::rename_retry`를 씀). `commands/`는 파일 작업을 async 안에서 바로 하고 `drives/`는 `spawn_blocking`을 쓴다. 둘을 한쪽으로 맞출지 정해야 한다.
+
+### v0.1.6 문서 도구
+
+- `workspace/Ribbon.tsx`: 편집·서식·보기·쪽·검토 도구와 문서 이력 진입점. 선택 서식은 `EditToolbar.tsx`와 같은 편집 명령을 사용한다.
+- `workspace/BlockCommands.tsx`: 문단 첫머리 슬래시 검색·IME 보호·선택 영역 우클릭. `DocPane.tsx`의 시놉시스 표시 여부는 문서 메타데이터에 저장한다.
+- `editor/verticalPages.ts`, `workspace/PagedText.tsx`: 세로 쪽 보기의 장식용 간격. 장식은 원고 JSON·실행 취소·내보내기에 들어가지 않으며, 실제 DOM의 줄 좌표를 측정한다.
+- `core::discover`, `workspace/DiscoverDialog.tsx`: 인물·장소 후보, UTF-16 등장 위치, 선택 등록과 별칭 중복 방지. 일반 명사·문맥 기반 로컬 제안으로 모든 고유명사를 보장하지 않는다.
+- `import::annotations`, `import::hwp::memos`: 문서 메모를 일반 가져오기에서 보존한다. 파일별 첫 선택 문서에 문서 메모로 연결하며 원문 인용·작성 정보는 제공되는 범위에서 유지한다.
+- `WebPane.tsx`, `Menu.tsx`, `browser::browser_preview`: 실제 메뉴 사각형과 웹 패널의 겹침을 판단한다. Windows WebView2 CapturePreview를 메모리에 유지하여 네이티브 웹뷰를 숨기는 동안 화면을 표시한다. 다른 플랫폼은 겹침 판단만 적용한다.
+
+자동 검사 외 Windows 실제 웹뷰에서 로그인 페이지를 연 뒤 사이드바 메뉴, 웹 패널 위 메뉴, 보기 설정 대화상자를 열고 닫아 페이지·로그인 상태·주소 유지와 미리보기 복원을 확인한다. 새 작품의 슬래시·시놉시스와 선택 우클릭, 긴 문단·빈 문단·쪽 나눔·한글 조합 입력의 세로 페이지도 확인한다.

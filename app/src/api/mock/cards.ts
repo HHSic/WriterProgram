@@ -1,3 +1,4 @@
+import { discoverMethods } from './discover';
 // Cards (인물, 장소, 용어 …), their kinds, and where their names appear.
 
 import type { JSONContent } from '@tiptap/core';
@@ -26,6 +27,7 @@ function paragraphTexts(body: JSONContent): { block: number; text: string }[] {
 }
 
 export const cardMethods = {
+  ...discoverMethods,
   async cardLoad(root, cardId) {
     const c = project(root).cards.get(cardId);
     if (!c) throw '카드를 찾을 수 없음';

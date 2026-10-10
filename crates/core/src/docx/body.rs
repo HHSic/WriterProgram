@@ -74,7 +74,11 @@ fn margin_ind(format: &ManuscriptFormat, attrs: ParaAttrs) -> String {
     let side = |n: u8| (u32::from(n) * 100, twips_pt(f64::from(n) * char_pt));
     let (left_chars, left) = side(attrs.left);
     let (right_chars, right) = side(attrs.right);
-    let first = attrs.indent.map_or(format.indent, f64::from);
+    let first = if attrs.heading.is_some() {
+        0.0
+    } else {
+        attrs.indent.map_or(format.indent, f64::from)
+    };
     let first_line = if first < 0.0 {
         format!(
             r#"w:hangingChars="{}" w:hanging="{}""#,
@@ -187,7 +191,12 @@ pub(super) fn document(
                         }
                     }
                     paras.push(Para {
-                        style: None,
+                        style: match attrs.heading {
+                            Some(1) => Some("WPBodyHeading1"),
+                            Some(2) => Some("WPBodyHeading2"),
+                            Some(3) => Some("WPBodyHeading3"),
+                            _ => None,
+                        },
                         ppr,
                         body: runs,
                     });

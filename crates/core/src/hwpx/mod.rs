@@ -56,11 +56,11 @@ pub fn hwpx_bytes(
                     margins.push(*attrs);
                 }
                 for piece in pieces(content) {
-                    if let Piece::Text(_, style) = piece
-                        && style != RunStyle::default()
-                        && !run_styles.contains(&style)
-                    {
-                        run_styles.push(style);
+                    if let Piece::Text(_, style) = piece {
+                        let style = crate::export::heading_style(style, attrs.heading);
+                        if style != RunStyle::default() && !run_styles.contains(&style) {
+                            run_styles.push(style);
+                        }
                     }
                 }
             }

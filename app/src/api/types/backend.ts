@@ -3,7 +3,7 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Bounds, PageClip, PageEvent } from './browser';
 import type { AiCheck, AiPreview, AiProvider, AiSettings, AiSettingsPatch, AiSummary, AiTask } from './ai';
-import type { Appearances, Card, CardSummary, CardType } from './cards';
+import type { Appearances, Card, CardSummary, CardType, Discovered, DiscoveredPick } from './cards';
 import type {
   Change,
   CopyAction,
@@ -134,6 +134,8 @@ export interface Backend {
   exchangeApply(root: string, exchangeId: string, decisions: Decisions): Promise<Applied>;
   search(root: string, query: SearchQuery): Promise<SearchResult>;
   replaceAll(root: string, query: SearchQuery, replacement: string): Promise<ReplaceOutcome>;
+  discoverScan(root: string, docIds?: string[]): Promise<Discovered>;
+  discoverAdd(root: string, picks: DiscoveredPick[]): Promise<string[]>;
   cardLoad(root: string, cardId: string): Promise<Card>;
   cardCreate(root: string, typeId: string, name: string): Promise<Card>;
   cardSave(root: string, card: Card): Promise<CardSummary>;
@@ -224,6 +226,7 @@ export interface Backend {
   aiCheck(root: string, docId: string): Promise<AiCheck>;
   /** In-app browser (prototype): desktop only. */
   browserOpen(label: string, url: string, at: Bounds): Promise<void>;
+  browserPreview(label: string): Promise<string | null>;
   browserBounds(label: string, at: Bounds, visible: boolean): Promise<void>;
   browserNavigate(label: string, url: string): Promise<string>;
   browserStep(label: string, step: 'back' | 'forward' | 'reload'): Promise<void>;

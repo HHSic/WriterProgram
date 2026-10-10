@@ -160,6 +160,7 @@ export const docMethods = {
   async docUpdateMeta(root, docId, patch) {
     const d = doc(project(root), docId);
     if (patch.title !== undefined) d.meta.title = patch.title.trim();
+    if (patch.showSynopsis !== undefined) d.meta.showSynopsis = patch.showSynopsis;
     if (patch.synopsis !== undefined) d.meta.synopsis = patch.synopsis.trim();
     if (patch.status !== undefined) d.meta.status = patch.status;
     if (patch.target !== undefined) d.meta.target = patch.target && patch.target > 0 ? patch.target : null;

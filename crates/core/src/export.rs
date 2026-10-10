@@ -160,12 +160,21 @@ fn per_doc_paths(dest: &Path, items: &[ExportItem], ext: &str) -> Vec<PathBuf> {
 /// Marks that show on paper. Memo anchors are not printed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct RunStyle {
+    pub heading: Option<u8>,
     pub color: Option<u32>,
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
     pub strike: bool,
     pub dot: bool,
+}
+
+pub(crate) fn heading_style(mut style: RunStyle, heading: Option<u8>) -> RunStyle {
+    if let Some(level @ 1..=3) = heading {
+        style.heading = Some(level);
+        style.bold = true;
+    }
+    style
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -182,6 +191,7 @@ pub fn pieces(content: &[Inline]) -> Vec<Piece> {
             Inline::HardBreak {} => out.push(Piece::Break),
             Inline::Text { text, marks } => {
                 let style = RunStyle {
+                    heading: None,
                     color: marks.iter().find_map(|m| match m {
                         Mark::TextColor { attrs } => crate::markup::rgb(&attrs.color),
                         _ => None,

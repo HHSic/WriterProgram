@@ -20,11 +20,11 @@ use super::{Builder, Edit, FileNote, Look, Marked, Tracked, Who};
 const BROKEN: &str = "Word 문서(docx)가 아니거나 손상됨";
 
 /// word/comments.xml: comment id to its text, author and date.
-fn comments(xml: &str) -> HashMap<String, FileNote> {
+fn comments(xml: &str) -> Result<HashMap<String, FileNote>, String> {
     let mut out = HashMap::new();
     let mut current: Option<(String, FileNote)> = None;
     let mut in_t = false;
-    let _ = walk(xml, |tok| match tok {
+    walk(xml, |tok| match tok {
         Tok::Start(n, a) if n == "comment" => {
             current = Some((
                 val(&a, "id").unwrap_or_default().to_string(),
@@ -55,8 +55,8 @@ fn comments(xml: &str) -> HashMap<String, FileNote> {
             }
         }
         _ => {}
-    });
-    out
+    })?;
+    Ok(out)
 }
 
 struct Reader<'a> {
@@ -213,10 +213,10 @@ pub(super) fn read(bytes: &[u8], scene_mark: &str) -> Result<Marked, String> {
         .and_then(Result::ok)
         .map(|xml| Styles::read(&xml))
         .unwrap_or_default();
-    let mut notes = read_part(&mut archive, "word/comments.xml")
-        .and_then(Result::ok)
-        .map(|xml| comments(&xml))
-        .unwrap_or_default();
+    let mut notes = match read_part(&mut archive, "word/comments.xml") {
+        Some(xml) => comments(&xml?)?,
+        None => HashMap::new(),
+    };
     let mut r = Reader {
         b: Builder::new(scene_mark),
         styles: &styles,

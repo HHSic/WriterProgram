@@ -19,6 +19,7 @@ import {
   unsplit,
   useApp,
 } from '../store';
+import { Ribbon } from './Ribbon';
 import { CenterHead } from './CenterHead';
 import { Panes } from './Panes';
 import { openSymbols } from './Symbols';
@@ -102,6 +103,7 @@ export function Workspace() {
       <Sidebar />
       <main className={`center${showMarks ? ' show-marks' : ''}`} style={viewStyle(view) as CSSProperties}>
         <CenterHead />
+        <Ribbon />
         <Panes />
         <StatusBar />
       </main>

@@ -36,6 +36,7 @@ interface MenuState {
   title?: string;
   subtitle?: string;
   openedAt: number;
+  bounds?: { left:number; top:number; right:number; bottom:number };
 }
 
 const useMenu = create<{ menu: MenuState | null }>(() => ({ menu: null }));
@@ -44,6 +45,9 @@ const useMenu = create<{ menu: MenuState | null }>(() => ({ menu: null }));
 export function useMenuOpen(): boolean {
   return useMenu((s) => s.menu !== null);
 }
+
+/** A native webview only needs hiding when the actual menu overlaps it. */
+export function useMenuBounds() { return useMenu(s => s.menu?.bounds ?? null); }
 
 /** Opens a menu at a point; after a finger it becomes a sheet. */
 export function openMenuAt(x: number, y: number, items: MenuItem[], opts: MenuOptions = {}) {
@@ -75,12 +79,18 @@ export function MenuHost() {
 
   useLayoutEffect(() => {
     if (!menu || !ref.current) return;
+    if (menu.sheet && !menu.bounds) {
+      const r = ref.current.getBoundingClientRect();
+      useMenu.setState({ menu: { ...menu, bounds: { left:r.left,top:r.top,right:r.right,bottom:r.bottom } } });
+    }
     if (!menu.sheet) {
       const { width, height } = ref.current.getBoundingClientRect();
-      setPos({
+      const next = {
         x: Math.max(8, Math.min(menu.x, window.innerWidth - width - 8)),
         y: Math.max(8, Math.min(menu.y, window.innerHeight - height - 8)),
-      });
+      };
+      setPos(next);
+      if (!menu.bounds) useMenu.setState({ menu: { ...menu, bounds: { left:next.x,top:next.y,right:next.x+width,bottom:next.y+height } } });
       ref.current.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
     }
   }, [menu]);

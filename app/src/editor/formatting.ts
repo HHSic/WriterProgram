@@ -10,6 +10,7 @@ const validAlign = (value: unknown) => ['left', 'center', 'right', 'justify'].in
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     paragraphFormat: {
+      setParagraphHeading: (level: number | null) => ReturnType;
       setParagraphAlign: (align: ParagraphAlign | null) => ReturnType;
       insertPageBreak: () => ReturnType;
       removePageBreak: () => ReturnType;
@@ -25,6 +26,9 @@ export const ParagraphFormat = Extension.create({
   name: 'paragraphFormat',
   addGlobalAttributes() {
     return [{ types: ['paragraph'], attributes: {
+      heading: { default: null, keepOnSplit: false,
+        parseHTML: (el: HTMLElement) => /^[1-3]$/.test(el.dataset.heading ?? '') ? Number(el.dataset.heading) : null,
+        renderHTML: (attrs: Record<string, unknown>) => [1,2,3].includes(Number(attrs.heading)) ? { 'data-heading': attrs.heading, role: 'heading', 'aria-level': attrs.heading } : {} },
       align: { default: null, keepOnSplit: true,
         parseHTML: (el: HTMLElement) => validAlign(el.dataset.align) ? el.dataset.align : null,
         renderHTML: (attrs: Record<string, unknown>) => validAlign(attrs.align) ? { 'data-align': attrs.align, style: `text-align: ${attrs.align}` } : {} },
@@ -38,13 +42,22 @@ export const ParagraphFormat = Extension.create({
       // Tiptap's middle-of-paragraph split copies attributes even when
       // keepOnSplit is false. A page boundary belongs only to the first part.
       splitBlock: (options) => (props) => {
+        const hadHeading = props.tr.selection.$from.parent.attrs.heading != null;
         const hadBreak = props.tr.selection.$from.parent.attrs.pageBreakBefore === true;
         if (!coreCommands.splitBlock(options)(props)) return false;
         const from = props.tr.selection.$from;
-        if (props.dispatch && hadBreak && from.depth && from.parent.type.name === 'paragraph') {
-          props.tr.setNodeMarkup(from.before(), undefined, { ...from.parent.attrs, pageBreakBefore: false });
+        if (props.dispatch && (hadBreak || hadHeading) && from.depth && from.parent.type.name === 'paragraph') {
+          props.tr.setNodeMarkup(from.before(), undefined, { ...from.parent.attrs, pageBreakBefore: false, heading: null });
         }
         return true;
+      },
+      setParagraphHeading: (heading) => ({ tr, dispatch }) => {
+        if (heading !== null && ![1,2,3].includes(heading)) return false;
+        tr.doc.nodesBetween(tr.selection.from, tr.selection.to, (node, pos) => {
+          if (node.type.name !== 'paragraph') return true;
+          if (dispatch) tr.setNodeMarkup(pos, undefined, { ...node.attrs, heading });
+          return false;
+        }); return true;
       },
       setParagraphAlign: (align) => ({ tr, dispatch }) => {
         if (align !== null && !validAlign(align)) return false;

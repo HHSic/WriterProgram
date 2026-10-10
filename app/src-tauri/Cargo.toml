@@ -1,6 +1,6 @@
 [package]
 name = "writer-app"
-version = "0.1.5"
+version = "0.1.6"
 description = "WriterProgram desktop app"
 edition.workspace = true
 publish = false
@@ -34,6 +34,10 @@ time = { version = "0.3", features = ["formatting"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = { version = "1", default-features = false }
+
+base64 = "0.22"
+webview2-com = "=0.39.1"
+windows = { version = "0.62.2", features = ["Win32_System_Com", "Win32_UI_Shell"] }
 
 [dev-dependencies]
 base64 = "0.22"

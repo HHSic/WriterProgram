@@ -10,6 +10,7 @@ import { ParagraphFormat, TextColor } from './formatting';
 import { AutoType } from './autoType';
 import { CardHighlight } from './cards';
 import { Composition } from './composition';
+import { VerticalPages } from './verticalPages';
 import { PageScroll } from './pageScroll';
 import { FocusWriting } from './focus';
 import { IndentRulesExtension } from './indent';
@@ -203,6 +204,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     SearchHighlight,
     ReadAloudHighlight,
     PageScroll,
+    VerticalPages,
     FocusWriting,
     CardHighlight.configure({ onOpen: hooks.onCardOpen }),
     Placeholder.configure({

@@ -37,14 +37,14 @@ const CHAPTER_TABS: TabList = [
   { id: 'outline', label: '개요' },
   { id: 'notes', label: '메모' },
   { id: 'cast', label: '등장 설정' },
-  { id: 'records', label: '기록' },
+  { id: 'records', label: '문서 이력' },
   { id: 'find', label: '찾기' },
   { id: 'ai', label: 'AI 점검' },
 ];
 const PLANNING_TABS: TabList = [
   { id: 'outline', label: '개요' },
   { id: 'notes', label: '메모' },
-  { id: 'records', label: '기록' },
+  { id: 'records', label: '문서 이력' },
   { id: 'find', label: '찾기' },
 ];
 const CARD_TABS: TabList = [

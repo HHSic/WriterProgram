@@ -53,6 +53,8 @@ export function marginMenu(editor: Editor): MenuItem[] {
 export function formatMenu(editor: Editor): MenuItem[] {
   const chain = () => editor.chain().focus();
   return [
+    { heading: '문단 스타일' },
+    ...([null, 1, 2, 3] as const).map((heading, i) => ({ label: ['일반 본문', '제목', '부제목', '소제목'][i], checked: editor.isActive('paragraph', { heading }), onSelect: () => { chain().setParagraphHeading(heading).run(); } })),
     { heading: '문단 정렬' },
     ...([['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽'], ['justify', '양쪽']] as [ParagraphAlign, string][]).map(([align, label]) => ({
       label: `${label} 정렬`, checked: editor.isActive('paragraph', { align }),

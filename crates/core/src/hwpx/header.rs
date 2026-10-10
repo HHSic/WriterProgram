@@ -226,6 +226,15 @@ pub(super) fn header(
     for style in run_styles {
         chars.push(CharShape {
             style: *style,
+            height: hu_pt(
+                format.size_pt
+                    * match style.heading {
+                        Some(1) => 1.6,
+                        Some(2) => 1.3,
+                        Some(3) => 1.1,
+                        _ => 1.0,
+                    },
+            ),
             ..base
         });
     }
@@ -364,19 +373,32 @@ pub(super) fn header(
     for m in margins {
         // 25– 문단 여백
         paras.push(ParaShape {
-            align: m.align.map_or(body.align, |a| match a {
-                crate::markup::Align::Left => "LEFT",
-                crate::markup::Align::Center => "CENTER",
-                crate::markup::Align::Right => "RIGHT",
-                crate::markup::Align::Justify => "JUSTIFY",
-            }),
+            align: m.align.map_or(
+                if m.heading.is_some() {
+                    "LEFT"
+                } else {
+                    body.align
+                },
+                |a| match a {
+                    crate::markup::Align::Left => "LEFT",
+                    crate::markup::Align::Center => "CENTER",
+                    crate::markup::Align::Right => "RIGHT",
+                    crate::markup::Align::Justify => "JUSTIFY",
+                },
+            ),
             page_break: m.page_break_before,
             left: (f64::from(m.left) * char_hu(format)).round() as i64,
             right: (f64::from(m.right) * char_hu(format)).round() as i64,
             // The paragraph's own first line; negative is 내어쓰기.
             indent: m
                 .indent
-                .map_or(body.indent, |i| hu_pt(f64::from(i) * format.size_pt)),
+                .map_or(if m.heading.is_some() { 0 } else { body.indent }, |i| {
+                    if m.heading.is_some() {
+                        0
+                    } else {
+                        hu_pt(f64::from(i) * format.size_pt)
+                    }
+                }),
             ..body
         });
     }
@@ -419,11 +441,18 @@ pub(super) fn header(
             0,
         ),
     ];
-    let _ = write!(out, r#"<hh:styles itemCnt="{}">"#, styles.len());
+    let _ = write!(out, r#"<hh:styles itemCnt="{}">"#, styles.len() + 3);
     for (id, (kind, name, eng, para, chr, next)) in styles.iter().enumerate() {
         let _ = write!(
             out,
             r#"<hh:style id="{id}" type="{kind}" name="{name}" engName="{eng}" paraPrIDRef="{para}" charPrIDRef="{chr}" nextStyleIDRef="{next}" langID="1042" lockForm="0"/>"#
+        );
+    }
+    for level in 1..=3 {
+        let id = styles.len() + level - 1;
+        let _ = write!(
+            out,
+            r#"<hh:style id="{id}" type="PARA" name="본문 제목 {level}" engName="WPBodyHeading{level}" paraPrIDRef="0" charPrIDRef="0" nextStyleIDRef="0" langID="1042" lockForm="0"/>"#
         );
     }
     out.push_str("</hh:styles>");

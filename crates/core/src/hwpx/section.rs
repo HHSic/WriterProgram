@@ -47,6 +47,7 @@ struct ParagraphWriter {
     pending_sec: Option<String>,
     /// Controls (머리말, 감추기) for the next paragraph written.
     pending_ctrls: String,
+    heading: Option<u8>,
 }
 
 impl ParagraphWriter {
@@ -72,7 +73,9 @@ impl ParagraphWriter {
         let _ = write!(
             self.out,
             r#"<hp:p id="{id}" paraPrIDRef="{para_pr}" styleIDRef="{}" pageBreak="{}" columnBreak="0" merged="0">{lead}{runs}</hp:p>"#,
-            if para_pr == PARA_TITLE {
+            if let Some(level @ 1..=3) = self.heading.take() {
+                23 + usize::from(level)
+            } else if para_pr == PARA_TITLE {
                 STYLE_TITLE
             } else {
                 0
@@ -230,6 +233,7 @@ pub(super) fn section(
         next_id: 0,
         pending_sec: Some(sec_pr(format)),
         pending_ctrls: String::new(),
+        heading: None,
     };
     let head = &format.header;
     let mut heads = Heads::new(format);
@@ -302,6 +306,7 @@ pub(super) fn section(
                     add_preview(&opts.scene_break);
                 }
                 Block::Paragraph { attrs, content } => {
+                    w.heading = attrs.heading;
                     // Line breaks go inside the text of the run before them.
                     let mut runs: Vec<(usize, String)> = Vec::new();
                     let mut plain = String::new();
@@ -309,7 +314,10 @@ pub(super) fn section(
                         match piece {
                             Piece::Text(text, style) => {
                                 plain.push_str(&text);
-                                runs.push((char_id(style), t_content(&text)));
+                                runs.push((
+                                    char_id(crate::export::heading_style(style, attrs.heading)),
+                                    t_content(&text),
+                                ));
                             }
                             Piece::Break => {
                                 plain.push(' ');

@@ -60,6 +60,7 @@ export type Dialog =
    * With `newProject` (시작 화면 "원고 가져오기") the chapters go into a new project.
    */
   | { kind: 'import'; partId?: string; newProject?: boolean }
+  | { kind: 'discover' }
   | { kind: 'view' }
   | { kind: 'symbols' }
   | { kind: 'share' }

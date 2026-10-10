@@ -109,6 +109,7 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
   const [loading, setLoading] = useState(false);
   const [target, setTarget] = useState(() => partId ?? newDocPartId() ?? ov?.parts[ov.parts.length - 1]?.id ?? '');
   const [leaveNotes, setLeaveNotes] = useState(true);
+  const [importNotes, setImportNotes] = useState(true);
   const [followPage, setFollowPage] = useState(false);
   const [busy, setBusy] = useState(false);
   const asked = useRef(0);
@@ -175,12 +176,13 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
     after: null,
     picks: rows.filter((r) => r.on).map((r) => ({ index: r.index, title: r.title.trim() })),
     leaveNotes: leaving && leaveNotes,
+    importNotes,
     pageSetup: !!paged && followPage,
   });
 
   const done = (count: number, notes: number, format: boolean) =>
     showToast({
-      text: `${noun} ${count}개를 가져왔습니다${notes > 0 ? ` · 빠진 자리에 메모 ${notes}개` : ''}${format ? ' · 원고 서식도 맞췄습니다' : ''}`,
+      text: `${noun} ${count}개를 가져왔습니다${notes > 0 ? ` · 메모함에 메모 ${notes}개` : ''}${format ? ' · 원고 서식도 맞췄습니다' : ''}`,
     });
 
   // 시작 화면: make the project, then bring the chapters into its first part.
@@ -514,6 +516,10 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
               </p>
             </div>
           )}
+          {preview && preview.files.some(f => (f.annotationCount ?? 0) > 0) && <div className="import-warn">
+            <label className="check"><input type="checkbox" checked={importNotes} onChange={e => setImportNotes(e.target.checked)}/>문서에 달린 메모·주석도 메모함에 가져오기</label>
+            <p className="hint">작성자·날짜·인용문을 보존하고, 파일마다 첫 번째로 가져오는 문서에 연결합니다.</p>
+          </div>}
           {leaving && (
             <div className="import-warn" role="alert">
               <strong>표·그림은 가져올 수 없습니다</strong>

@@ -198,7 +198,7 @@ function BookPages({ body, heading, preferences, enterAtEnd, hasPrevious, hasNex
             <h3>{heading}</h3>
             {(body.content ?? []).map((node, i) => node.type === 'sceneBreak'
               ? <div className="reader-scene" key={i} role="separator" aria-label="장면 나눔">***</div>
-              : <p key={i} style={{ textAlign: ['left', 'center', 'right', 'justify'].includes(node.attrs?.align) ? node.attrs?.align : undefined,
+              : <p key={i} data-heading={[1,2,3].includes(node.attrs?.heading) ? node.attrs?.heading : undefined} style={{ textAlign: ['left', 'center', 'right', 'justify'].includes(node.attrs?.align) ? node.attrs?.align : undefined,
                 breakBefore: node.attrs?.pageBreakBefore ? 'column' : undefined,
                 marginLeft: `${Math.max(0, Math.min(20, Number(node.attrs?.left) || 0))}em`,
                 marginRight: `${Math.max(0, Math.min(20, Number(node.attrs?.right) || 0))}em`,

@@ -59,8 +59,8 @@ export async function askAi(task: AiTask, docIds: string[]) {
 /** Puts a summary into the chapter's synopsis (the writer's click). */
 export async function putSynopsis(docId: string, synopsis: string): Promise<boolean> {
   try {
-    await api.docUpdateMeta(root(), docId, { synopsis });
-    patchSummary(docId, { synopsis });
+    await api.docUpdateMeta(root(), docId, { synopsis, showSynopsis: true });
+    patchSummary(docId, { synopsis, showSynopsis: true });
     return true;
   } catch (e) {
     toastError('시놉시스에 넣지 못함', e);

@@ -272,6 +272,9 @@ impl Reader<'_> {
                     self.memo_depth = 1;
                     return;
                 }
+                if n == "memogroup" {
+                    return;
+                }
                 if left_out(&n).is_some() {
                     self.skipping = 1;
                     // A control may open a 메모 field right here.
@@ -289,6 +292,7 @@ impl Reader<'_> {
                                 .copied();
                             let heading = match style {
                                 Some(StyleKind::Heading(_)) | Some(StyleKind::Toc) => true,
+                                Some(StyleKind::BodyHeading(_)) => false,
                                 None => val(&a, "paraPrIDRef")
                                     .is_some_and(|p| self.outlines.contains_key(p)),
                             };
@@ -307,6 +311,9 @@ impl Reader<'_> {
                 }
             }
             Tok::Empty(n, a) => {
+                if n == "memogroup" {
+                    return;
+                }
                 if left_out(&n).is_some() {
                     return;
                 }

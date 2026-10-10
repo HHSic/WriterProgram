@@ -47,3 +47,11 @@ it('finds the first actual scene character across blank paragraphs, tabs, marks 
   const pos = sceneTextPosition(e.state.doc, 3);
   expect(e.state.doc.textBetween(pos, pos + 1)).toBe('장');
 });
+it('persists in-body heading styles and returns to normal body on Enter', () => {
+  const e=create(); e.commands.setTextSelection(3); e.commands.setParagraphHeading(2);
+  expect(e.getHTML()).toContain('data-heading="2"');
+  const saved=e.getJSON(); e.commands.setContent(saved);
+  expect(e.state.doc.child(0).attrs.heading).toBe(2);
+  e.commands.splitBlock(); expect(e.state.doc.child(0).attrs.heading).toBe(2); expect(e.state.doc.child(1).attrs.heading).toBeNull();
+  expect(e.commands.setParagraphHeading(9)).toBe(false);
+});

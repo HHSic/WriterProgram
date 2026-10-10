@@ -15,6 +15,7 @@ export interface ImportOptions {
 }
 
 export interface ImportFile {
+  annotationCount?: number;
   name: string;
   kind: string;
   /** Why the file cannot be imported. */
@@ -65,6 +66,7 @@ export interface ImportSpec {
   after: string | null;
   picks: { index: number; title: string }[];
   leaveNotes: boolean;
+  importNotes?: boolean;
   /** Make the 원고 서식 follow the pages of the first 한글 file. */
   pageSetup: boolean;
 }

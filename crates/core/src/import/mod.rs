@@ -11,6 +11,7 @@
 //! [`commit`] once. `commit` reads the files again with the same options, so
 //! the chapters it makes are the ones the preview listed.
 
+mod annotations;
 mod hangul;
 mod hwp;
 pub(crate) mod marked;
@@ -117,6 +118,7 @@ pub(crate) enum Item {
 /// What a file read gave.
 pub(crate) struct Raw {
     pub items: Vec<Item>,
+    pub notes: Vec<crate::notes::NewNote>,
     /// txt and md only.
     pub encoding: Option<String>,
     /// hwpx only.
@@ -153,9 +155,9 @@ fn read_raw(path: &Path, opts: &ImportOptions) -> std::result::Result<Raw, Strin
     match ext.as_str() {
         "txt" => text::read(&read()?, opts, false),
         "md" | "markdown" => text::read(&read()?, opts, true),
-        "docx" => word::read(&read()?),
+        "docx" => annotations::read(&read()?, "docx", opts),
         "doc" => Err("옛 Word 형식(.doc)은 읽을 수 없음 · Word에서 docx로 저장해 주세요".into()),
-        "hwpx" => hangul::read(&read()?),
+        "hwpx" => annotations::read(&read()?, "hwpx", opts),
         "hwp" => hwp::read(path),
         _ => Err("가져올 수 없는 파일 형식 (txt, md, docx, hwp, hwpx)".into()),
     }
@@ -165,6 +167,9 @@ fn read_raw(path: &Path, opts: &ImportOptions) -> std::result::Result<Raw, Strin
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileInfo {
+    pub annotation_count: usize,
+    #[serde(skip)]
+    notes: Vec<crate::notes::NewNote>,
     pub name: String,
     /// txt, md or docx.
     pub kind: String,
@@ -196,6 +201,8 @@ fn read_files(paths: &[PathBuf], opts: &ImportOptions) -> (Vec<FileInfo>, Vec<Ch
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
         let mut info = FileInfo {
+            annotation_count: 0,
+            notes: Vec::new(),
             name,
             kind,
             error: None,
@@ -206,6 +213,8 @@ fn read_files(paths: &[PathBuf], opts: &ImportOptions) -> (Vec<FileInfo>, Vec<Ch
         };
         let result = read_raw(path, opts).and_then(|raw| {
             let how = resolve(&raw.items, opts)?;
+            info.annotation_count = raw.notes.len();
+            info.notes = raw.notes;
             info.encoding = raw.encoding;
             info.page = raw.page;
             info.rule = how.label(opts.rule).into();
@@ -339,11 +348,17 @@ pub struct CommitSpec {
     /// Leave a 메모 where something was left out.
     #[serde(default)]
     pub leave_notes: bool,
+    #[serde(default = "import_annotations")]
+    pub import_notes: bool,
     #[serde(default)]
     pub status: Option<String>,
     /// Make the 원고 서식 follow the pages of the first 한글 file.
     #[serde(default)]
     pub page_setup: bool,
+}
+
+fn import_annotations() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -433,6 +448,7 @@ pub fn commit(
     let dir = root.join(MANUSCRIPT_DIR);
     let mut made: Vec<String> = Vec::new();
     let mut note_ids: Vec<String> = Vec::new();
+    let mut annotated = std::collections::HashSet::new();
     let result = (|| -> Result<()> {
         for pick in &picks {
             let chapter = &chapters[pick.index];
@@ -448,6 +464,9 @@ pub fn commit(
             } else {
                 Vec::new()
             };
+            if spec.import_notes && annotated.insert(chapter.file) {
+                new_notes.extend(files[chapter.file].notes.clone());
+            }
             let title = pick.title.trim();
             let mut meta = DocMeta::new(&id, title);
             meta.status = status.into();

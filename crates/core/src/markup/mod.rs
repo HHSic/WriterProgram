@@ -77,6 +77,12 @@ pub enum Block {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ParaAttrs {
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "heading_level"
+    )]
+    pub heading: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub align: Option<Align>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -100,7 +106,8 @@ impl ParaAttrs {
     pub const MAX_INDENT: i8 = 10;
 
     pub fn is_plain(&self) -> bool {
-        self.left == 0
+        self.heading.is_none()
+            && self.left == 0
             && self.right == 0
             && self.indent.is_none()
             && self.align.is_none()
@@ -133,6 +140,11 @@ pub fn rgb(color: &str) -> Option<u32> {
     (hex.len() == 6 && hex.bytes().all(|c| c.is_ascii_hexdigit()))
         .then(|| u32::from_str_radix(hex, 16).ok())
         .flatten()
+}
+
+fn heading_level<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<Option<u8>, D::Error> {
+    let level: Option<u8> = Option::deserialize(d)?;
+    Ok(level.filter(|n| (1..=3).contains(n)))
 }
 
 /// Reads a first-line indent leniently, like `margin`; null is none.

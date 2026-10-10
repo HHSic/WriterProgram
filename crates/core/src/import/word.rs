@@ -232,7 +232,15 @@ pub(super) fn property(
                     }
                 }
                 "pageBreakBefore" => p.attrs.page_break_before = flag(a),
-                "pStyle" => p.style = val(a, "val").map(str::to_string),
+                "pStyle" => {
+                    p.style = val(a, "val").map(str::to_string);
+                    p.attrs.heading = p
+                        .style
+                        .as_deref()
+                        .and_then(|s| s.strip_prefix("WPBodyHeading"))
+                        .and_then(|s| s.parse::<u8>().ok())
+                        .filter(|n| (1..=3).contains(n));
+                }
                 "outlineLvl" => p.outline = val(a, "val").and_then(|v| v.parse().ok()),
                 _ => {}
             }
@@ -272,6 +280,7 @@ pub(super) fn read(bytes: &[u8]) -> Result<Raw, String> {
         .map(|xml| Styles::read(&xml))
         .unwrap_or_default();
     Ok(Raw {
+        notes: Vec::new(),
         items: body(&document, &styles)?,
         encoding: None,
         page: None,

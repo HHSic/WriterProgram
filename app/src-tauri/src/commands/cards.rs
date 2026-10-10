@@ -78,3 +78,24 @@ pub async fn card_type_remove(
     let _write = state.write();
     cards::remove_type(Path::new(&root), &type_id).map_err(fail)
 }
+
+#[tauri::command]
+pub async fn discover_scan(
+    root: String,
+    doc_ids: Option<Vec<String>>,
+) -> Res<writer_core::discover::Discovered> {
+    tauri::async_runtime::spawn_blocking(move || {
+        writer_core::discover::scan(Path::new(&root), doc_ids.as_deref()).map_err(fail)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+#[tauri::command]
+pub async fn discover_add(
+    state: State<'_, AppState>,
+    root: String,
+    picks: Vec<writer_core::discover::Pick>,
+) -> Res<Vec<String>> {
+    let _write = state.write();
+    writer_core::discover::add(Path::new(&root), &picks).map_err(fail)
+}

@@ -272,3 +272,91 @@ mod tests {
         assert_eq!(address("").as_str(), HOME);
     }
 }
+
+/// Keep a local image behind the native child webview while UI overlays cover it.
+/// No page script, cookie, or screenshot is sent to another service or saved to disk.
+#[tauri::command]
+pub async fn browser_preview(app: AppHandle, label: String) -> Res<Option<String>> {
+    let page = webview(&app, &label)?;
+    #[cfg(not(windows))]
+    {
+        let _ = page;
+        Ok(None)
+    }
+    #[cfg(windows)]
+    {
+        use base64::Engine as _;
+        use webview2_com::{
+            CapturePreviewCompletedHandler,
+            Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+        };
+        use windows::Win32::{
+            System::Com::{STATFLAG_NONAME, STATSTG, STREAM_SEEK_SET},
+            UI::Shell::SHCreateMemStream,
+        };
+        let (send, recv) = mpsc::channel();
+        page.with_webview(move |native| {
+            let fallback = send.clone();
+            let result = (|| -> windows::core::Result<()> {
+                // All COM objects are created and used on the webview's UI thread.
+                let stream = unsafe { SHCreateMemStream(None) }.ok_or_else(|| {
+                    windows::core::Error::from_hresult(windows::core::HRESULT(0x80004005u32 as i32))
+                })?;
+                let reader = stream.clone();
+                let handler = CapturePreviewCompletedHandler::create(Box::new(move |result| {
+                    let bytes = (|| -> windows::core::Result<Vec<u8>> {
+                        result?;
+                        let mut stat = STATSTG::default();
+                        unsafe {
+                            reader.Stat(&mut stat, STATFLAG_NONAME)?;
+                        }
+                        if stat.cbSize == 0 || stat.cbSize > 16 * 1024 * 1024 {
+                            return Err(windows::core::Error::from_hresult(
+                                windows::core::HRESULT(0x80004005u32 as i32),
+                            ));
+                        }
+                        let mut output = vec![0u8; stat.cbSize as usize];
+                        let mut read = 0;
+                        unsafe {
+                            reader.Seek(0, STREAM_SEEK_SET, None)?;
+                            reader
+                                .Read(
+                                    output.as_mut_ptr().cast(),
+                                    output.len() as u32,
+                                    Some(&mut read),
+                                )
+                                .ok()?;
+                        }
+                        output.truncate(read as usize);
+                        Ok(output)
+                    })()
+                    .map_err(|e| e.to_string());
+                    let _ = send.send(bytes);
+                    Ok(())
+                }));
+                unsafe {
+                    native.controller().CoreWebView2()?.CapturePreview(
+                        COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG,
+                        &stream,
+                        &handler,
+                    )?;
+                }
+                Ok(())
+            })();
+            if let Err(e) = result {
+                let _ = fallback.send(Err(e.to_string()));
+            }
+        })
+        .map_err(|e| e.to_string())?;
+        let bytes = tauri::async_runtime::spawn_blocking(move || {
+            recv.recv_timeout(Duration::from_secs(3))
+                .map_err(|_| "웹 화면 미리보기 시간 초과".to_string())?
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+        Ok(Some(format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        )))
+    }
+}

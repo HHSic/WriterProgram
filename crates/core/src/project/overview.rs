@@ -61,6 +61,7 @@ pub struct DocSummary {
     pub id: String,
     pub title: String,
     pub synopsis: String,
+    pub show_synopsis: Option<bool>,
     pub status: String,
     pub target: Option<u32>,
     /// 완료 회차 잠금 (see `DocMeta::locked`).
@@ -78,6 +79,7 @@ impl DocSummary {
             id: doc.meta.id.clone(),
             title: doc.meta.title.clone(),
             synopsis: doc.meta.synopsis.clone(),
+            show_synopsis: doc.meta.show_synopsis,
             status: doc.meta.status.clone(),
             target: doc.meta.target,
             locked: doc.meta.locked,

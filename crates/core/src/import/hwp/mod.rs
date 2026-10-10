@@ -2,6 +2,7 @@
 //! Uses CFB and raw DEFLATE; no Hancom installation or external converter.
 
 mod body;
+mod memos;
 mod records;
 mod styles;
 
@@ -148,6 +149,7 @@ pub(super) fn read(path: &Path) -> Result<Raw, String> {
         return Err(BROKEN.into());
     }
     let mut items = Vec::new();
+    let mut notes = Vec::new();
     for (_, path) in sections {
         let data = stream(
             &mut compound,
@@ -156,8 +158,10 @@ pub(super) fn read(path: &Path) -> Result<Raw, String> {
             &mut remaining,
         )?;
         body::read(&data, &styles, &mut items)?;
+        notes.extend(memos::read(&data)?);
     }
     Ok(Raw {
+        notes,
         items,
         encoding: None,
         page: None,

@@ -12,6 +12,7 @@ pub mod changes;
 pub mod copies;
 pub mod corrections;
 pub mod count;
+pub mod discover;
 pub mod doc;
 pub mod docx;
 pub mod error;

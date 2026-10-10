@@ -40,6 +40,16 @@ pub(super) fn parse_para_open(chars: &[char]) -> Option<(ParaAttrs, usize)> {
             return Some((attrs, i + 1));
         }
         let rest = &chars[i.min(chars.len())..];
+        if starts_with(rest, " data-heading=\"") {
+            i += " data-heading=\"".len();
+            let level = chars.get(i)?.to_digit(10)? as u8;
+            if !(1..=3).contains(&level) || chars.get(i + 1) != Some(&'"') {
+                return None;
+            }
+            attrs.heading = Some(level);
+            i += 2;
+            continue;
+        }
         if starts_with(rest, " data-align=\"") {
             i += " data-align=\"".len();
             let value: String = chars[i..]

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api } from '../api';
 import type { Bounds } from '../api/types';
 import { Icon } from '../components/Icon';
-import { useMenuOpen } from '../components/Menu';
+import { useMenuBounds } from '../components/Menu';
 import { clipPage, rememberWebPage, useApp, webPages } from '../store';
 
 const HOME = 'https://www.google.com/';
@@ -16,7 +16,7 @@ const HOME = 'https://www.google.com/';
 export function WebPane({ id, active }: { id: string; active: boolean }) {
   const projectId = useApp((s) => s.overview!.project.id);
   const covered = useApp((s) => s.dialog !== null || s.busy !== null);
-  const menuOpen = useMenuOpen();
+  const menuBounds = useMenuBounds();
   const label = `web-${id}`;
   const saved = webPages(projectId)[id];
   const [url, setUrl] = useState(saved?.url || HOME);
@@ -25,7 +25,15 @@ export function WebPane({ id, active }: { id: string; active: boolean }) {
   const [editing, setEditing] = useState(false);
   const host = useRef<HTMLDivElement>(null);
   const opened = useRef(false);
-  const visible = active && !covered && !menuOpen && api.isDesktop;
+  const mounted = useRef(true);
+  const placement = useRef<{at:Bounds; show:boolean}|null>(null);
+  const [preview,setPreview] = useState<string|null>(null);
+  const previewGeneration = useRef(0);
+  const capture = () => {
+    const generation = ++previewGeneration.current;
+    void api.browserPreview(label).then(image => { if(generation === previewGeneration.current) setPreview(image); }).catch(() => {});
+  };
+  const visible = active && !covered && api.isDesktop;
 
   // Address, title and loading from the page.
   useEffect(
@@ -38,7 +46,7 @@ export function WebPane({ id, active }: { id: string; active: boolean }) {
           rememberWebPage(projectId, id, { url: e.url });
         }
         if (e.title !== undefined) rememberWebPage(projectId, id, { title: e.title });
-        if (e.loading !== undefined) setLoading(e.loading);
+        if (e.loading !== undefined) { setLoading(e.loading); if(!e.loading) capture(); }
       }),
     [label, projectId, id, editing],
   );
@@ -52,17 +60,24 @@ export function WebPane({ id, active }: { id: string; active: boolean }) {
     const place = () => {
       const r = el.getBoundingClientRect();
       const at: Bounds = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
-      const show = visible && at.w > 0 && at.h > 0;
+      const overlap = menuBounds && menuBounds.left < r.right && menuBounds.right > r.left && menuBounds.top < r.bottom && menuBounds.bottom > r.top;
+      const show = visible && !overlap && at.w > 0 && at.h > 0;
+      placement.current = {at,show};
       const key = `${show}:${at.x},${at.y},${at.w},${at.h}`;
       if (key === last) return;
       last = key;
       if (show && !opened.current) {
         opened.current = true;
-        void api.browserOpen(label, url, at).catch(() => {
+        void api.browserOpen(label, url, at).then(async () => {
+          if(!mounted.current) { await api.browserClose(label); return; }
+          const latest = placement.current;
+          if(latest) await api.browserBounds(label,latest.at,latest.show);
+          capture();
+        }).catch(() => {
           opened.current = false;
         });
       } else if (opened.current) {
-        void api.browserBounds(label, at, show);
+        void api.browserBounds(label, at, show).catch(() => { last = ''; });
       }
     };
     place();
@@ -78,11 +93,13 @@ export function WebPane({ id, active }: { id: string; active: boolean }) {
       clearInterval(timer);
     };
     // `url` only matters for the first opening.
-  }, [label, visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [label, visible, menuBounds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Closing the tab closes the page.
   useEffect(
     () => () => {
+      mounted.current = false;
+      previewGeneration.current++;
       if (opened.current) void api.browserClose(label);
     },
     [label],
@@ -139,6 +156,8 @@ export function WebPane({ id, active }: { id: string; active: boolean }) {
         </button>
       </form>
       <div ref={host} className="web-host">
+        {api.isDesktop && !preview && covered && <p className="pane-message">열어 둔 웹 페이지는 이 창을 닫으면 계속 사용할 수 있습니다.</p>}
+        {api.isDesktop && preview && <img className="web-preview" src={preview} alt="열어 둔 웹 페이지" draggable={false}/> }
         {!api.isDesktop && <p className="pane-message">앱 안 브라우저는 데스크톱 앱에서만 보입니다.</p>}
       </div>
     </div>

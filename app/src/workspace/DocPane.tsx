@@ -40,6 +40,7 @@ import { touchCapable, touchLike } from '../lib/pointer';
 import { keysText } from '../lib/shortcuts';
 import { useNameIndex } from './CardPanels';
 import { DocBanners } from './Copies';
+import { SlashCommands, openSelectionMenu } from './BlockCommands';
 import { EditToolbar } from './EditToolbar';
 import { ReadingBar } from './ReadingBar';
 import { PagedText } from './PagedText';
@@ -253,11 +254,12 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       {docLocked && <LockedBanner docId={docId} planning={isPlanning} />}
       <div className={`doc-scroll${view.pages ? ' page-mode' : ''}`}>
         {showRuler && <Ruler editor={editor} planning={isPlanning} />}
-        <article className={view.pages ? 'paged-shell' : 'page'}>
-          <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={locked || docLocked} />
+        <article className={view.pages ? 'paged-shell' : 'page'} onContextMenu={e => openSelectionMenu(e,editor)}>
+          <DocHeader root={root} data={data} editor={editor} planning={isPlanning} locked={!editable} />
           {view.pages ? <PagedText editor={editor} format={pageFormat} view={view} /> : <EditorContent editor={editor} />}
         </article>
         <FormatBubble editor={editor} />
+        <SlashCommands editor={editor} />
         <ReadingBar editor={editor} />
       </div>
       {toolbar && <EditToolbar editor={editor} />}
@@ -314,6 +316,8 @@ function DocHeader({
   const summary = useApp((s) => findDoc(s.overview!, docId)?.doc);
   const [title, setTitle] = useState(data.meta.title);
   const [synopsis, setSynopsis] = useState(data.meta.synopsis);
+  const visible = summary?.showSynopsis ?? data.meta.showSynopsis ?? !!synopsis;
+  const [added, setAdded] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const synopsisRef = useRef<HTMLTextAreaElement>(null);
 
@@ -346,6 +350,17 @@ function DocHeader({
     schedule({ ...pending.current, ...patch });
   };
 
+  useEffect(() => {
+    const command = (event: Event) => {
+      if (locked || planning || !editor.isEditable) return;
+      const action = (event as CustomEvent<string>).detail;
+      if (action === 'add') { setAdded(true); change({ showSynopsis: true }); }
+      else if (action === 'remove') { setSynopsis(''); change({ synopsis: '', showSynopsis: false }); }
+    };
+    editor.view.dom.addEventListener('writer:synopsis', command);
+    return () => editor.view.dom.removeEventListener('writer:synopsis', command);
+  });
+  useEffect(() => { if (added && visible) { synopsisRef.current?.focus(); setAdded(false); } }, [added, visible]);
   return (
     <header className="doc-head">
       <input
@@ -364,14 +379,15 @@ function DocHeader({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault();
-            if (planning) editor.commands.focus('start');
+            if (planning || !visible) editor.commands.focus('start');
             else synopsisRef.current?.focus();
           }
         }}
       />
-      {!planning && (
+      {!planning && visible && (
         <label className="synopsis">
           <span className="synopsis-label">시놉시스</span>
+          <button type="button" className="synopsis-remove" aria-label="시놉시스 삭제" disabled={locked} onClick={() => { setSynopsis(''); change({ synopsis: '', showSynopsis: false }); }}>삭제</button>
           <textarea
             ref={synopsisRef}
             rows={1}

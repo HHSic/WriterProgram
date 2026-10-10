@@ -129,6 +129,9 @@ fn memo_id(id: &str) -> String {
 
 fn para_open(attrs: ParaAttrs) -> String {
     let mut tag = String::from("<p");
+    if let Some(level @ 1..=3) = attrs.heading {
+        tag.push_str(&format!(" data-heading=\"{level}\""));
+    }
     if attrs.left > 0 {
         tag.push_str(&format!(" data-left=\"{}\"", attrs.left));
     }

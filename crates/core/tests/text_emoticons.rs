@@ -119,6 +119,7 @@ fn every_offered_face_survives_hwpx_export_and_import() {
                 title: "표정".into(),
             }],
             leave_notes: false,
+            import_notes: true,
             status: None,
             page_setup: false,
         },

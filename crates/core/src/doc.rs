@@ -50,6 +50,8 @@ pub struct DocMeta {
     pub title: String,
     #[serde(default)]
     pub synopsis: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub show_synopsis: Option<bool>,
     #[serde(default = "default_status")]
     pub status: String,
     #[serde(default)]
@@ -76,6 +78,7 @@ impl DocMeta {
             id: id.into(),
             title: title.into(),
             synopsis: String::new(),
+            show_synopsis: None,
             status: default_status(),
             target: None,
             locked: false,
@@ -148,6 +151,7 @@ pub fn parse_doc(src: &str, fallback_id: &str) -> DocFile {
                 "id" => meta.id = decode_value(raw),
                 "title" => meta.title = decode_value(raw),
                 "synopsis" => meta.synopsis = decode_value(raw),
+                "showSynopsis" => meta.show_synopsis = Some(decode_value(raw) == "true"),
                 "status" => meta.status = decode_value(raw),
                 "target" => meta.target = decode_value(raw).parse().ok(),
                 "locked" => meta.locked = decode_value(raw) == "true",
@@ -187,6 +191,9 @@ pub fn write_doc(doc: &DocFile) -> String {
     out.push_str(&format!("id: {}\n", encode(&m.id)));
     out.push_str(&format!("title: {}\n", encode(&m.title)));
     out.push_str(&format!("synopsis: {}\n", encode(&m.synopsis)));
+    if let Some(show) = m.show_synopsis {
+        out.push_str(&format!("showSynopsis: {show}\n"));
+    }
     out.push_str(&format!("status: {}\n", encode(&m.status)));
     if let Some(target) = m.target {
         out.push_str(&format!("target: {target}\n"));
@@ -460,6 +467,7 @@ pub fn keep_record(
 pub struct MetaPatch {
     pub title: Option<String>,
     pub synopsis: Option<String>,
+    pub show_synopsis: Option<bool>,
     pub status: Option<String>,
     #[serde(default, with = "double_option")]
     pub target: Option<Option<u32>>,
@@ -488,6 +496,9 @@ pub fn update_meta(root: &Path, id: &str, patch: &MetaPatch) -> Result<DocMeta> 
     if let Some(synopsis) = &patch.synopsis {
         doc.meta.synopsis = synopsis.trim().to_string();
     }
+    if let Some(show) = patch.show_synopsis {
+        doc.meta.show_synopsis = Some(show);
+    }
     if let Some(status) = &patch.status {
         if !STATUSES.contains(&status.as_str()) {
             return Err(Error::Invalid(format!("알 수 없는 상태: {status}")));
@@ -512,6 +523,7 @@ mod tests {
     fn front_matter_round_trips() {
         let mut meta = DocMeta::new("abc", "비에 젖은 손님: \"첫\" 화");
         meta.synopsis = "줄바꿈\n있는 요약".into();
+        meta.show_synopsis = Some(true);
         meta.target = Some(5000);
         meta.extra.push(("futureKey".into(), "[1, 2]".into()));
         let doc = DocFile {

@@ -59,6 +59,7 @@ export interface DocSummary {
   id: string;
   title: string;
   synopsis: string;
+  showSynopsis?: boolean | null;
   status: DocStatus;
   target: number | null;
   /** 완료 회차 잠금: kept as it is (read-only, passed by replace-all and corrections). */
@@ -74,6 +75,7 @@ export interface DocMeta {
   id: string;
   title: string;
   synopsis: string;
+  showSynopsis?: boolean | null;
   status: DocStatus;
   target: number | null;
   locked: boolean;
@@ -154,6 +156,7 @@ export interface Mended {
 export interface MetaPatch {
   title?: string;
   synopsis?: string;
+  showSynopsis?: boolean;
   status?: DocStatus;
   /** `null` clears the target; leave out to keep it. */
   target?: number | null;

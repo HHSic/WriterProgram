@@ -21,6 +21,7 @@ import { SymbolsDialog } from './Symbols';
 import { ShareDialog } from './ShareDialog';
 import { ReaderDialog } from './ReaderDialog';
 import { TrashDialog } from './TrashDialog';
+import { DiscoverDialog } from './DiscoverDialog';
 import { ViewDialog } from './ViewDialog';
 import { useApp } from '../store';
 
@@ -40,6 +41,8 @@ export function DialogHost() {
       return <ExchangesDialog />;
     case 'import':
       return <ImportDialog partId={dialog.partId} newProject={dialog.newProject} />;
+    case 'discover':
+      return <DiscoverDialog />;
     case 'view':
       return <ViewDialog />;
     case 'symbols':

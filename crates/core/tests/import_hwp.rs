@@ -153,6 +153,7 @@ fn import_text(path: &Path, root: &Path, options: &ImportOptions) -> (String, Ve
             })
             .collect(),
         leave_notes: true,
+        import_notes: true,
         status: None,
         page_setup: false,
     };
@@ -395,6 +396,7 @@ fn paragraph_dimensions_literal_indentation_colour_and_page_break_survive_save()
                 title: "들여쓰기".into(),
             }],
             leave_notes: false,
+            import_notes: true,
             status: None,
             page_setup: false,
         },
@@ -413,4 +415,61 @@ fn paragraph_dimensions_literal_indentation_colour_and_page_break_survive_save()
         matches!(&content[0], Inline::Text { marks, .. } if marks.iter().any(|m| matches!(m, Mark::TextColor { attrs } if attrs.color == "#2365B8")))
     );
     assert_eq!(saved.body[2].attrs().indent, Some(0));
+}
+
+#[test]
+fn binary_memo_lists_are_imported_as_notes_without_entering_manuscript() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("메모.hwp");
+    let mut section = paragraph("원고 본문", 0, &[(0, 0)], 0);
+    section.extend(record(93, 1, &[0; 4]));
+    section.extend(record(92, 1, &[0; 22]));
+    section.extend(paragraph("이 문장을 다시 검토하세요 😀", 0, &[(0, 0)], 2));
+    section.extend(paragraph("두 번째 메모 줄", 0, &[(0, 0)], 2));
+    section.extend(record(93, 1, &[0; 4]));
+    section.extend(paragraph("다른 메모", 0, &[(0, 0)], 2));
+    write_hwp(&path, 1, &[section]);
+    let preview = import::preview(std::slice::from_ref(&path), &ImportOptions::default());
+    assert_eq!(preview.files[0].annotation_count, 2);
+    assert_eq!(preview.chapters[0].chars, 5);
+    let root = project::create(&NewProject {
+        title: "메모 검증".into(),
+        parent: dir.path().to_string_lossy().into_owned(),
+        kind: ProjectKind::Webnovel,
+        per_doc_goal: None,
+        count_spaces: true,
+        first_chapter: false,
+        platform: None,
+    })
+    .unwrap();
+    let result = import::commit(
+        &root,
+        &[path],
+        &ImportOptions::default(),
+        &CommitSpec {
+            part_id: None,
+            after: None,
+            picks: vec![Pick {
+                index: 0,
+                title: "가져오기".into(),
+            }],
+            leave_notes: false,
+            import_notes: true,
+            status: None,
+            page_setup: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(result.notes, 2);
+    let notes = writer_core::notes::list(&root).unwrap();
+    assert!(notes.iter().all(|n| n.target == result.docs[0]));
+    assert!(
+        notes
+            .iter()
+            .any(|n| n.text.contains("😀") && n.text.contains("두 번째 메모 줄"))
+    );
+    assert_eq!(
+        plain_text(&doc::load(&root, &result.docs[0]).unwrap().body),
+        "원고 본문"
+    );
 }

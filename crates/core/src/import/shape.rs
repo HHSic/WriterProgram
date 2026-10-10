@@ -24,6 +24,7 @@ impl Shape {
                 .clamp(0.0, f64::from(ParaAttrs::MAX)) as u8
         };
         ParaAttrs {
+            heading: None,
             align: self.align,
             page_break_before: self.page_break,
             left: margin(self.left),

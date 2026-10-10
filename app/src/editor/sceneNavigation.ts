@@ -30,7 +30,7 @@ export function goToScene(editor: Editor, start: number) {
   if (!scroller) return;
   let caret = editor.view.coordsAtPos(pos);
   const page = editor.view.dom.closest<HTMLElement>('.paged-viewport');
-  if (page) {
+  if (page?.dataset.pageStep) {
     const step = Number(page.dataset.pageStep) || page.clientWidth + 48;
     const column = Math.max(0, Math.floor((caret.left - page.getBoundingClientRect().left + page.scrollLeft) / step));
     page.scrollLeft = column * step;

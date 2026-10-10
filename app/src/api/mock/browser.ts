@@ -4,6 +4,7 @@ import type { Backend } from '../types';
 
 export const browserMethods = {
   async browserOpen() {},
+  async browserPreview() { return null; },
   async browserBounds() {},
   async browserNavigate(_label, url) {
     return url;

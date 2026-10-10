@@ -128,6 +128,7 @@ export function CardsSection() {
     <section aria-label="설정집" className="tree planning">
       <div className="section-head">
         <span className="section-label">설정집</span>
+        <button type="button" className="btn small" onClick={() => openDialog({ kind: 'discover' })}>자동 찾기</button>
         <button type="button" className="icon-btn tiny" aria-label="분류 추가" title="분류 추가" onClick={addKind}>
           <Icon name="plus" size={13} />
         </button>

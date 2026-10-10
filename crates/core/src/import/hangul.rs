@@ -174,6 +174,7 @@ fn para_shapes(header: &str) -> HashMap<String, Shape> {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum StyleKind {
     Heading(u8),
+    BodyHeading(u8),
     Toc,
 }
 
@@ -196,6 +197,13 @@ pub(super) fn styles(header: &str) -> HashMap<String, StyleKind> {
             };
             let kind = names.iter().find_map(|name| {
                 let lower = name.to_lowercase();
+                if let Some(level) = name
+                    .strip_prefix("WPBodyHeading")
+                    .and_then(|s| s.parse::<u8>().ok())
+                    .filter(|n| (1..=3).contains(n))
+                {
+                    return Some(StyleKind::BodyHeading(level));
+                }
                 if *name == "장 제목" || lower == "chapter title" {
                     return Some(StyleKind::Heading(1));
                 }
@@ -350,7 +358,7 @@ pub(super) fn left_out(name: &str) -> Option<Option<SkipKind>> {
         | "curve" | "connectLine" | "line" | "textart" | "video" | "chart" => Some(SkipKind::Image),
         // Controls (머리말, 꼬리말, 쪽 번호, 각주 …), the section's page setup,
         // and 한글's own line layout cache: nothing of the text.
-        "ctrl" | "secPr" | "linesegarray" => None,
+        "ctrl" | "secPr" | "linesegarray" | "memo" | "memogroup" => None,
         _ => return None,
     })
 }
@@ -366,6 +374,7 @@ fn section(
     struct Open {
         para: Para,
         heading: Option<u8>,
+        body_heading: Option<u8>,
         toc: bool,
         shape: Option<Shape>,
         height: Option<f64>,
@@ -382,6 +391,7 @@ fn section(
         if let Some(shape) = open.shape {
             open.para.attrs = shape.attrs(open.height.unwrap_or(1000.0));
         }
+        open.para.attrs.heading = open.body_heading;
         open.para.attrs.page_break_before |= open.page_break;
         open.para.close(open.heading, open.toc, items);
     };
@@ -417,6 +427,7 @@ fn section(
                         let style = val(&a, "styleIDRef").and_then(|s| styles.get(s)).copied();
                         let heading = match style {
                             Some(StyleKind::Heading(level)) => Some(level),
+                            Some(StyleKind::BodyHeading(_)) => None,
                             _ => val(&a, "paraPrIDRef")
                                 .and_then(|p| outlines.get(p))
                                 .copied(),
@@ -430,6 +441,10 @@ fn section(
                             height: None,
                             page_break: val(&a, "pageBreak") == Some("1"),
                             heading,
+                            body_heading: match style {
+                                Some(StyleKind::BodyHeading(n)) => Some(n),
+                                _ => None,
+                            },
                             toc: style == Some(StyleKind::Toc),
                         });
                     }
@@ -530,6 +545,7 @@ pub(super) fn read(bytes: &[u8]) -> Result<Raw, String> {
     }
     let page = found.setup();
     Ok(Raw {
+        notes: Vec::new(),
         items,
         encoding: None,
         page,
