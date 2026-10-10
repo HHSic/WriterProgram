@@ -6,6 +6,7 @@ import type { DocData } from '../api/types';
 import { Modal } from '../components/Modal';
 import { BOOK_GAP, MM_TO_PX, bookColumns, bookLayout, loadBookPreferences, saveBookPreferences, type BookPreferences } from '../lib/book';
 import { useReaderFullscreen } from '../lib/useReaderFullscreen';
+import { PREFERENCES_CHANGED } from '../lib/preferenceEvents';
 import { ReaderSettings } from './ReaderSettings';
 import { UNTITLED, docNumber } from '../lib/labels';
 import { allManuscript, closeDialog, saveEverything, useApp } from '../store';
@@ -26,6 +27,7 @@ export function ReaderDialog() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { saveBookPreferences(preferences); }, [preferences]);
+  useEffect(() => { const reload=()=>{const next=loadBookPreferences();setPreferences(old=>JSON.stringify(old)===JSON.stringify(next)?old:next);};window.addEventListener(PREFERENCES_CHANGED,reload);return()=>window.removeEventListener(PREFERENCES_CHANGED,reload); }, []);
   useEffect(() => {
     if (!chapterId) return;
     let alive = true;

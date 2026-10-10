@@ -6196,7 +6196,7 @@ dependencies = [
 
 [[package]]
 name = "writer-app"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -6213,6 +6213,7 @@ dependencies = [
  "tempfile",
  "time",
  "ureq",
+ "url",
  "webview2-com",
  "windows 0.62.2",
  "windows-native-keyring-store",

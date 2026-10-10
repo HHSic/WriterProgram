@@ -8,6 +8,8 @@
 
 **책 미리보기**: `workspace/ReaderDialog.tsx`는 저장 후 기존 `docLoad`로 회차를 불러와 읽기 전용으로 표시한다. `lib/book.ts`는 한 쪽·두 쪽 계산과 기기별 읽기 설정, `styles/reader.css`는 책 화면을 맡는다. 사용 방법과 배포 범위는 [book-reader.md](book-reader.md).
 
+**계정·개인 설정 동기화**: `workspace/AccountDialog.tsx` → `store/account.ts`(계정별 캐시·오프라인 변경·자동 적용) → `src-tauri/src/accounts/`(Supabase Auth·PKCE·자격 증명 저장소·설정 RPC). `lib/preferences.ts`는 공유 가능한 설정만 고르고 `preferenceEvents.ts`로 열려 있는 도구줄과 책 미리보기에 적용한다. DB 설치는 `supabase/migrations/202610100001_personal_settings.sql`, 운영자 설정은 [accounts.md](accounts.md). DB 권한과 충돌 처리는 실제 PostgreSQL 엔진(PGlite)에서 시험한다.
+
 ## Rust
 
 **드라이브 연결 마법사**: `workspace/Drives.tsx`의 진입 버튼 → `workspace/DriveWizard.tsx`(등록 안내·입력·로그인·완료) → `api` → `src-tauri/src/drives/registration.rs`(등록값 읽기·검사·원자적 저장·회사 콘솔 열기)와 `connect.rs`(기존 PKCE 로그인, 중복 로그인 방지). 등록 파일의 다른 드라이브 설정은 보존하고 로그인 중 또는 연결된 드라이브의 등록값 변경을 막는다. 안내는 [drive-apps.md](drive-apps.md).

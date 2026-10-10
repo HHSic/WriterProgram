@@ -1,5 +1,5 @@
-// Writing screen settings (작성 화면 설정): per device, never written into
-// manuscript files (docs/mvp-scope.md "서식 모델").
+// Writing screen settings (작성 화면 설정): local unless account sync is enabled;
+// never written into manuscript files (docs/mvp-scope.md "서식 모델").
 
 import type { QuoteStyle } from '../editor/autoType';
 import type { AccentId, PaletteId } from './colors';

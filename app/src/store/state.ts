@@ -62,6 +62,7 @@ export type Dialog =
   | { kind: 'import'; partId?: string; newProject?: boolean }
   | { kind: 'discover' }
   | { kind: 'view' }
+  | { kind: 'account' }
   | { kind: 'symbols' }
   | { kind: 'share' }
   | { kind: 'reader' }

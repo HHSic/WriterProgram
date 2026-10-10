@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { api } from './api';
+import { installAccountSettings } from './store/account';
 import { MenuHost } from './components/Menu';
 import { CornerNote } from './components/CornerNote';
 import { ToastHost } from './components/ToastHost';
@@ -19,6 +20,8 @@ export function App() {
   const accent = useApp((s) => s.view.accent);
   const customColor = useApp((s) => s.view.customColor);
   const busy = useApp((s) => s.busy);
+
+  useEffect(installAccountSettings, []);
 
   useEffect(() => {
     const root = document.documentElement;

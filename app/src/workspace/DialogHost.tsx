@@ -2,6 +2,7 @@
 
 import { NewProjectDialog } from '../screens/NewProjectDialog';
 import { RecoverDialog } from '../screens/RecoverDialog';
+import { AccountDialog } from './AccountDialog';
 import { AiDialog } from './AiDialog';
 import { CompareDialog, HistoryCompareDialog } from './Compare';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -29,6 +30,8 @@ export function DialogHost() {
   const dialog = useApp((s) => s.dialog);
   if (!dialog) return null;
   switch (dialog.kind) {
+    case 'account':
+      return <AccountDialog />;
     case 'prompt':
       return <PromptDialog key={dialog.title} dialog={dialog} />;
     case 'confirm':

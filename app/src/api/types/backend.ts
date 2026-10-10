@@ -1,5 +1,6 @@
 // The Backend interface: every call the screens make to the Rust side (or the browser stand-in).
 
+import type { AccountLogin, AccountLoginResult, AccountStatus, PersonalSettings, SettingsSnapshot, SettingsWrite } from './account';
 import type { JSONContent } from '@tiptap/core';
 import type { Bounds, PageClip, PageEvent } from './browser';
 import type { AiCheck, AiPreview, AiProvider, AiSettings, AiSettingsPatch, AiSummary, AiTask } from './ai';
@@ -53,6 +54,13 @@ import type { ShareLink } from './share';
 export interface Backend {
   /** True in the desktop app, false in the browser preview. */
   isDesktop: boolean;
+  accountStatus(): Promise<AccountStatus>;
+  accountConfigure(url: string, publishableKey: string): Promise<AccountStatus>;
+  accountLogin(request: AccountLogin): Promise<AccountLoginResult>;
+  accountCancel(): Promise<void>;
+  accountLogout(): Promise<void>;
+  accountSettingsRead(accountKey: string): Promise<SettingsSnapshot>;
+  accountSettingsWrite(accountKey: string, revision: number, patch: PersonalSettings): Promise<SettingsWrite>;
   shareList(root: string): Promise<ShareLink[]>;
   shareCreate(root: string, docIds: string[], provider: DriveProvider): Promise<ShareLink>;
   shareRevoke(root: string, id: string): Promise<void>;

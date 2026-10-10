@@ -1,4 +1,6 @@
-/** Reading preferences stay on this device; the manuscript is never changed. */
+import { notifyPreferencesChanged } from './preferenceEvents';
+
+/** Reading preferences never change the manuscript. Device mode stays local. */
 export type BookDevice = 'auto' | 'phone' | 'pc';
 export type BookTheme = 'paper' | 'light' | 'dark';
 export interface BookPreferences { device: BookDevice; theme: BookTheme; fontSize: number; pageWidth: number; pageHeight: number }
@@ -21,7 +23,7 @@ export function loadBookPreferences(): BookPreferences {
 }
 
 export function saveBookPreferences(value: BookPreferences) {
-  try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* Reading still works without storage. */ }
+  try { const text=JSON.stringify(value); if(localStorage.getItem(KEY)===text)return; localStorage.setItem(KEY,text); notifyPreferencesChanged(); } catch { /* Reading still works without storage. */ }
 }
 
 export const BOOK_GAP = 48;

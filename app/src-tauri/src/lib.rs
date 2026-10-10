@@ -1,3 +1,4 @@
+mod accounts;
 mod browser;
 mod commands;
 mod drives;
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state)
+        .manage(accounts::AccountState::default())
         .manage(drives::connect::DriveState::default())
         .manage(commands::update::PendingUpdate::default())
         .setup(|app| {
@@ -30,6 +32,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            accounts::account_status,
+            accounts::account_configure,
+            accounts::account_login,
+            accounts::account_cancel,
+            accounts::account_logout,
+            accounts::account_settings_read,
+            accounts::account_settings_write,
             commands::share::share_list,
             commands::share::share_create,
             commands::share::share_revoke,

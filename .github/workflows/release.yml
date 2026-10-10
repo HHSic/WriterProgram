@@ -33,6 +33,8 @@ jobs:
     timeout-minutes: 120
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      WRITER_SUPABASE_URL: ${{ vars.WRITER_SUPABASE_URL }}
+      WRITER_SUPABASE_PUBLISHABLE_KEY: ${{ vars.WRITER_SUPABASE_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:

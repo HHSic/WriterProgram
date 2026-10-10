@@ -21,6 +21,13 @@ const FILE_TYPE_NAMES: Record<string, string> = {
 
 export const tauriBackend: Backend = {
   isDesktop: true,
+  accountStatus: () => invoke('account_status'),
+  accountConfigure: (url, publishableKey) => invoke('account_configure', { url, publishableKey }),
+  accountLogin: (request) => invoke('account_login', { request }),
+  accountCancel: () => invoke('account_cancel'),
+  accountLogout: () => invoke('account_logout'),
+  accountSettingsRead: (accountKey) => invoke('account_settings_read', { accountKey }),
+  accountSettingsWrite: (accountKey, revision, patch) => invoke('account_settings_write', { accountKey, revision, patch }),
   shareList: (root) => invoke('share_list', { root }),
   shareCreate: (root, docIds, provider) => invoke('share_create', { root, docIds, provider }),
   shareRevoke: (root, id) => invoke('share_revoke', { root, id }),

@@ -4,6 +4,7 @@
 // Each file next to this one holds the part of the backend for one area.
 
 import type { Backend } from '../types';
+import { accountMethods } from './account';
 import { aiMethods } from './ai';
 import { browserMethods } from './browser';
 import { cardMethods } from './cards';
@@ -31,6 +32,7 @@ export function startMockBackend(): Backend {
   if (typeof window !== 'undefined') (window as unknown as { __otherDevice: typeof otherDevice }).__otherDevice = otherDevice;
   return {
     isDesktop: false,
+    ...accountMethods,
     shareList: async () => [],
     shareCreate: async () => { throw '온라인 공유는 설치형 앱에서 쓸 수 있습니다'; },
     shareRevoke: async () => { throw '온라인 공유는 설치형 앱에서 쓸 수 있습니다'; },

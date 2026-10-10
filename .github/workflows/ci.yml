@@ -11,6 +11,9 @@ on:
 jobs:
   check:
     runs-on: windows-latest
+    env:
+      WRITER_SUPABASE_URL: ${{ vars.WRITER_SUPABASE_URL }}
+      WRITER_SUPABASE_PUBLISHABLE_KEY: ${{ vars.WRITER_SUPABASE_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
 

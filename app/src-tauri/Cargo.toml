@@ -1,6 +1,6 @@
 [package]
 name = "writer-app"
-version = "0.1.7"
+version = "0.1.8"
 description = "WriterProgram desktop app"
 edition.workspace = true
 publish = false
@@ -15,6 +15,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 chrono = "0.4"
+base64 = "0.22"
+url = "2"
 keyring-core = "1"
 notify-debouncer-mini = "0.7"
 serde = { version = "1", features = ["derive"] }
@@ -35,11 +37,9 @@ time = { version = "0.3", features = ["formatting"] }
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = { version = "1", default-features = false }
 
-base64 = "0.22"
 webview2-com = "=0.39.1"
 windows = { version = "0.62.2", features = ["Win32_System_Com", "Win32_UI_Shell"] }
 
 [dev-dependencies]
-base64 = "0.22"
 minisign-verify = "0.2"
 tempfile = "3"

@@ -29,7 +29,8 @@ export function ViewDialog() {
   return (
     <Modal title="보기 설정" onClose={closeDialog} width={500}>
       <div className="form">
-        <p className="hint">이 기기의 작성 화면에만 적용됩니다. 원고 파일과 내보내기 모양은 바뀌지 않습니다.</p>
+        <button type="button" className="btn" onClick={()=>useApp.setState({dialog:{kind:"account"}})}>계정·설정 동기화</button>
+        <p className="hint">작성 화면 설정입니다. 로그인하면 개인 설정을 기기 사이에서 동기화합니다. 원고 파일과 내보내기 모양은 바뀌지 않습니다.</p>
         <label className="check"><input type="checkbox" checked={view.pages} onChange={(e) => setView({ pages: e.target.checked })} />페이지 단위로 보기·편집하기</label>
         <p className="hint">페이지의 용지·여백은 작품의 원고 서식에서 가져오고, 글꼴·크기·간격은 아래 보기 설정을 따릅니다.</p>
         <label className="field">

@@ -50,6 +50,7 @@ export function StartScreen() {
           <p>한 편을 끝까지 쓰는 곳</p>
         </div>
         <div className="row">
+          <button type="button" className="btn ghost" onClick={()=>openDialog({kind:"account"})}>계정·설정 동기화</button>
           <button type="button" className="btn" onClick={() => void pickProjectFile()} disabled={!api.isDesktop}>
             작품 파일 열기…
           </button>

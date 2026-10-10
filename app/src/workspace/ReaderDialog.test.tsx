@@ -267,3 +267,12 @@ it('allows 1px and arbitrary larger sizes through direct input and reloads the s
   const { loadBookPreferences } = await import('../lib/book');
   expect(loadBookPreferences().fontSize).toBe(1200);
 });
+
+it('applies downloaded account preferences while the reader is open', async () => {
+  await show();
+  const { saveBookPreferences } = await import('../lib/book');
+  await act(async () => saveBookPreferences({device:'auto',theme:'dark',fontSize:26,pageWidth:210,pageHeight:297}));
+  expect(document.querySelector<HTMLInputElement>('[aria-label="읽기 글자 크기(px)"]')?.value).toBe('26');
+  expect(document.querySelector('.reader-book')?.getAttribute('data-reader-theme')).toBe('dark');
+  expect(JSON.parse(localStorage.getItem('wp.bookReader')!)).toMatchObject({fontSize:26,pageWidth:210,pageHeight:297});
+});

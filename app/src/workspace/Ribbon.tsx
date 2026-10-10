@@ -6,17 +6,14 @@ import { FONT_LABEL, type BodyFont } from '../lib/view';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
 import { addTextNote, openDialog, openFind, openWeb, saveNow, saveProjectFileAs, setView, splitView, toggleReading, unsplit, toggleFocusMode, updateProject, useApp } from '../store';
 import { api } from '../api';
+import { loadRibbon, saveRibbon } from '../lib/preferences';
+import { PREFERENCES_CHANGED } from '../lib/preferenceEvents';
 import { formatMenu, marginMenu } from './EditToolbar';
 import { synopsisCommand } from './BlockCommands';
 import { openSymbols } from './Symbols';
 
 type Tab = '편집' | '서식' | '보기' | '쪽' | '검토';
 const TABS: Tab[] = ['편집','서식','보기','쪽','검토'];
-const KEY='wp.ribbon';
-function loadRibbon():{tab:Tab;collapsed:boolean} {
-  try { const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved)return {tab:TABS.includes(saved.tab)?saved.tab:'편집',collapsed:saved.collapsed===true}; } catch { /* Preferences are optional. */ }
-  return {tab:'편집',collapsed:false};
-}
 export function Ribbon() {
   const editor = useApp(s => s.editor);
   const activeDocId=useApp(s=>s.activeDocId);
@@ -25,7 +22,8 @@ export function Ribbon() {
   const reading=useApp(s=>s.reading!==null&&s.reading.status!=='noVoice'&&s.reading.editor===s.editor);
   const view = useApp(s => s.view);
   const [{tab,collapsed},setPrefs]=useState(loadRibbon);
-  useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify({tab,collapsed}));}catch{/* Preferences are optional. */}},[tab,collapsed]);
+  useEffect(()=>saveRibbon({tab,collapsed}),[tab,collapsed]);
+  useEffect(()=>{const reload=()=>{const next=loadRibbon();setPrefs(old=>old.tab===next.tab&&old.collapsed===next.collapsed?old:next);};window.addEventListener(PREFERENCES_CHANGED,reload);return()=>window.removeEventListener(PREFERENCES_CHANGED,reload);},[]);
   const selectTab=(next:Tab)=>setPrefs({tab:next,collapsed:false});
   const onTabKey=(e:KeyboardEvent<HTMLButtonElement>,index:number)=>{
     let next:number;

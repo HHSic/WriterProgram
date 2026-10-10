@@ -62,3 +62,12 @@ pub fn rescue_dir(app: &AppHandle) -> Res<PathBuf> {
 pub fn base_dir(app: &AppHandle) -> Res<PathBuf> {
     config_file(app, "sync")
 }
+
+/// Public Supabase connection data, separate from OS-stored credentials.
+pub fn account_config_file(app: &AppHandle) -> Res<PathBuf> {
+    config_file(app, "account-app.json")
+}
+/// Last account identity; contains no login tokens or passwords.
+pub fn account_session_file(app: &AppHandle) -> Res<PathBuf> {
+    config_file(app, "account-session.json")
+}
