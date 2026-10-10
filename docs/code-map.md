@@ -120,7 +120,7 @@ npm --prefix app test
 
 ### v0.1.6 문서 도구
 
-- `workspace/Ribbon.tsx`: 편집·서식·보기·쪽·검토 도구와 문서 이력 진입점. 선택 서식은 `EditToolbar.tsx`와 같은 편집 명령을 사용한다. 탭·접힘 설정을 기기에 저장하고 방향키 탭 이동을 지원한다. `CenterHead.tsx`는 좁은 창에서 작업 메뉴로 빠른 기능을 모은다.
+- `workspace/Ribbon.tsx`: 편집·서식·보기·쪽·검토 도구와 문서 이력 진입점. 선택 서식은 `EditToolbar.tsx`와 같은 편집 명령을 사용한다. 탭·접힘 설정을 기기에 저장하고 방향키 탭 이동을 지원한다. 화면·읽기·창 기능은 보기 탭, 파일·공유 기능은 편집 탭 아래로 모았다. `CenterHead.tsx`는 문서 위치·저장 상태·패널과 접힌 도구줄의 작업 메뉴를 표시한다.
 - `workspace/Compare.tsx`의 `HistoryCompareDialog`, `store/records.ts`: 지금 편집 중인 글·저장된 이력 두 개의 문단 비교와 복원. 오래된 비동기 응답을 무시하고, 저장 실패·작품 전환·잠금·동시 수정 충돌 시 복원을 막는다. 복원 전에 현재 원고를 기록에 보관하는 core 동작을 사용한다.
 - `workspace/BlockCommands.tsx`: 문단 첫머리 슬래시 검색·IME 보호·선택 영역 우클릭. `DocPane.tsx`의 시놉시스 표시 여부는 문서 메타데이터에 저장한다.
 - `editor/verticalPages.ts`, `workspace/PagedText.tsx`: 세로 쪽 보기의 장식용 간격. 장식은 원고 JSON·실행 취소·내보내기에 들어가지 않으며, 실제 DOM의 줄 좌표를 측정한다.

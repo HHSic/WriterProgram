@@ -24,10 +24,7 @@
   flex-shrink: 0;
 }
 
-.center-head { container-type:inline-size; }
 .center-actions { display:flex; align-items:center; flex-shrink:0; gap:8px; }
-@container(max-width:760px) { .center-actions .head-secondary { display:none; } }
-@container(max-width:440px) { .center-actions .head-compact { display:none; } }
 .center-head > .grow {
   flex: 0 0 0;
 }

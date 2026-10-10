@@ -6,7 +6,7 @@ import { findDoc, openDialog, openWeb, saveNow, saveProjectFileAs, setFocusMode,
 import { SaveStatus } from './SaveStatus';
 import { api } from '../api';
 
-/** Keep the header for navigation and common actions; formatting is in the ribbon. */
+/** Document location and save status; commands live below the ribbon tabs. */
 export function CenterHead() {
   const ov = useApp(s=>s.overview)!;
   const activeDocId=useApp(s=>s.activeDocId);
@@ -56,11 +56,6 @@ export function CenterHead() {
     <div className="grow"/>
     <div className="center-actions">
       {conflict?<span className="save-state conflict" role="status" title="다른 기기에서 고친 내용과 달라 저장을 멈춤"><span className="dot-mark"/>다른 기기에서 바뀜</span>:<SaveStatus/>}
-      {editor&&<button type="button" className={`btn head-compact${pages?' on':''}`} aria-pressed={pages} title="연속 보기와 페이지 단위 보기 전환" onClick={()=>setView({pages:!pages})}>쪽 보기</button>}
-      <button type="button" className="btn head-secondary" onClick={()=>openDialog({kind:'reader'})}>책 미리보기</button>
-      <button type="button" className="btn head-secondary" onClick={()=>openDialog({kind:'share'})}>공유</button>
-      <button type="button" className="btn head-secondary" onClick={e=>openMenu(e,fileItems(),{title:'작품 파일'})}>파일</button>
-      <button type="button" className="icon-btn head-compact" aria-label="집중 모드" title={`집중 모드 (${keysText('focusMode')}, 나갈 때 Esc)`} onClick={()=>setFocusMode(true)}><Icon name="focus" size={17}/></button>
       <button type="button" className={`icon-btn${rightOpen?' on':''}`} aria-label={rightOpen?'오른쪽 패널 닫기':'오른쪽 패널 열기'} aria-pressed={rightOpen} title="오른쪽 패널" onClick={()=>useApp.setState({rightOpen:!rightOpen})}><Icon name="panel" size={18}/></button>
       <button type="button" className="icon-btn" aria-label="작업 메뉴" title="저장·읽기·창·설정" onClick={e=>openMenu(e,moreItems(),{title:'작업 메뉴'})}><Icon name="more"/></button>
     </div>

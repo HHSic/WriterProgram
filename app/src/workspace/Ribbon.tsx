@@ -4,7 +4,8 @@ import type { Editor } from '@tiptap/core';
 import { openMenu } from '../components/Menu';
 import { FONT_LABEL, type BodyFont } from '../lib/view';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
-import { addTextNote, openDialog, openFind, saveNow, setView, splitView, unsplit, toggleFocusMode, updateProject, useApp } from '../store';
+import { addTextNote, openDialog, openFind, openWeb, saveNow, saveProjectFileAs, setView, splitView, toggleReading, unsplit, toggleFocusMode, updateProject, useApp } from '../store';
+import { api } from '../api';
 import { formatMenu, marginMenu } from './EditToolbar';
 import { synopsisCommand } from './BlockCommands';
 import { openSymbols } from './Symbols';
@@ -19,6 +20,9 @@ function loadRibbon():{tab:Tab;collapsed:boolean} {
 export function Ribbon() {
   const editor = useApp(s => s.editor);
   const activeDocId=useApp(s=>s.activeDocId);
+  const rightOpen=useApp(s=>s.rightOpen);
+  const split=useApp(s=>s.panes.length>1?s.split:null);
+  const reading=useApp(s=>s.reading!==null&&s.reading.status!=='noVoice'&&s.reading.editor===s.editor);
   const view = useApp(s => s.view);
   const [{tab,collapsed},setPrefs]=useState(loadRibbon);
   useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify({tab,collapsed}));}catch{/* Preferences are optional. */}},[tab,collapsed]);
@@ -35,16 +39,30 @@ export function Ribbon() {
   return <section className={`ribbon${collapsed ? ' collapsed' : ''}`} aria-label="문서 도구">
     <div className="ribbon-tabs" role="tablist" aria-label="도구 종류">{TABS.map((t,i) => <button key={t} role="tab" id={`ribbon-${t}`} tabIndex={t===tab?0:-1} aria-controls="ribbon-tools" aria-selected={t===tab} onKeyDown={e=>onTabKey(e,i)} onClick={()=>selectTab(t)}>{t}</button>)}<span className="grow"/><button className="ribbon-collapse" aria-label={collapsed ? '도구 펼치기' : '도구 접기'} title={collapsed?'도구 펼치기':'도구 접기'} aria-expanded={!collapsed} onClick={() => setPrefs({tab,collapsed:!collapsed})}>{collapsed ? '⌄' : '⌃'}</button></div>
     {!collapsed && <div id="ribbon-tools" role="tabpanel" aria-labelledby={`ribbon-${tab}`} className="ribbon-tools">
+      {tab==='편집'&&<Group label="파일·공유">
+        <Button label="작품 파일 저장" glyph="▣" disabled={!api.isDesktop} run={()=>void saveProjectFileAs()}/>
+        <Button label="원고 가져오기" glyph="↓" run={()=>openDialog({kind:'import'})}/>
+        <Button label="내보내기" glyph="↑" run={()=>openDialog({kind:'export'})}/>
+        <Button label="공유" glyph="↗" run={()=>openDialog({kind:'share'})}/>
+      </Group>}
       {editor ? <EditorTools editor={editor} tab={tab}/> : <span className="hint">문서를 열면 편집 도구를 사용할 수 있습니다.</span>}
       {tab==='보기' && <><Group label="작성 화면">
         <Button label="쪽 보기" glyph="▤" active={view.pages} run={() => setView({pages:!view.pages})}/>
         <Button label="눈금자" glyph="┠" active={view.ruler} run={() => setView({ruler:!view.ruler})}/>
         <Button label="문단 부호" glyph="¶" active={view.showMarks} run={() => setView({showMarks:!view.showMarks})}/>
         <Button label="보기 설정" glyph="⚙" run={() => openDialog({kind:'view'})}/>
-      </Group><Group label="창·읽기">
-        <Button label="나눠 보기" glyph="◫" run={() => { if(useApp.getState().panes.length>1) void unsplit(); else splitView('row'); }}/>
+      </Group><Group label="창">
+        <button type="button" className="ribbon-button" aria-label="나눠 보기" aria-pressed={split!==null} onMouseDown={e=>e.preventDefault()} onClick={e=>openMenu(e,[
+          {label:'좌우로 나눠 보기',checked:split==='row',onSelect:()=>splitView('row')},
+          {label:'위아래로 나눠 보기',checked:split==='column',onSelect:()=>splitView('column')},
+          {label:'나눠 보기 닫기',disabled:split===null,onSelect:()=>void unsplit()},
+        ],{title:'나눠 보기'})}><span className="ribbon-glyph" aria-hidden="true">◫</span><span>나눠 보기</span></button>
         <Button label="집중 모드" glyph="⛶" run={toggleFocusMode}/>
+        <Button label="오른쪽 패널" glyph="◧" active={rightOpen} run={()=>useApp.setState({rightOpen:!rightOpen})}/>
+        <Button label="웹 보기" glyph="◎" run={()=>void openWeb()}/>
+      </Group><Group label="읽기·미리보기">
         <Button label="책 미리보기" glyph="▣" run={() => openDialog({kind:'reader'})}/>
+        <Button label={reading?'읽기 멈춤':'소리 내어 읽기'} glyph="♪" disabled={!editor} active={reading} run={toggleReading}/>
       </Group></>}
       {(tab==='서식'||tab==='보기') && <Group label="화면 글꼴·크기">
         <select aria-label="화면 글꼴" value={view.font} onChange={e => setView({font:e.target.value as BodyFont})}>{Object.entries(FONT_LABEL).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
