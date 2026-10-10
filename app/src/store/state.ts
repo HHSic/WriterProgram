@@ -72,6 +72,7 @@ export type Dialog =
    * to its copy, or a chapter next to its rescue copy (비상 보관).
    */
   | { kind: 'compare'; docId: string; copy?: CopyInfo; rescue?: RescueFile }
+  | { kind: 'historyCompare'; docId: string; recordId: string }
   /** Every copy left by sync programs (다른 기기 사본). */
   | { kind: 'copies' }
   /** 기기 간 맞추기: connecting drives. */

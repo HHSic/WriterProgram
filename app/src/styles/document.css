@@ -403,7 +403,7 @@ img.ProseMirror-separator {
 .ribbon-tabs { display:flex; align-items:center; gap:2px; padding:2px 10px 0; }
 .ribbon-tabs button { border:0; color:inherit; background:transparent; padding:6px 16px; cursor:pointer; border-radius:4px 4px 0 0; }
 .ribbon-tabs [aria-selected='true'] { background:var(--accent); color:var(--accent-text,#fff); }
-.ribbon-tools { display:flex; overflow-x:auto; min-height:95px; padding:8px 10px 3px; gap:10px; }
+.ribbon-tools { display:flex; overflow-x:auto; min-height:78px; padding:6px 10px 3px; gap:10px; }
 .ribbon-group { flex-shrink:0; border-right:1px solid var(--border); padding-right:10px; display:flex; flex-direction:column; justify-content:space-between; gap:6px; }
 .ribbon-group-tools { display:flex; align-items:center; gap:3px; height:100%; }
 .ribbon-group-label { font-size:10px; text-align:center; color:var(--muted); }

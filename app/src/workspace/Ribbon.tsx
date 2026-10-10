@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import { openMenu } from '../components/Menu';
@@ -11,13 +11,29 @@ import { openSymbols } from './Symbols';
 
 type Tab = '편집' | '서식' | '보기' | '쪽' | '검토';
 const TABS: Tab[] = ['편집','서식','보기','쪽','검토'];
+const KEY='wp.ribbon';
+function loadRibbon():{tab:Tab;collapsed:boolean} {
+  try { const saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved)return {tab:TABS.includes(saved.tab)?saved.tab:'편집',collapsed:saved.collapsed===true}; } catch { /* Preferences are optional. */ }
+  return {tab:'편집',collapsed:false};
+}
 export function Ribbon() {
   const editor = useApp(s => s.editor);
+  const activeDocId=useApp(s=>s.activeDocId);
   const view = useApp(s => s.view);
-  const [tab,setTab] = useState<Tab>('편집');
-  const [collapsed,setCollapsed] = useState(false);
+  const [{tab,collapsed},setPrefs]=useState(loadRibbon);
+  useEffect(()=>{try{localStorage.setItem(KEY,JSON.stringify({tab,collapsed}));}catch{/* Preferences are optional. */}},[tab,collapsed]);
+  const selectTab=(next:Tab)=>setPrefs({tab:next,collapsed:false});
+  const onTabKey=(e:KeyboardEvent<HTMLButtonElement>,index:number)=>{
+    let next:number;
+    if(e.key==='ArrowRight')next=(index+1)%TABS.length;
+    else if(e.key==='ArrowLeft')next=(index+TABS.length-1)%TABS.length;
+    else if(e.key==='Home')next=0;
+    else if(e.key==='End')next=TABS.length-1;
+    else return;
+    e.preventDefault();selectTab(TABS[next]);document.getElementById(`ribbon-${TABS[next]}`)?.focus();
+  };
   return <section className={`ribbon${collapsed ? ' collapsed' : ''}`} aria-label="문서 도구">
-    <div className="ribbon-tabs" role="tablist" aria-label="도구 종류">{TABS.map(t => <button key={t} role="tab" id={`ribbon-${t}`} aria-controls="ribbon-tools" aria-selected={t===tab} onClick={() => { setTab(t); setCollapsed(false); }}>{t}</button>)}<span className="grow"/><button className="ribbon-collapse" aria-label={collapsed ? '도구 펼치기' : '도구 접기'} aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? '⌄' : '⌃'}</button></div>
+    <div className="ribbon-tabs" role="tablist" aria-label="도구 종류">{TABS.map((t,i) => <button key={t} role="tab" id={`ribbon-${t}`} tabIndex={t===tab?0:-1} aria-controls="ribbon-tools" aria-selected={t===tab} onKeyDown={e=>onTabKey(e,i)} onClick={()=>selectTab(t)}>{t}</button>)}<span className="grow"/><button className="ribbon-collapse" aria-label={collapsed ? '도구 펼치기' : '도구 접기'} title={collapsed?'도구 펼치기':'도구 접기'} aria-expanded={!collapsed} onClick={() => setPrefs({tab,collapsed:!collapsed})}>{collapsed ? '⌄' : '⌃'}</button></div>
     {!collapsed && <div id="ribbon-tools" role="tabpanel" aria-labelledby={`ribbon-${tab}`} className="ribbon-tools">
       {editor ? <EditorTools editor={editor} tab={tab}/> : <span className="hint">문서를 열면 편집 도구를 사용할 수 있습니다.</span>}
       {tab==='보기' && <><Group label="작성 화면">
@@ -43,7 +59,7 @@ export function Ribbon() {
         <Button label="머리말·꼬리말" glyph="☰" run={() => openDialog({kind:'project',tab:'format'})}/>
       </Group>}
       {tab==='검토' && <><Group label="문서 이력">
-        <Button label="문서 이력 관리" glyph="◷" run={() => useApp.setState({rightOpen:true,rightTab:'records',previewCardId:null})}/>
+        <Button label="문서 이력 관리" glyph="◷" disabled={!activeDocId} run={() => useApp.setState({rightOpen:true,rightTab:'records',previewCardId:null})}/>
         <Button label="교정본 주고받기" glyph="⇄" run={() => openDialog({kind:'exchanges'})}/>
         <Button label="창작 기록" glyph="▥" run={() => openDialog({kind:'proof'})}/>
       </Group><Group label="원고 분석"><Button label="인물·장소 찾기" glyph="⌕" run={() => openDialog({kind:'discover'})}/></Group></>}

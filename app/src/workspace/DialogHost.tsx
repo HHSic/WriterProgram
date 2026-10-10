@@ -3,7 +3,7 @@
 import { NewProjectDialog } from '../screens/NewProjectDialog';
 import { RecoverDialog } from '../screens/RecoverDialog';
 import { AiDialog } from './AiDialog';
-import { CompareDialog } from './Compare';
+import { CompareDialog, HistoryCompareDialog } from './Compare';
 import { ConfirmDialog } from './ConfirmDialog';
 import { CopiesDialog } from './Copies';
 import { DriveImportDialog, DrivesDialog } from './Drives';
@@ -66,6 +66,8 @@ export function DialogHost() {
           rescue={dialog.rescue}
         />
       );
+    case 'historyCompare':
+      return <HistoryCompareDialog key={`${dialog.docId}/${dialog.recordId}`} docId={dialog.docId} recordId={dialog.recordId}/>;
     case 'copies':
       return <CopiesDialog />;
     case 'move':

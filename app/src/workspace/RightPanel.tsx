@@ -18,7 +18,7 @@ import {
   findDoc,
   leaveProject,
   openDialog,
-  patchSummary,
+  restoreRecord,
   saveEverything,
   setFocusMode,
   toastError,
@@ -220,6 +220,7 @@ function OutlineTab({ editor }: { editor: Editor }) {
 function RecordsTab({ docId }: { docId: string }) {
   const root = useApp((s) => s.overview!.root);
   const version = useApp((s) => s.recordsVersion);
+  const cannotRestore = useApp(s => !!s.conflicts[docId] || !!findDoc(s.overview!, docId)?.doc.locked);
   const [records, setRecords] = useState<SnapshotInfo[] | null>(null);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
@@ -269,26 +270,6 @@ function RecordsTab({ docId }: { docId: string }) {
       toastError('보관하지 못함', e);
     }
   };
-
-  const restore = (record: SnapshotInfo) =>
-    openDialog({
-      kind: 'confirm',
-      title: '이 때로 되돌리기',
-      message: `${timeLabel(record.at)}의 원고로 되돌립니다. 지금 원고는 '되돌리기 전' 기록으로 남아서 언제든 다시 돌아올 수 있습니다.`,
-      confirm: '되돌리기',
-      onConfirm: async () => {
-        if (!(await saveEverything())) return;
-        try {
-          await api.snapshotRestore(root, docId, record.id);
-          const reloaded = await api.docLoad(root, docId);
-          patchSummary(docId, { counts: reloaded.counts });
-          setSelected(null);
-          useApp.setState((s) => ({ docVersion: s.docVersion + 1, recordsVersion: s.recordsVersion + 1 }));
-        } catch (e) {
-          toastError('되돌리지 못함', e);
-        }
-      },
-    });
 
   const ov = useApp((s) => s.overview!);
   const current = findDoc(ov, docId)?.doc.counts.withSpaces ?? 0;
@@ -345,7 +326,10 @@ function RecordsTab({ docId }: { docId: string }) {
               {selected === r.id && (
                 <div className="record-preview">
                   <p>{preview || ' '}</p>
-                  <button type="button" className="btn small" onClick={() => restore(r)}>
+                  <button type="button" className="btn small" onClick={() => openDialog({kind:'historyCompare',docId,recordId:r.id})}>
+                    지금 글과 비교
+                  </button>
+                  <button type="button" className="btn small" disabled={cannotRestore} onClick={() => restoreRecord(docId,r)}>
                     <Icon name="restore" size={14} />이 때로 되돌리기
                   </button>
                 </div>

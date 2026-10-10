@@ -4,6 +4,10 @@
   position: fixed;
   z-index: 60;
   min-width: 180px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
   padding: 6px;
   border-radius: 10px;
   background: var(--surface);

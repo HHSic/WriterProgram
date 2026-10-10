@@ -144,6 +144,9 @@
 
 /* 둘 다 보기 */
 
+.history-choices { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+.history-choices label { display:flex; flex:1 1 240px; min-width:0; flex-direction:column; gap:5px; }
+.history-choices select { width:100%; min-width:0; }
 .compare-summary {
   display: flex;
   flex-wrap: wrap;
