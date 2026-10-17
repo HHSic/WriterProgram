@@ -344,7 +344,7 @@ Judges become more usable with specific criteria, pairwise comparison, length tr
 ## 4. Which techniques increase lexical diversity or reduce repeated phrasing, and how do sampling settings interact with prompting?
 
 ### Takeaway
-Prompt-level **distribution requests** (Verbalized Sampling) and **in-context regeneration** (showing previous outputs and asking for something different) measurably raise diversity without hurting quality. "Be unique" system prompts and paraphrasing barely help. Banned-word *instructions* are weak or backfire, while **sampler-level backtracking** suppresses thousands of patterns. Temperature is a weak creativity lever that trades away coherence, and min-p's benefits are disputed. Diversity methods compose with decoding settings. Raw lexical-diversity metrics (TTR) are a poor proxy for quality.
+Prompt-level **distribution requests** (Verbalized Sampling, shown to keep judged quality) and **in-context regeneration** (showing previous outputs and asking for something different) measurably raise diversity. "Be unique" system prompts and paraphrasing barely help. Banned-word *instructions* are weak or backfire, while **sampler-level backtracking** suppresses thousands of patterns. Temperature is a weak creativity lever that trades away coherence, and min-p's benefits are disputed. Diversity methods compose with decoding settings. Raw lexical-diversity metrics (TTR) are a poor proxy for quality.
 
 ### Cited Findings
 
