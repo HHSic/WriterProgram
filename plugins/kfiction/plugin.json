@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "kfiction",
+  "version": "0.1.0",
+  "description": "한국어 소설 작문 지침. 맥락(관계·말 단계·장면)에 맞는 문장·대사 후보를 낸다. Korean fiction writing skill for context-fitting sentence and dialogue candidates.",
+  "author": { "name": "HHSic", "url": "https://github.com/HHSic" },
+  "homepage": "https://github.com/HHSic/WriterProgram/tree/main/plugins/kfiction",
+  "repository": "https://github.com/HHSic/WriterProgram",
+  "license": "MIT",
+  "keywords": ["korean", "fiction", "writing", "novel"]
+}

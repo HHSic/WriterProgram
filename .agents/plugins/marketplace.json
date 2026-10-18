@@ -1,0 +1,12 @@
+{
+  "name": "writerprogram",
+  "interface": { "displayName": "WriterProgram" },
+  "plugins": [
+    {
+      "name": "kfiction",
+      "source": { "source": "local", "path": "./plugins/kfiction" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

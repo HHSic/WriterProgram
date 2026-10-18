@@ -27,6 +27,8 @@ node WriterProgram/plugins/kfiction/integrations/codex/install.mjs --uninstall
 
 설치 전에 `config.toml`과 `AGENTS.md`를 백업한다. skill은 `~/.agents/skills/kfiction/`에 복사되므로 클론한 폴더를 옮기면 다시 설치한다.
 
+ChatGPT (웹 프로젝트·GPT, Work 모드 스킬, 데스크톱 앱 개인 플러그인): [integrations/chatgpt](integrations/chatgpt/README.md). 웹에서는 `integrations/chatgpt/dist/instructions.md`를 프로젝트 지침에 붙이고 `dist/knowledge/` 파일을 올리는 방법이 가장 확실하다. 점검기는 명령을 실행할 수 없어 빠진다.
+
 ## 쓰는 법
 
 채팅에서 원고를 붙이거나 원고 파일을 가리키고 요청하면 된다. 한국어 소설을 이어 쓰거나 고치는 요청이면 `kfiction` 스킬이 저절로 쓰인다.
@@ -89,4 +91,6 @@ KSTE와 달리 문체 경고로 모델을 막지 않는다. 문체 수치를 0�
 | `hooks/` | Claude Code PostToolUse hook |
 | `commands/` | `/kfiction:candidates`, `/kfiction:check`, `/kfiction:set` |
 | `integrations/codex/` | AGENTS.md 절, MCP 서버, hook, prompt, 설치 스크립트 |
+| `integrations/chatgpt/` | ChatGPT용 지침·지식 파일·스킬 zip(`dist/`)과 데스크톱 앱 설치 스크립트 |
+| `plugin.json` | OpenAI 플러그인 형식(agent-plugins) 매니페스트. `.claude-plugin/plugin.json`은 Claude Code용 |
 | `test/` | `npm test` (node --test) |
