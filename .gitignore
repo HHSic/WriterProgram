@@ -3,3 +3,4 @@ node_modules/
 app/dist/
 app/src-tauri/gen/schemas/
 *.log
+evals/context-sentences/results/

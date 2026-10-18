@@ -3,6 +3,7 @@
 pub mod hangul;
 pub mod morph;
 pub mod rules;
+pub mod speech;
 pub mod text;
 
 pub use morph::Analyzer;

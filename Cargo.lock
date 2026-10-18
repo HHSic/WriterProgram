@@ -6252,6 +6252,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "writer-evals"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "writer-ai",
+ "writer-revise",
+]
+
+[[package]]
 name = "writer-revise"
 version = "0.1.0"
 dependencies = [
