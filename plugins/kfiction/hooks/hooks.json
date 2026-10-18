@@ -1,0 +1,17 @@
+{
+  "description": "kfiction: 한국어 소설 원고(.md, .txt)를 쓰거나 고치면 점검합니다. 원고에 섞인 설명·마크다운만 모델에게 돌려주고, 문체 경고는 사용자에게만 알립니다.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/kfiction-hook.mjs\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -40,7 +40,20 @@ Supabase Free 플랜으로 시작할 수 있으며 SAML SSO는 Pro 이상이다.
 | `app/` | 데스크톱 앱 (화면: React + Tiptap, `app/src-tauri`: Tauri) |
 | `crates/core` | 작품 폴더 형식, 저장, 기록, 분량, 설정집, 메모, 찾기/바꾸기, 원고 서식, 내보내기 |
 | `crates/revise` | 퇴고 점검 엔진 시제품 |
+| `crates/evals`, `evals/` | 맥락 문장 후보 평가 실행기(`context-eval`)와 평가셋 |
+| `plugins/kfiction` | 한국어 소설 작문 플러그인 (Claude Code, Codex) |
 | `docs/` | 설계 문서 |
+
+## 한국어 소설 작문 플러그인
+
+채팅에서 원고에 들어갈 문장·대사 후보를 맥락(관계, 말 단계, 장면)에 맞게 내고, 원고를 쓰면 점검기가 알려 주는 플러그인. Claude Code에서는 이렇게 설치한다.
+
+```
+/plugin marketplace add HHSic/WriterProgram
+/plugin install kfiction@writerprogram
+```
+
+Claude Code 2.1.275 이후에서는 `/plugin install kfiction --marketplace HHSic/WriterProgram` 한 줄로도 된다. Codex 설치와 쓰는 법은 [plugins/kfiction](plugins/kfiction/README.md).
 
 ## 실행
 

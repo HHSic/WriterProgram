@@ -1,0 +1,18 @@
+{
+  "name": "writerprogram",
+  "owner": { "name": "HHSic" },
+  "metadata": {
+    "description": "WriterProgram 작가 도구 마켓플레이스. Plugins from the WriterProgram repository.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "kfiction",
+      "source": "./plugins/kfiction",
+      "description": "한국어 소설 작문 지침 + 맥락 문장 후보 + 원고 점검 hook. Korean fiction writing skill, sentence candidates, and advisory linter.",
+      "version": "0.1.0",
+      "category": "writing",
+      "keywords": ["korean", "fiction", "writing"]
+    }
+  ]
+}

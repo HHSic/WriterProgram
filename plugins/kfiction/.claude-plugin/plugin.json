@@ -1,0 +1,11 @@
+{
+  "name": "kfiction",
+  "displayName": "kfiction",
+  "version": "0.1.0",
+  "description": "한국어 소설 작문 지침과 원고 점검기. 맥락(관계·말 단계·장면)에 맞는 문장 후보를 내고, 원고를 쓰면 점검기가 알려 줍니다. Korean fiction writing skill and advisory linter.",
+  "author": { "name": "HHSic" },
+  "license": "MIT",
+  "keywords": ["korean", "fiction", "writing", "novel", "linter"],
+  "homepage": "https://github.com/HHSic/WriterProgram/tree/main/plugins/kfiction",
+  "repository": "https://github.com/HHSic/WriterProgram"
+}

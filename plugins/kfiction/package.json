@@ -1,0 +1,10 @@
+{
+  "name": "kfiction",
+  "version": "0.1.0",
+  "description": "Korean fiction writing skill and advisory linter for Claude Code and Codex",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "kfiction": "bin/kfiction.js" },
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=20" }
+}
