@@ -2,17 +2,18 @@
 // kfiction: 한국어 소설 원고 점검.
 //   kfiction check <파일> [--all] [--json]   원고 점검 리포트
 //   kfiction levels <파일>                    대사별 말 단계 어림
-// 파일 대신 '-'를 주면 표준 입력을 읽는다.
+// 파일 대신 '-'를 주면 표준 입력을 읽는다. 이름만 준 파일이 지금 폴더에 없으면 원고 폴더에서 찾는다.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { lint } from '../lib/lint.js';
 import { renderReport, renderLevels } from '../lib/report.js';
+import { resolveManuscript } from '../lib/config.js';
 
 const USAGE = '사용법: kfiction check <파일|-> [--all] [--json] | kfiction levels <파일|->';
 
-export function main(argv, read = (f) => readFileSync(f === '-' ? 0 : f, 'utf8')) {
+export function main(argv, read = (f) => readFileSync(f === '-' ? 0 : resolveManuscript(f), 'utf8')) {
   const [cmd, file, ...rest] = argv;
   if (!cmd || !file) return { code: 2, err: USAGE };
   let text;

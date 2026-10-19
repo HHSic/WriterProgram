@@ -56,6 +56,7 @@ ChatGPT (웹 프로젝트·GPT, Work 모드 스킬, 데스크톱 앱 개인 플�
 | `/kfiction:check [파일]` | `/prompts:kfiction-check`, MCP `kfiction_check` | 원고 점검 리포트 |
 | | MCP `kfiction_levels` | 대사별 말 단계 어림 |
 | `/kfiction:set on\|off\|status` | `.kfiction/state.json` 직접 수정 | 원고 점검 hook 켜기·끄기 |
+| `/kfiction:set dir <폴더>` | | 원고 폴더 정하기 (Google Drive 등) |
 
 명령줄에서도 쓸 수 있다.
 
@@ -63,6 +64,24 @@ ChatGPT (웹 프로젝트·GPT, Work 모드 스킬, 데스크톱 앱 개인 플�
 node plugins/kfiction/bin/kfiction.js check 1화.md [--all] [--json]
 node plugins/kfiction/bin/kfiction.js levels 1화.md
 ```
+
+## 원고 폴더 (Google Drive)
+
+원고는 보통 `claude`를 켠 폴더에 써진다. 원고 폴더를 정해 두면 어디서 켜든 새 원고가 그 폴더로 간다. Google Drive 데스크톱 앱이 만든 폴더를 고르면 원고가 Drive에 저장된다.
+
+```
+/kfiction:set dir G:\내 드라이브\소설                                   (Windows)
+/kfiction:set dir ~/Library/CloudStorage/GoogleDrive-계정/내 드라이브/소설   (Mac)
+/kfiction:set dir          지금 설정 보기
+/kfiction:set dir off      설정 지우기
+```
+
+- 설정은 `~/.kfiction/config.json`에 남고 모든 프로젝트에 적용된다. 세션을 시작할 때 hook이 원고 폴더를 모델에게 알린다.
+- 폴더가 없으면 만든다. 바로 위 폴더(예: `내 드라이브`)는 있어야 한다. 드라이브가 꺼져 있어 폴더가 안 보이면 세션 시작 때 알리고, 모델은 원고를 쓰기 전에 묻는다.
+- `/kfiction:check 1화.md`처럼 이름만 주면 지금 폴더에 없을 때 원고 폴더에서 찾는다.
+- Claude Code는 켠 폴더 밖에 파일을 쓸 때 허락을 묻는다. 묻지 않게 하려면 `claude --add-dir "G:\내 드라이브\소설"`로 켜거나 원고 폴더 안에서 켠다.
+- 같은 원고를 두 컴퓨터에서 동시에 고치면 Drive가 사본을 따로 만들 수 있다.
+- Codex 연동은 아직 이 설정을 읽지 않는다.
 
 ## 원고 점검 hook
 
