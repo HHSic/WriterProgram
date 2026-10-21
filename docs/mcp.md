@@ -26,6 +26,7 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 
 | 도구 | 하는 일 |
 |---|---|
+| `guide` | kfiction 작문 지침(SKILL.md)과 참고 문서 5개. 서버로 쓸 때는 이것을 읽기 전에 회차를 쓸 수 없다 |
 | `outline` | 부·회차(id, 제목, 상태, 글자 수, 잠금), 기획 문서, 설정 카드 목록 |
 | `read_doc` | 회차 하나. 본문은 한 줄에 한 문단, 장면 나눔은 `***`. `rev`(본문 지문)를 함께 준다 |
 | `add_doc` | 새 회차나 기획 문서, `text`를 주면 본문까지 |
@@ -42,13 +43,34 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 | `records`, `restore_record` | 문서의 기록 목록, 기록으로 되돌리기 |
 | `export` | txt, docx(Word), hwpx(한글) 내보내기. 회차마다 파일 하나도 된다 |
 
+MCP 프롬프트 `candidates`(문장·대사 후보 3개)와 `check`(회차 점검 리포트)도 있다. Claude Code에서는 `/mcp__writerprogram__candidates`처럼 부른다.
+
 명령줄에서는 `writer-mcp call <도구> '<JSON 인자>' [--project <폴더>]`로 같은 도구를 부른다. 인자 자리에 `-`를 주면 표준 입력에서 JSON을 읽는다. `writer-mcp tools`는 도구 목록을 보인다.
+
+## 작문 지침 (kfiction)
+
+kfiction 플러그인의 `skills/kfiction/SKILL.md`와 `references/` 다섯 개를 빌드할 때 `writer-mcp`에 넣는다(`guide.rs`, `include_str!`). 원본은 플러그인 파일 하나이고, 플러그인 전용 부분(명령줄 점검기, hook, 참고 문서 링크)만 이 도구들에 맞게 바꾼다. 플러그인을 깔지 않고 서버만 연결해도 같은 지침이 적용된다.
+
+- 서버(`serve`)는 이번 연결에서 `guide`를 한 번 읽기 전에는 회차 본문을 쓰지 않는다. 연결할 때 주는 안내에도 먼저 읽으라고 적었다. 명령줄 `call`은 사람이 쓰므로 묻지 않는다.
+- SKILL.md 문장을 바꾸면 `guide.rs`의 시험이 플러그인 전용 표현(`hook`, `references/`, `CLAUDE_PLUGIN_ROOT`)이 남았는지 확인한다.
+
+## 맥락 메모
+
+지침은 후보를 내기 전에 맥락 메모(시점, 시제, 화자→청자 말 단계와 호칭)를 작가에게 보이게 한다. 회차를 쓰는 도구는 이 메모를 `context`로 꼭 받는다(`context.rs`).
+
+- `pov`, `tense`(past/present)가 없거나, 보낸 글에 대사가 있는데 `speech`가 없으면 쓰지 않는다. 말 단계는 하십시오체·해요체·하오체·하게체·해체·해라체 가운데 하나.
+- 저장 뒤 답의 `check.context`에 메모와 본문이 어긋나 보이는 곳을 담는다.
+  - 시제: 메모가 과거형인데 현재형(-ㄴ다)으로 끝난 서술이 두 문장 이상이고 30%를 넘으면, 또는 그 반대.
+  - 말 단계: 메모의 쌍이 모두 높임(또는 모두 안높임)이면, 반대로 읽히는 대사를 짚는다. 높임과 안높임이 섞인 장면은 누가 한 대사인지 글자로 정할 수 없으므로, 대사마다 읽힌 말 단계를 보여 도우미가 쌍과 맞춰 보게 한다.
+  - 대사 끝 글자로 어림하므로 틀릴 수 있다. 막지 않고 알린다.
+- `new_facts`(지어낸 이름이나 사실)는 그 회차의 메모로 남겨 작가가 앱에서 본다.
+- 시점(시점 인물이 모를 일을 서술했는가), 숨은 의도, 설정 모순은 글자로 판정할 수 없어 지침의 확인 목록으로 도우미가 직접 본다.
 
 ## 원고 점검 (kfiction)
 
 Claude Code의 kfiction hook은 Write·Edit 도구로 쓴 파일만 보므로 MCP로 쓴 회차는 지나친다. 그래서 `writer-mcp`가 같은 점검기를 직접 돌린다(`crates/mcp/src/check`, `review.rs`). Node 없이 설치판만으로 돈다.
 
-- **저장 전**: `write_doc`, `add_doc`으로 회차에 보낸 글에 계약 위반(어시스턴트 말투, 마크다운)이 있으면 저장하지 않고 고칠 줄을 돌려준다. 저장한 뒤 고치게 하면 도우미가 덧붙이기를 다시 해 글이 겹칠 수 있어서 저장 전에 막는다. hook처럼 문서마다 30분 안에 두 번까지 거절하고, 세 번째는 저장하되 답의 `check.unfixed_contract`에 남은 위반을 적는다. 깨끗한 글을 한 번 쓰면 다시 센다. 거절 횟수는 서버가 켜져 있는 동안만 기억한다.
+- **저장 전**: `write_doc`, `add_doc`으로 회차에 보낸 글에 계약 위반(어시스턴트 말투, 마크다운)이 있으면 저장하지 않고 고칠 줄을 돌려준다. 저장한 뒤 고치게 하면 도우미가 덧붙이기를 다시 해 글이 겹칠 수 있어서 저장 전에 막는다. hook처럼 문서마다 30분 안에 두 번까지 거절하고, 세 번째는 저장하되 답의 `check.unfixed_contract`에 남은 위반을 적는다. 깨끗한 글을 한 번 쓰면 다시 센다. 거절 횟수는 임시 폴더의 `writer-mcp/refusals.json`(또는 `WRITER_MCP_STATE_DIR`)에 남아, 서버를 다시 켜거나 명령줄로 따로 불러도 이어진다.
 - **저장 뒤**: 답의 `check`에 그 회차 전체의 경고(최대 20개와 전체 수)와 참고 수를 담는다. 문체 경고는 막지 않는다. 문체 수치를 0으로 몰면 문장과 개성이 깎이므로 작가가 고른다.
 - 기획 문서는 점검하지 않는다.
 - **JS 점검기와 같은 판정**: Rust 점검기는 `plugins/kfiction/lib`를 옮긴 것이다. `plugins/kfiction/scripts/lint-cases.mjs`가 JS 점검기로 만든 사례(`test/fixtures/lint-cases.json`, 규칙 16개 모두와 대사 86줄의 말 단계)를 두 쪽 시험이 모두 확인한다. 규칙을 바꾸면 스크립트를 다시 돌리고 Rust 쪽도 고친다. 한쪽만 고치면 시험이 실패한다.
@@ -69,4 +91,5 @@ Claude Code의 kfiction hook은 Write·Edit 도구로 쓴 파일만 보므로 MC
 
 - 줄바꿈만 있는 문단 안 줄(Shift+Enter)은 `read_doc`에서 줄로 나뉘어 보이고, 그대로 `replace`하면 문단으로 나뉜다.
 - 휴지통 비우기, 문서 합치기·나누기, 교정본 주고받기, 원고 서식 바꾸기는 도구가 없다. 앱에서 한다.
-- 시험: `cargo test -p writer-mcp` (점검기 사례 대조, 저장 전 거절과 세 번째 통과, 저장 뒤 경고, 쓰고 읽기, 기록, 지문 충돌, 잠금, 서식, 카드·메모, 부와 옮기기, 휴지통, 찾기·바꾸기와 되돌리기, txt·docx·hwpx 내보내기, JSON-RPC 응답), 화면은 `AiHelperField.test.tsx`.
+- 말 단계 대조는 메모의 쌍이 한쪽(모두 높임이나 모두 안높임)일 때만 자동으로 짚는다. 호칭이 쌍과 맞는지는 아직 보지 않는다.
+- 시험: `cargo test -p writer-mcp` (지침 변환과 읽기 전 거절, 맥락 메모 필수·시제·말 단계 대조·새 설정 메모, 거절 횟수 파일, 점검기 사례 대조, 저장 전 거절과 세 번째 통과, 저장 뒤 경고, 쓰고 읽기, 기록, 지문 충돌, 잠금, 서식, 카드·메모, 부와 옮기기, 휴지통, 찾기·바꾸기와 되돌리기, txt·docx·hwpx 내보내기, JSON-RPC 응답), 화면은 `AiHelperField.test.tsx`.

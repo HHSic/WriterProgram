@@ -5,24 +5,61 @@
 //! refused, so nothing half-done lands in the manuscript and a retried append
 //! cannot double the text. Like the hook, a document is refused twice at most
 //! within half an hour; the third try goes through and the answer lists what
-//! is still wrong. After saving, the answer carries the chapter's warnings,
-//! for the writer to decide on.
+//! is still wrong. The count is kept in a file (see [`state_file`]), so it
+//! holds across server restarts and one-off CLI calls. After saving, the
+//! answer carries the chapter's warnings, for the writer to decide on.
 
 use std::collections::HashMap;
-use std::sync::{LazyLock, Mutex};
-use std::time::{Duration, Instant};
+use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
 use crate::check::{self, Severity};
 
 pub const MAX_REFUSALS: u32 = 2;
-const STALE: Duration = Duration::from_secs(30 * 60);
+const STALE_SECS: u64 = 30 * 60;
 /// Warnings listed in an answer; the rest are counted.
 const LISTED: usize = 20;
 
-static REFUSED: LazyLock<Mutex<HashMap<String, (u32, Instant)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+/// Refusal counts: `{key: [count, unix seconds of the last refusal]}`, in
+/// `WRITER_MCP_STATE_DIR` or the system's temporary folder. Losing it only
+/// starts the counts again.
+fn state_file() -> PathBuf {
+    std::env::var_os("WRITER_MCP_STATE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::temp_dir().join("writer-mcp"))
+        .join("refusals.json")
+}
+
+/// One read-change-write at a time within this process.
+static STATE: Mutex<()> = Mutex::new(());
+
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+fn load() -> HashMap<String, (u32, u64)> {
+    std::fs::read_to_string(state_file())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn store(mut counts: HashMap<String, (u32, u64)>) {
+    let now = now();
+    counts.retain(|_, (_, at)| now.saturating_sub(*at) < STALE_SECS);
+    let path = state_file();
+    let Some(dir) = path.parent() else { return };
+    let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
+    // Best effort: a count that cannot be kept only means more refusals.
+    let _ = std::fs::create_dir_all(dir)
+        .and_then(|()| std::fs::write(&tmp, serde_json::to_string(&counts).unwrap_or_default()))
+        .and_then(|()| std::fs::rename(&tmp, &path));
+}
 
 /// Checks `text` about to be written under `key` (project and document).
 /// `Err` refuses it with the lines to fix; `Ok` lets it through, with the
@@ -32,21 +69,26 @@ pub fn before(key: &str, text: &str) -> Result<Vec<Value>, String> {
         .into_iter()
         .filter(|f| f.severity == Severity::Contract)
         .collect();
-    let mut refused = REFUSED.lock().unwrap_or_else(|p| p.into_inner());
+    let _guard = STATE.lock().unwrap_or_else(|p| p.into_inner());
+    let mut counts = load();
     if contract.is_empty() {
-        refused.remove(key);
+        if counts.remove(key).is_some() {
+            store(counts);
+        }
         return Ok(Vec::new());
     }
-    let now = Instant::now();
-    let count = match refused.get(key) {
-        Some((n, at)) if now.duration_since(*at) < STALE => *n,
+    let now = now();
+    let count = match counts.get(key) {
+        Some((n, at)) if now.saturating_sub(*at) < STALE_SECS => *n,
         _ => 0,
     };
     if count >= MAX_REFUSALS {
-        refused.remove(key);
+        counts.remove(key);
+        store(counts);
         return Ok(contract.iter().map(check::Finding::to_json).collect());
     }
-    refused.insert(key.to_string(), (count + 1, now));
+    counts.insert(key.to_string(), (count + 1, now));
+    store(counts);
     let rows: Vec<String> = contract
         .iter()
         .map(|f| {
@@ -80,12 +122,12 @@ pub fn after(chapter_text: &str, unfixed: Vec<Value>) -> Value {
         "warn": warn.iter().take(LISTED).collect::<Vec<_>>(),
         "warn_count": warn.len(),
         "info_count": info,
-        "note": "kfiction 점검. 경고는 참고용이라 작가가 고르게 한다. 작가가 원하지 않으면 고치지 않는다. 줄 번호는 read_doc 본문 기준.",
+        "note": "kfiction 점검. 경고는 참고용이라 작가가 고르게 한다. 작가가 원하지 않으면 고치지 않는다. warn 줄 번호는 read_doc 본문, context 줄 번호는 보낸 글 기준. context는 보낸 맥락 메모와 어긋나 보이는 곳이라 먼저 확인한다.",
     });
     if !unfixed.is_empty() {
         out["unfixed_contract"] = Value::Array(unfixed);
         out["note"] = json!(
-            "고치지 못한 계약 위반이 본문에 남았음(unfixed_contract). 작가에게 알린다. 경고는 참고용이다. 줄 번호는 read_doc 본문 기준."
+            "고치지 못한 계약 위반이 본문에 남았음(unfixed_contract). 작가에게 알린다. 경고는 참고용이다. warn 줄 번호는 read_doc 본문, context 줄 번호는 보낸 글 기준."
         );
     }
     out

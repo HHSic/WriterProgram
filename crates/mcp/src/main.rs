@@ -11,6 +11,8 @@
 //! (the MCP stdio transport). Only tools are offered.
 
 mod check;
+mod context;
+mod guide;
 mod manage;
 mod review;
 mod text;
@@ -31,6 +33,7 @@ const PROTOCOL_VERSION: &str = "2025-06-18";
 
 /// Told to the assistant on `initialize`: how to use the tools with a writer.
 const INSTRUCTIONS: &str = "WriterProgram 작품 폴더를 읽고 쓰는 도구다. 작가가 앱으로 함께 연다.
+- 한국어 소설을 쓰거나 고치거나 후보를 내기 전에 guide로 kfiction 작문 지침을 읽고 따른다. 읽기 전에는 회차를 쓸 수 없다.
 - 먼저 outline으로 작품 구조를 본다. 회차 본문은 read_doc으로 읽는다.
 - 원고 본문은 작가가 넣어 달라거나 쓰라고 했을 때만 add_doc, write_doc으로 쓴다. 후보와 제안은 채팅으로 보이거나 add_note로 메모에 남긴다.
 - write_doc 전에는 read_doc으로 읽고 그 rev를 base_rev로 넘긴다. 고치기 직전 본문은 '지금 원고 보관' 기록으로 남아 앱에서 되돌릴 수 있다.
@@ -93,10 +96,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 _ => return Err(USAGE.into()),
             };
             let out = tools::call(name, &args, project.as_deref())?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&out).expect("values serialize")
-            );
+            println!("{}", tools::as_text(&out));
             Ok(())
         }
         _ => Err(USAGE.into()),
@@ -104,6 +104,7 @@ fn run(args: &[String]) -> Result<(), String> {
 }
 
 fn serve(project: Option<PathBuf>) -> Result<(), String> {
+    guide::require();
     let stdin = io::stdin();
     let mut stdout = io::stdout().lock();
     for line in stdin.lock().lines() {
@@ -131,18 +132,29 @@ fn handle(line: &str, project: Option<&std::path::Path>) -> Option<String> {
     let result = match method {
         "initialize" => json!({
             "protocolVersion": params.get("protocolVersion").and_then(Value::as_str).unwrap_or(PROTOCOL_VERSION),
-            "capabilities": {"tools": {"listChanged": false}},
+            "capabilities": {"tools": {"listChanged": false}, "prompts": {"listChanged": false}},
             "serverInfo": {"name": "writerprogram", "version": env!("CARGO_PKG_VERSION")},
             "instructions": INSTRUCTIONS,
         }),
         "ping" => json!({}),
         "tools/list" => json!({"tools": tools::list()}),
+        "prompts/list" => json!({"prompts": guide::prompts()}),
+        "prompts/get" => {
+            let name = params.get("name").and_then(Value::as_str).unwrap_or("");
+            let args = params.get("arguments").cloned().unwrap_or(json!({}));
+            match guide::prompt(name, &args) {
+                Ok(text) => json!({
+                    "messages": [{"role": "user", "content": {"type": "text", "text": text}}],
+                }),
+                Err(e) => return Some(error(id, -32602, &e)),
+            }
+        }
         "tools/call" => {
             let name = params.get("name").and_then(Value::as_str).unwrap_or("");
             let args = params.get("arguments").cloned().unwrap_or(json!({}));
             match tools::call(name, &args, project) {
                 Ok(out) => json!({
-                    "content": [{"type": "text", "text": serde_json::to_string_pretty(&out).expect("values serialize")}],
+                    "content": [{"type": "text", "text": tools::as_text(&out)}],
                     "isError": false,
                 }),
                 Err(e) => json!({"content": [{"type": "text", "text": e}], "isError": true}),

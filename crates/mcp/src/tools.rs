@@ -16,7 +16,7 @@ use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
 use writer_core::{markup::Block, snapshot};
 
 use crate::text::{has_formatting, to_blocks, to_text};
-use crate::{manage, review};
+use crate::{context, guide, manage, review};
 
 /// Same interval as the app's editor (`app/src-tauri/src/commands/doc.rs`).
 const AUTO_RECORD_EVERY_MINUTES: i64 = 10;
@@ -41,7 +41,13 @@ pub(crate) fn tool(name: &str, description: &str, props: Value, required: &[&str
 
 /// Tool list for MCP `tools/list`.
 pub fn list() -> Value {
+    let new_facts = json!({"type": "array", "items": {"type": "string"}, "description": "보낸 글에서 새로 지어낸 이름이나 사실. 회차에 메모로 남는다"});
     let mut tools = vec![
+        json!({
+            "name": "guide",
+            "description": "kfiction 한국어 소설 작문 지침. 글을 쓰거나 고치거나 후보를 내기 전에 먼저 읽는다(읽기 전에는 회차를 쓸 수 없다). topic을 주면 참고 문서 하나(context, speech-levels, figurative, vocabulary, revision).",
+            "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["context", "speech-levels", "figurative", "vocabulary", "revision"]}}, "required": []},
+        }),
         tool(
             "outline",
             "작품 목차: 부와 회차(id, 제목, 상태, 글자 수, 잠금), 기획 문서, 설정 카드 목록, 전체 글자 수.",
@@ -63,6 +69,8 @@ pub fn list() -> Value {
                 "section": {"type": "string", "enum": ["manuscript", "planning"], "description": "기본 manuscript(회차)"},
                 "part_id": {"type": "string", "description": "넣을 부. 기본은 마지막 부"},
                 "after": {"type": "string", "description": "이 문서 바로 뒤에 넣음"},
+                "context": context::schema(),
+                "new_facts": new_facts.clone(),
             }),
             &["title"],
         ),
@@ -75,6 +83,8 @@ pub fn list() -> Value {
                 "mode": {"type": "string", "enum": ["append", "replace"]},
                 "base_rev": {"type": "string", "description": "read_doc에서 받은 rev. 그 뒤에 앱이나 다른 기기에서 바뀌었으면 고치지 않는다"},
                 "allow_plain": {"type": "boolean", "description": "replace로 굵게·방점·메모 구간·문단 여백 같은 서식이 사라져도 된다고 작가가 확인했을 때만 true"},
+                "context": context::schema(),
+                "new_facts": new_facts,
             }),
             &["id", "text", "mode"],
         ),
@@ -149,8 +159,10 @@ pub fn list() -> Value {
 
 /// Runs a tool. `default_project` is the folder given when the server started.
 pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome {
-    if name == "create_project" {
-        return create_project(args);
+    match name {
+        "create_project" => return create_project(args),
+        "guide" => return guide::read(str_arg(args, "topic")).map(Value::String),
+        _ => {}
     }
     let root = project_root(args, default_project)?;
     match name {
@@ -166,6 +178,15 @@ pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome
         "check" => check_doc(&root, args),
         _ => manage::call(name, &root, args)
             .unwrap_or_else(|| Err(format!("알 수 없는 도구: {name}"))),
+    }
+}
+
+/// A tool's answer as the text it hands back: strings as they are, values
+/// as pretty JSON.
+pub fn as_text(out: &Value) -> String {
+    match out {
+        Value::String(s) => s.clone(),
+        v => serde_json::to_string_pretty(v).expect("values serialize"),
     }
 }
 
@@ -261,10 +282,14 @@ fn add_doc(root: &Path, args: &Value) -> Outcome {
     };
     let text = str_arg(args, "text").unwrap_or_default();
     let manuscript = section == Section::Manuscript && !text.trim().is_empty();
-    let unfixed = if manuscript {
-        review::before(&format!("{}#new:{}", root.display(), spec.title), text)?
+    let gate = if manuscript {
+        Some(gate(
+            &format!("{}#new:{}", root.display(), spec.title),
+            args,
+            text,
+        )?)
     } else {
-        Vec::new()
+        None
     };
     let id = project::add_doc(root, &spec).map_err(err)?;
     let blocks = to_blocks(text);
@@ -274,8 +299,8 @@ fn add_doc(root: &Path, args: &Value) -> Outcome {
         save(root, &id, blocks.clone(), None)?.counts.with_spaces
     };
     let mut out = json!({"id": id, "chars": chars});
-    if manuscript {
-        out["check"] = review::after(&to_text(&blocks), unfixed);
+    if let Some(gate) = gate {
+        out["check"] = report(root, &id, gate, args, text, &to_text(&blocks))?;
     }
     Ok(out)
 }
@@ -311,11 +336,10 @@ fn write_doc(root: &Path, args: &Value) -> Outcome {
         }
         other => return Err(format!("mode는 append나 replace: {other}")),
     };
-    let manuscript = section == Section::Manuscript;
-    let unfixed = if manuscript {
-        review::before(&format!("{}#{id}", root.display()), text)?
+    let gate = if section == Section::Manuscript {
+        Some(gate(&format!("{}#{id}", root.display()), args, text)?)
     } else {
-        Vec::new()
+        None
     };
     let record = keep_before(root, &current)?;
     let chapter_text = to_text(&body);
@@ -326,10 +350,66 @@ fn write_doc(root: &Path, args: &Value) -> Outcome {
         "chars": outcome.counts.with_spaces,
         "record": record,
     });
-    if manuscript {
-        out["check"] = review::after(&chapter_text, unfixed);
+    if let Some(gate) = gate {
+        out["check"] = report(root, id, gate, args, text, &chapter_text)?;
     }
     Ok(out)
+}
+
+/// What a chapter write is checked against afterwards.
+struct Gate {
+    context: context::Context,
+    unfixed: Vec<Value>,
+}
+
+/// Before `text` goes into a chapter: the guide was read, the context memo
+/// came with it, and it has no contract breaks (review.rs).
+fn gate(key: &str, args: &Value, text: &str) -> Result<Gate, String> {
+    guide::check_read()?;
+    let context = context::parse(args, text)?;
+    let unfixed = review::before(key, text)?;
+    Ok(Gate { context, unfixed })
+}
+
+/// After a chapter write: its warnings, the memo against the text sent, and
+/// the names or facts the assistant made up, kept as a note on the chapter.
+fn report(
+    root: &Path,
+    id: &str,
+    gate: Gate,
+    args: &Value,
+    text: &str,
+    chapter_text: &str,
+) -> Result<Value, String> {
+    let mut check = review::after(chapter_text, gate.unfixed);
+    let memo = context::line(&gate.context);
+    check["context"] = Value::Array(context::compare(&gate.context, text));
+    check["memo"] = json!(memo);
+    let facts: Vec<&str> = args
+        .get("new_facts")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::trim)
+        .filter(|f| !f.is_empty())
+        .collect();
+    if !facts.is_empty() {
+        let lines: Vec<String> = facts.iter().map(|f| format!("- {f}")).collect();
+        let note = notes::create(
+            root,
+            &NewNote {
+                id: None,
+                anchor: Anchor::Doc,
+                target: id.to_string(),
+                quote: String::new(),
+                text: format!("새 설정 (Claude가 지어냄 · {memo})\n{}", lines.join("\n")),
+            },
+        )
+        .map_err(err)?;
+        check["new_facts_note"] = json!(note.id);
+    }
+    Ok(check)
 }
 
 fn check_doc(root: &Path, args: &Value) -> Outcome {
@@ -508,7 +588,7 @@ fn create_project(args: &Value) -> Outcome {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn new_project() -> (tempfile::TempDir, PathBuf) {
@@ -523,8 +603,16 @@ mod tests {
         (dir, root)
     }
 
+    /// Writing tools get a context memo unless the test gives its own.
+    pub(crate) fn with_context(name: &str, mut args: Value) -> Value {
+        if matches!(name, "write_doc" | "add_doc") && args.get("context").is_none() {
+            args["context"] = json!({"pov": "윤재", "tense": "past", "speech": [{"from": "윤재", "to": "서아", "level": "해체"}]});
+        }
+        args
+    }
+
     fn run(root: &Path, name: &str, args: Value) -> Outcome {
-        call(name, &args, Some(root))
+        call(name, &with_context(name, args), Some(root))
     }
 
     fn first_chapter(root: &Path) -> String {
@@ -766,6 +854,100 @@ mod tests {
         )
         .unwrap();
         assert!(plan.get("check").is_none());
+    }
+
+    #[test]
+    fn the_guide_is_read_before_a_chapter_is_written() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        guide::require();
+        let e = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "비가 왔다.", "mode": "append"}),
+        )
+        .unwrap_err();
+        assert!(e.contains("guide"), "{e}");
+        let text = call("guide", &json!({}), None).unwrap();
+        assert!(text.as_str().unwrap().contains("## 확인 목록"));
+        run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "비가 왔다.", "mode": "append"}),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_chapter_needs_its_context_memo() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        let e = call(
+            "write_doc",
+            &json!({"id": id, "text": "비가 왔다.", "mode": "append"}),
+            Some(&root),
+        )
+        .unwrap_err();
+        assert!(e.contains("맥락 메모"), "{e}");
+        let e = call(
+            "write_doc",
+            &json!({"id": id, "text": "“가자.”", "mode": "append", "context": {"pov": "윤재", "tense": "past"}}),
+            Some(&root),
+        )
+        .unwrap_err();
+        assert!(e.contains("speech"), "{e}");
+        assert_eq!(
+            run(&root, "read_doc", json!({"id": id})).unwrap()["text"],
+            ""
+        );
+    }
+
+    #[test]
+    fn the_memo_is_compared_and_new_facts_become_a_note() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        let w = run(
+            &root,
+            "write_doc",
+            json!({
+                "id": id,
+                "mode": "append",
+                "text": "서아가 골목을 달린다. 윤재가 뒤따른다.\n“오빠, 빨리 와요.”",
+                "new_facts": ["서아의 할머니는 반찬가게를 한다"],
+            }),
+        )
+        .unwrap();
+        let kinds: Vec<&str> = w["check"]["context"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["kind"].as_str().unwrap())
+            .collect();
+        assert_eq!(kinds, ["시제", "말 단계"]);
+        assert_eq!(w["check"]["memo"], "시점 윤재 · 과거형 · 윤재→서아 해체");
+        let notes = run(&root, "notes", json!({})).unwrap();
+        assert_eq!(notes[0]["target"], id.as_str());
+        assert!(
+            notes[0]["text"]
+                .as_str()
+                .unwrap()
+                .contains("- 서아의 할머니는 반찬가게를 한다")
+        );
+    }
+
+    #[test]
+    fn a_refusal_is_counted_in_the_state_file() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        let dirty = json!({"id": id, "text": "**굵게**", "mode": "append"});
+        run(&root, "write_doc", dirty).unwrap_err();
+        let kept = std::fs::read_to_string(
+            std::env::temp_dir()
+                .join("writer-mcp")
+                .join("refusals.json"),
+        )
+        .unwrap_or_default();
+        assert!(kept.contains(&format!("#{id}")), "{kept}");
     }
 
     #[test]

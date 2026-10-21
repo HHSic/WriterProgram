@@ -8,8 +8,8 @@
 //! - warn: marks more common in AI text than in people's. Reported, not enforced.
 //! - info: notes.
 
-mod speech;
-mod text;
+pub(crate) mod speech;
+pub(crate) mod text;
 
 use std::collections::HashSet;
 use std::sync::LazyLock;
@@ -156,7 +156,7 @@ fn first_word(s: &str) -> &str {
     s.split_whitespace().next().unwrap_or("")
 }
 
-fn cut(s: &str) -> String {
+pub(crate) fn cut(s: &str) -> String {
     if len(s) > 40 {
         s.chars().take(40).collect::<String>() + "…"
     } else {

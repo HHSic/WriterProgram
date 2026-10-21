@@ -346,6 +346,7 @@ fn item(id: &str, title: &str, place: usize) -> ExportItem {
 #[cfg(test)]
 mod tests {
     use crate::tools::call;
+    use crate::tools::tests::with_context;
     use serde_json::{Value, json};
     use std::path::{Path, PathBuf};
 
@@ -362,7 +363,7 @@ mod tests {
     }
 
     fn run(root: &Path, name: &str, args: Value) -> Value {
-        call(name, &args, Some(root)).unwrap_or_else(|e| panic!("{name}: {e}"))
+        call(name, &with_context(name, args), Some(root)).unwrap_or_else(|e| panic!("{name}: {e}"))
     }
 
     fn chapter(root: &Path, title: &str, text: &str) -> String {
