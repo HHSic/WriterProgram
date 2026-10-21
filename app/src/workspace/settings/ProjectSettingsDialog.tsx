@@ -11,6 +11,7 @@ import { placeNote, usePlaceOf } from '../../components/PlacePicker';
 import { KIND_LABEL, docNoun } from '../../lib/labels';
 import { closeDialog, openDialog, saveProjectFileAs, toastError, updateProject, useApp, type SettingsTab } from '../../store';
 import { ProjectDriveField } from '../Drives';
+import { AiHelperField } from './AiHelperField';
 import { FormatEditor } from './FormatEditor';
 import { JournalField } from './JournalField';
 import { PlatformField } from './PlatformField';
@@ -144,6 +145,7 @@ export function ProjectSettingsDialog({ tab: initialTab }: { tab?: SettingsTab }
           <ProjectSizeField />
           <ProjectDriveField />
           <JournalField root={ov.root} keepDaily={keepDaily} onKeepDaily={setKeepDaily} />
+          <AiHelperField root={ov.root} />
         </div>
       )}
 

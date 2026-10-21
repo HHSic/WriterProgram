@@ -15,6 +15,7 @@ use writer_core::notes::{self, Anchor, NewNote};
 use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
 use writer_core::{markup::Block, snapshot};
 
+use crate::manage;
 use crate::text::{has_formatting, to_blocks, to_text};
 
 /// Same interval as the app's editor (`app/src-tauri/src/commands/doc.rs`).
@@ -26,19 +27,21 @@ pub const RECORD_NAME: &str = "Claude가 고치기 전";
 
 pub type Outcome = Result<Value, String>;
 
+/// One tool's entry in `tools/list`, with the `project` argument every tool
+/// on a project takes.
+pub(crate) fn tool(name: &str, description: &str, props: Value, required: &[&str]) -> Value {
+    let mut props = props;
+    props["project"] = json!({"type": "string", "description": "작품 폴더 경로 (project.json이 있는 폴더). 서버를 켤 때 정했으면 생략"});
+    json!({
+        "name": name,
+        "description": description,
+        "inputSchema": {"type": "object", "properties": props, "required": required},
+    })
+}
+
 /// Tool list for MCP `tools/list`.
 pub fn list() -> Value {
-    let project = json!({"type": "string", "description": "작품 폴더 경로 (project.json이 있는 폴더). 서버를 켤 때 정했으면 생략"});
-    let tool = |name: &str, description: &str, props: Value, required: &[&str]| {
-        let mut props = props;
-        props["project"] = project.clone();
-        json!({
-            "name": name,
-            "description": description,
-            "inputSchema": {"type": "object", "properties": props, "required": required},
-        })
-    };
-    Value::Array(vec![
+    let mut tools = vec![
         tool(
             "outline",
             "작품 목차: 부와 회차(id, 제목, 상태, 글자 수, 잠금), 기획 문서, 설정 카드 목록, 전체 글자 수.",
@@ -133,7 +136,9 @@ pub fn list() -> Value {
                     "required": ["parent", "title"],
                 },
         }),
-    ])
+    ];
+    tools.extend(manage::list());
+    Value::Array(tools)
 }
 
 /// Runs a tool. `default_project` is the folder given when the server started.
@@ -152,19 +157,20 @@ pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome
         "save_card" => save_card(&root, args),
         "notes" => list_notes(&root),
         "add_note" => add_note(&root, args),
-        _ => Err(format!("알 수 없는 도구: {name}")),
+        _ => manage::call(name, &root, args)
+            .unwrap_or_else(|| Err(format!("알 수 없는 도구: {name}"))),
     }
 }
 
-fn err(e: writer_core::Error) -> String {
+pub(crate) fn err(e: writer_core::Error) -> String {
     e.to_string()
 }
 
-fn str_arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
+pub(crate) fn str_arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
     args.get(key).and_then(Value::as_str)
 }
 
-fn required<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+pub(crate) fn required<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     str_arg(args, key).ok_or_else(|| format!("{key}를 주세요"))
 }
 

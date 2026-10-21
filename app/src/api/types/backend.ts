@@ -108,6 +108,8 @@ export interface Backend {
   recordsTidy(root: string): Promise<number>;
   /** 이 작품 크기, and the free room on the project's disk. */
   projectSize(root: string): Promise<ProjectSizes>;
+  /** writer-mcp installed next to the app, for connecting an AI assistant (docs/mcp.md); null when absent. */
+  mcpServer(): Promise<string | null>;
   trashList(root: string): Promise<TrashItem[]>;
   trashRestore(root: string, trashId: string): Promise<void>;
   trashDelete(root: string, trashId: string): Promise<void>;

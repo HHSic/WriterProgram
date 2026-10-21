@@ -75,10 +75,18 @@ jobs:
       - name: Check before building
         run: |
           npm --prefix app run build
-          cargo fmt -p writer-core -p writer-sync -p writer-app -p writer-ai --check
+          cargo fmt -p writer-core -p writer-sync -p writer-app -p writer-ai -p writer-mcp --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
           npm --prefix app test
+
+      # writer-mcp goes into the installer next to the app (docs/mcp.md). Tauri
+      # takes sidecars named for the target and strips the suffix when bundling.
+      - name: Build writer-mcp for the installer
+        run: |
+          cargo build --release --locked -p writer-mcp
+          mkdir -p app/src-tauri/binaries
+          cp target/release/writer-mcp.exe app/src-tauri/binaries/writer-mcp-x86_64-pc-windows-msvc.exe
 
       - name: Build, sign and draft the release
         uses: tauri-apps/tauri-action@v0
@@ -94,6 +102,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
+          args: --config src-tauri/tauri.mcp.conf.json
 
       - name: Verify uploaded installer and updater metadata
         env:

@@ -7,6 +7,10 @@ import { clone, createProject, forgetRecent, id, newDoc, overview, project, rece
 const MB = 1024 * 1024;
 
 export const projectMethods = {
+  async mcpServer() {
+    // The browser preview has no writer-mcp next to it.
+    return null;
+  },
   async projectSize(root) {
     const p = project(root);
     const writing = bytesOf(p.info) + bytesOf([...p.docs.values()]) + bytesOf([...p.cards.values()]) + bytesOf([...p.notes.values()]);

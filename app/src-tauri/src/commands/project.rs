@@ -101,6 +101,23 @@ pub async fn project_size(root: String) -> Res<Sizes> {
     project::sizes(Path::new(&root)).map_err(fail)
 }
 
+/// writer-mcp next to the app, where the installer puts it, for connecting an
+/// AI assistant to a project (docs/mcp.md). None when it is not there.
+#[tauri::command]
+pub async fn mcp_server() -> Res<Option<String>> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let name = if cfg!(windows) {
+        "writer-mcp.exe"
+    } else {
+        "writer-mcp"
+    };
+    Ok(exe
+        .parent()
+        .map(|dir| dir.join(name))
+        .filter(|path| path.is_file())
+        .map(|path| path.display().to_string()))
+}
+
 /// Shows a file or folder in the system file manager.
 #[tauri::command]
 pub async fn reveal(app: AppHandle, path: String) -> Res<()> {

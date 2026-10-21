@@ -4,3 +4,4 @@ app/dist/
 app/src-tauri/gen/schemas/
 *.log
 evals/context-sentences/results/
+app/src-tauri/binaries/

@@ -10,6 +10,7 @@
 //! The server speaks JSON-RPC 2.0, one message per line on stdin and stdout
 //! (the MCP stdio transport). Only tools are offered.
 
+mod manage;
 mod text;
 mod tools;
 
@@ -32,7 +33,9 @@ const INSTRUCTIONS: &str = "WriterProgram 작품 폴더를 읽고 쓰는 도구�
 - 원고 본문은 작가가 넣어 달라거나 쓰라고 했을 때만 add_doc, write_doc으로 쓴다. 후보와 제안은 채팅으로 보이거나 add_note로 메모에 남긴다.
 - write_doc 전에는 read_doc으로 읽고 그 rev를 base_rev로 넘긴다. 고치기 직전 본문은 '지금 원고 보관' 기록으로 남아 앱에서 되돌릴 수 있다.
 - 본문은 한 줄에 한 문단, 장면 나눔은 ***. 본문에 설명, 인사, 마크다운을 넣지 않는다.
-- 잠근 회차는 고치지 않는다. 서식이 있는 회차를 replace로 바꾸려면 작가에게 서식이 사라져도 되는지 먼저 묻는다.";
+- 잠근 회차는 고치지 않는다. 서식이 있는 회차를 replace로 바꾸려면 작가에게 서식이 사라져도 되는지 먼저 묻는다.
+- trash_doc, replace_all, restore_record, export는 작가가 시켰을 때만 쓴다. replace_all 전에는 search로 몇 곳인지 보인다.
+- 잘못 고쳤으면 records로 기록을 찾아 restore_record로 되돌린다. 지운 문서는 trash와 restore_trash로 되살린다.";
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

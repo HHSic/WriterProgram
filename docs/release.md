@@ -7,6 +7,7 @@ Windows 설치 파일을 GitHub Releases로 내보내고, 설치된 앱이 스�
 | 부분 | 위치 | 내용 |
 |---|---|---|
 | 설치 파일 | `app/src-tauri/tauri.conf.json` `bundle` | NSIS 하나(`.exe`). 관리자 권한 없이 내 계정에만 설치(`currentUser`). WebView2가 없는 PC는 설치 중에 받아 온다. 한국어 설치 화면 |
+| AI 도우미 연결 | `app/src-tauri/tauri.mcp.conf.json`, 배포 워크플로의 "Build writer-mcp" | `writer-mcp.exe`를 앱 옆에 함께 설치한다(사이드카). 배포 빌드에서만 넣는다([mcp.md](mcp.md)) |
 | 업데이트 확인 | `plugins.updater`, 앱 `commands/update.rs`, 화면 `store/update.ts` | 시작하고 조금 뒤, 하루 한 번 `releases/latest/download/latest.json`을 묻는다. 새 버전이 있으면 알림 하나만 띄우고, 작가가 "바꾸기"를 누르면 원고를 모두 저장한 뒤 받는다. 보기 설정에 버전, "새 버전 확인", 자동 확인 끄기 |
 | 업데이트 서명 | 공개 키는 `tauri.conf.json`, 비밀 키는 운영자 PC와 GitHub 비밀값 | 받은 설치 파일의 서명이 공개 키와 맞지 않으면 설치하지 않는다(minisign). 코드 서명과는 다른 것이고 무료 |
 | 자동 배포 | `.github/workflows/release.yml` | 정식 버전 태그를 올리면 검사 → 빌드 → 서명 → 초안 릴리스 → 업로드된 파일 서명 검증 → 자동 공개(설치 파일, `.sig`, `latest.json`) |
