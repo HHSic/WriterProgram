@@ -85,7 +85,7 @@ node plugins/kfiction/bin/kfiction.js levels 1화.md
 
 ## WriterProgram 작품과 함께 쓰기
 
-WriterProgram 앱의 작품 폴더를 Claude가 직접 읽고 쓰게 하려면 `writer-mcp`를 MCP 서버로 붙인다. 회차 목차·본문·설정집·메모를 다루고, 본문을 고치기 전에 앱에서 되돌릴 수 있는 기록을 남긴다. 설치와 도구는 [AI 도우미 연결](../../docs/mcp.md).
+WriterProgram 앱의 작품 폴더를 Claude가 직접 읽고 쓰게 하려면 `writer-mcp`를 MCP 서버로 붙인다. 회차 목차·본문·설정집·메모를 다루고, 본문을 고치기 전에 앱에서 되돌릴 수 있는 기록을 남긴다. 아래 원고 점검 hook은 MCP로 쓴 회차를 보지 못하므로, `writer-mcp`가 같은 점검기를 Rust로 옮겨 쓰기 도구 안에서 돌린다(계약 위반은 저장 전에 거절). 설치와 도구는 [AI 도우미 연결](../../docs/mcp.md).
 
 ```
 cargo install --path crates/mcp
@@ -122,3 +122,4 @@ KSTE와 달리 문체 경고로 모델을 막지 않는다. 문체 수치를 0�
 | `integrations/chatgpt/` | ChatGPT용 지침·지식 파일·스킬 zip(`dist/`)과 데스크톱 앱 설치 스크립트 |
 | `plugin.json` | OpenAI 플러그인 형식(agent-plugins) 매니페스트. `.claude-plugin/plugin.json`은 Claude Code용 |
 | `test/` | `npm test` (node --test) |
+| `scripts/lint-cases.mjs` | 점검기 시험 사례(`test/fixtures/lint-cases.json`)를 만든다. `writer-mcp`의 Rust 점검기도 같은 사례로 시험하므로, 규칙을 바꾸면 다시 돌린다 |

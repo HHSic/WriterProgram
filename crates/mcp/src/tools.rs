@@ -15,8 +15,8 @@ use writer_core::notes::{self, Anchor, NewNote};
 use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
 use writer_core::{markup::Block, snapshot};
 
-use crate::manage;
 use crate::text::{has_formatting, to_blocks, to_text};
+use crate::{manage, review};
 
 /// Same interval as the app's editor (`app/src-tauri/src/commands/doc.rs`).
 const AUTO_RECORD_EVERY_MINUTES: i64 = 10;
@@ -56,7 +56,7 @@ pub fn list() -> Value {
         ),
         tool(
             "add_doc",
-            "새 회차(또는 기획 문서)를 만든다. text를 주면 본문으로 넣는다. 작가가 쓰라고 했을 때만 쓴다.",
+            "새 회차(또는 기획 문서)를 만든다. text를 주면 본문으로 넣는다. 작가가 쓰라고 했을 때만 쓴다. 회차 본문은 write_doc과 같이 점검한다.",
             json!({
                 "title": {"type": "string"},
                 "text": {"type": "string", "description": "본문. 한 줄에 한 문단, 장면 나눔은 ***"},
@@ -68,7 +68,7 @@ pub fn list() -> Value {
         ),
         tool(
             "write_doc",
-            "회차 본문을 고친다. mode=append는 끝에 덧붙이고 replace는 통째로 바꾼다. 고치기 직전 본문을 '지금 원고 보관' 기록으로 남기므로 앱의 기록에서 되돌릴 수 있다. 잠근 회차는 고치지 않는다. 작가가 넣어 달라고 했을 때만 쓴다.",
+            "회차 본문을 고친다. mode=append는 끝에 덧붙이고 replace는 통째로 바꾼다. 고치기 직전 본문을 '지금 원고 보관' 기록으로 남기므로 앱의 기록에서 되돌릴 수 있다. 잠근 회차는 고치지 않는다. 작가가 넣어 달라고 했을 때만 쓴다. 보낸 글에 설명·인사·마크다운이 섞이면 저장하지 않고 고칠 줄을 돌려준다. 저장하면 회차의 kfiction 경고를 check에 담아 준다.",
             json!({
                 "id": {"type": "string"},
                 "text": {"type": "string", "description": "한 줄에 한 문단, 장면 나눔은 ***"},
@@ -77,6 +77,12 @@ pub fn list() -> Value {
                 "allow_plain": {"type": "boolean", "description": "replace로 굵게·방점·메모 구간·문단 여백 같은 서식이 사라져도 된다고 작가가 확인했을 때만 true"},
             }),
             &["id", "text", "mode"],
+        ),
+        tool(
+            "check",
+            "kfiction 원고 점검: 계약 위반(원고에 섞인 설명·인사·마크다운), 경고(겹친 피동, 같은 끝맺음 반복 등), 참고(번역 투 등). id로 회차를, 또는 text를 점검한다. 파일은 고치지 않는다.",
+            json!({"id": {"type": "string"}, "text": {"type": "string"}}),
+            &[],
         ),
         tool(
             "set_meta",
@@ -157,6 +163,7 @@ pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome
         "save_card" => save_card(&root, args),
         "notes" => list_notes(&root),
         "add_note" => add_note(&root, args),
+        "check" => check_doc(&root, args),
         _ => manage::call(name, &root, args)
             .unwrap_or_else(|| Err(format!("알 수 없는 도구: {name}"))),
     }
@@ -252,19 +259,32 @@ fn add_doc(root: &Path, args: &Value) -> Outcome {
         after: str_arg(args, "after").map(String::from),
         title: required(args, "title")?.to_string(),
     };
+    let text = str_arg(args, "text").unwrap_or_default();
+    let manuscript = section == Section::Manuscript && !text.trim().is_empty();
+    let unfixed = if manuscript {
+        review::before(&format!("{}#new:{}", root.display(), spec.title), text)?
+    } else {
+        Vec::new()
+    };
     let id = project::add_doc(root, &spec).map_err(err)?;
-    let blocks = str_arg(args, "text").map(to_blocks).unwrap_or_default();
+    let blocks = to_blocks(text);
     let chars = if blocks.is_empty() {
         0
     } else {
-        save(root, &id, blocks, None)?.counts.with_spaces
+        save(root, &id, blocks.clone(), None)?.counts.with_spaces
     };
-    Ok(json!({"id": id, "chars": chars}))
+    let mut out = json!({"id": id, "chars": chars});
+    if manuscript {
+        out["check"] = review::after(&to_text(&blocks), unfixed);
+    }
+    Ok(out)
 }
 
 fn write_doc(root: &Path, args: &Value) -> Outcome {
     let id = required(args, "id")?;
-    let new = to_blocks(required(args, "text")?);
+    let text = required(args, "text")?;
+    let new = to_blocks(text);
+    let (section, _) = doc::locate(root, id).map_err(err)?;
     let current = doc::load(root, id).map_err(err)?;
     if current.meta.locked {
         return Err("잠근 회차라 고치지 않음. 작가가 앱에서 잠금을 풀어야 함".into());
@@ -291,14 +311,35 @@ fn write_doc(root: &Path, args: &Value) -> Outcome {
         }
         other => return Err(format!("mode는 append나 replace: {other}")),
     };
+    let manuscript = section == Section::Manuscript;
+    let unfixed = if manuscript {
+        review::before(&format!("{}#{id}", root.display()), text)?
+    } else {
+        Vec::new()
+    };
     let record = keep_before(root, &current)?;
+    let chapter_text = to_text(&body);
     let outcome = save(root, id, body, Some(&current.rev()))?;
-    Ok(json!({
+    let mut out = json!({
         "id": id,
         "rev": outcome.rev,
         "chars": outcome.counts.with_spaces,
         "record": record,
-    }))
+    });
+    if manuscript {
+        out["check"] = review::after(&chapter_text, unfixed);
+    }
+    Ok(out)
+}
+
+fn check_doc(root: &Path, args: &Value) -> Outcome {
+    match (str_arg(args, "id"), str_arg(args, "text")) {
+        (Some(id), _) => Ok(review::full(&to_text(
+            &doc::load(root, id).map_err(err)?.body,
+        ))),
+        (None, Some(text)) => Ok(review::full(text)),
+        (None, None) => Err("id나 text를 주세요".into()),
+    }
 }
 
 /// Keeps the body as it is before a tool changes it, unless the newest record
@@ -640,6 +681,91 @@ mod tests {
         run(&root, "add_note", json!({"text": "제목 다시 생각"})).unwrap();
         let notes = run(&root, "notes", json!({})).unwrap();
         assert_eq!(notes.as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn assistant_talk_is_refused_before_saving_twice_at_most() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "윤재는 문을 열었다.", "mode": "append"}),
+        )
+        .unwrap();
+        let dirty = json!({"id": id, "text": "다음은 이어서 쓴 장면입니다.\n서아가 뒤따랐다.", "mode": "append"});
+        for n in 1..=crate::review::MAX_REFUSALS {
+            let e = run(&root, "write_doc", dirty.clone()).unwrap_err();
+            assert!(
+                e.contains(&format!("({n}/2회차)")) && e.contains("L1 F1"),
+                "{e}"
+            );
+        }
+        assert_eq!(
+            run(&root, "read_doc", json!({"id": id})).unwrap()["text"],
+            "윤재는 문을 열었다."
+        );
+        assert!(
+            snapshot::list(&root, &id).unwrap().is_empty(),
+            "a refusal keeps no record"
+        );
+
+        let third = run(&root, "write_doc", dirty.clone()).unwrap();
+        assert_eq!(third["check"]["unfixed_contract"][0]["rule"], "F1");
+        // A clean write starts the count again.
+        run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "비가 왔다.", "mode": "append"}),
+        )
+        .unwrap();
+        assert!(run(&root, "write_doc", dirty).is_err());
+    }
+
+    #[test]
+    fn a_save_reports_the_chapter_warnings() {
+        let (_dir, root) = new_project();
+        let made = run(
+            &root,
+            "add_doc",
+            json!({"title": "2", "text": "물 자국이 번지는 것이 보여졌다.\n“들어오세요.”"}),
+        )
+        .unwrap();
+        assert_eq!(made["check"]["warn"][0]["rule"], "F3");
+        assert_eq!(made["check"]["warn_count"], 1);
+        assert!(made["check"].get("unfixed_contract").is_none());
+
+        let report = run(&root, "check", json!({"id": made["id"]})).unwrap();
+        assert_eq!(report["warn"][0]["match"], "보여졌");
+        let text = run(
+            &root,
+            "check",
+            json!({"text": "원하시면 더 다듬어 드릴게요."}),
+        )
+        .unwrap();
+        assert_eq!(text["contract"][0]["rule"], "F1");
+    }
+
+    #[test]
+    fn a_refused_new_chapter_is_not_made_and_planning_is_not_checked() {
+        let (_dir, root) = new_project();
+        let e = run(
+            &root,
+            "add_doc",
+            json!({"title": "2", "text": "**굵게** 쓴 장면"}),
+        )
+        .unwrap_err();
+        assert!(e.contains("F2"), "{e}");
+        let o = run(&root, "outline", json!({})).unwrap();
+        assert_eq!(o["parts"][0]["docs"].as_array().unwrap().len(), 1);
+
+        let plan = run(
+            &root,
+            "add_doc",
+            json!({"title": "기획", "section": "planning", "text": "- **주인공**: 윤재\n- 열쇠 가게"}),
+        )
+        .unwrap();
+        assert!(plan.get("check").is_none());
     }
 
     #[test]

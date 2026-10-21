@@ -33,6 +33,7 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 | `set_meta` | 제목, 시놉시스, 상태 |
 | `cards`, `save_card` | 설정집 카드 읽기, 만들기·고치기 (준 항목만 바꿈) |
 | `notes`, `add_note` | 메모 읽기, 작품이나 회차에 메모 남기기 |
+| `check` | kfiction 원고 점검(회차 id나 글). 계약 위반·경고·참고 |
 | `create_project` | 새 작품 폴더 |
 | `add_part`, `rename_part`, `remove_part` | 부 만들기, 이름 바꾸기, 빈 부 지우기 |
 | `move_doc` | 회차를 다른 부·자리로, 기획 문서는 기획 문서 사이에서 |
@@ -42,6 +43,15 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 | `export` | txt, docx(Word), hwpx(한글) 내보내기. 회차마다 파일 하나도 된다 |
 
 명령줄에서는 `writer-mcp call <도구> '<JSON 인자>' [--project <폴더>]`로 같은 도구를 부른다. 인자 자리에 `-`를 주면 표준 입력에서 JSON을 읽는다. `writer-mcp tools`는 도구 목록을 보인다.
+
+## 원고 점검 (kfiction)
+
+Claude Code의 kfiction hook은 Write·Edit 도구로 쓴 파일만 보므로 MCP로 쓴 회차는 지나친다. 그래서 `writer-mcp`가 같은 점검기를 직접 돌린다(`crates/mcp/src/check`, `review.rs`). Node 없이 설치판만으로 돈다.
+
+- **저장 전**: `write_doc`, `add_doc`으로 회차에 보낸 글에 계약 위반(어시스턴트 말투, 마크다운)이 있으면 저장하지 않고 고칠 줄을 돌려준다. 저장한 뒤 고치게 하면 도우미가 덧붙이기를 다시 해 글이 겹칠 수 있어서 저장 전에 막는다. hook처럼 문서마다 30분 안에 두 번까지 거절하고, 세 번째는 저장하되 답의 `check.unfixed_contract`에 남은 위반을 적는다. 깨끗한 글을 한 번 쓰면 다시 센다. 거절 횟수는 서버가 켜져 있는 동안만 기억한다.
+- **저장 뒤**: 답의 `check`에 그 회차 전체의 경고(최대 20개와 전체 수)와 참고 수를 담는다. 문체 경고는 막지 않는다. 문체 수치를 0으로 몰면 문장과 개성이 깎이므로 작가가 고른다.
+- 기획 문서는 점검하지 않는다.
+- **JS 점검기와 같은 판정**: Rust 점검기는 `plugins/kfiction/lib`를 옮긴 것이다. `plugins/kfiction/scripts/lint-cases.mjs`가 JS 점검기로 만든 사례(`test/fixtures/lint-cases.json`, 규칙 16개 모두와 대사 86줄의 말 단계)를 두 쪽 시험이 모두 확인한다. 규칙을 바꾸면 스크립트를 다시 돌리고 Rust 쪽도 고친다. 한쪽만 고치면 시험이 실패한다.
 
 ## 원고를 지키는 규칙
 
@@ -59,4 +69,4 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 
 - 줄바꿈만 있는 문단 안 줄(Shift+Enter)은 `read_doc`에서 줄로 나뉘어 보이고, 그대로 `replace`하면 문단으로 나뉜다.
 - 휴지통 비우기, 문서 합치기·나누기, 교정본 주고받기, 원고 서식 바꾸기는 도구가 없다. 앱에서 한다.
-- 시험: `cargo test -p writer-mcp` (쓰고 읽기, 기록, 지문 충돌, 잠금, 서식, 카드·메모, 부와 옮기기, 휴지통, 찾기·바꾸기와 되돌리기, txt·docx·hwpx 내보내기, JSON-RPC 응답), 화면은 `AiHelperField.test.tsx`.
+- 시험: `cargo test -p writer-mcp` (점검기 사례 대조, 저장 전 거절과 세 번째 통과, 저장 뒤 경고, 쓰고 읽기, 기록, 지문 충돌, 잠금, 서식, 카드·메모, 부와 옮기기, 휴지통, 찾기·바꾸기와 되돌리기, txt·docx·hwpx 내보내기, JSON-RPC 응답), 화면은 `AiHelperField.test.tsx`.
