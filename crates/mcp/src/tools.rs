@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 use writer_core::cards::{self, Card};
+use writer_core::count::count_blocks;
 use writer_core::doc::{self, MetaPatch, SaveGuard, Section};
 use writer_core::notes::{self, Anchor, NewNote};
 use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
@@ -76,7 +77,7 @@ pub fn list() -> Value {
         ),
         tool(
             "write_doc",
-            "회차 본문을 고친다. mode=append는 끝에 덧붙이고 replace는 통째로 바꾼다. 고치기 직전 본문을 '지금 원고 보관' 기록으로 남기므로 앱의 기록에서 되돌릴 수 있다. 잠근 회차는 고치지 않는다. 작가가 넣어 달라고 했을 때만 쓴다. 보낸 글에 설명·인사·마크다운이 섞이면 저장하지 않고 고칠 줄을 돌려준다. 저장하면 회차의 kfiction 경고를 check에 담아 준다.",
+            "회차 본문을 고친다. 답의 chars는 회차 전체, added_chars는 보낸 글의 글자 수(공백 포함). mode=append는 끝에 덧붙이고 replace는 통째로 바꾼다. 고치기 직전 본문을 '지금 원고 보관' 기록으로 남기므로 앱의 기록에서 되돌릴 수 있다. 잠근 회차는 고치지 않는다. 작가가 넣어 달라고 했을 때만 쓴다. 보낸 글에 설명·인사·마크다운이 섞이면 저장하지 않고 고칠 줄을 돌려준다. 저장하면 회차의 kfiction 경고를 check에 담아 준다.",
             json!({
                 "id": {"type": "string"},
                 "text": {"type": "string", "description": "한 줄에 한 문단, 장면 나눔은 ***"},
@@ -309,6 +310,7 @@ fn write_doc(root: &Path, args: &Value) -> Outcome {
     let id = required(args, "id")?;
     let text = required(args, "text")?;
     let new = to_blocks(text);
+    let added_chars = count_blocks(&new).with_spaces;
     let (section, _) = doc::locate(root, id).map_err(err)?;
     let current = doc::load(root, id).map_err(err)?;
     if current.meta.locked {
@@ -348,6 +350,7 @@ fn write_doc(root: &Path, args: &Value) -> Outcome {
         "id": id,
         "rev": outcome.rev,
         "chars": outcome.counts.with_spaces,
+        "added_chars": added_chars,
         "record": record,
     });
     if let Some(gate) = gate {
@@ -667,6 +670,10 @@ pub(crate) mod tests {
         );
         let text = run(&root, "read_doc", json!({"id": id})).unwrap()["text"].clone();
         assert_eq!(text, "첫 문단.\n\n둘째 문단.");
+        assert_eq!(
+            (w["chars"].as_u64(), w["added_chars"].as_u64()),
+            (Some(11), Some(6))
+        );
     }
 
     #[test]
@@ -808,6 +815,25 @@ pub(crate) mod tests {
         )
         .unwrap();
         assert!(run(&root, "write_doc", dirty).is_err());
+    }
+
+    #[test]
+    fn json_escapes_left_in_the_text_are_refused() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        let e = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "문이 열렸다.\n\\\"가자.\\\"", "mode": "append"}),
+        )
+        .unwrap_err();
+        assert!(e.contains("L2 E1 이스케이프 흔적"), "{e}");
+        let ok = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "문이 열렸다.\n\"가자.\"", "mode": "append"}),
+        );
+        assert!(ok.is_ok(), "{ok:?}");
     }
 
     #[test]

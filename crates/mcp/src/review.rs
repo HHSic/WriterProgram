@@ -65,10 +65,12 @@ fn store(mut counts: HashMap<String, (u32, u64)>) {
 /// `Err` refuses it with the lines to fix; `Ok` lets it through, with the
 /// contract breaks still in it once the refusals are used up.
 pub fn before(key: &str, text: &str) -> Result<Vec<Value>, String> {
-    let contract: Vec<_> = check::lint(text)
+    let mut contract: Vec<_> = check::lint(text)
         .into_iter()
         .filter(|f| f.severity == Severity::Contract)
         .collect();
+    contract.extend(escapes(text));
+    contract.sort_by_key(|f| f.line.unwrap_or(0));
     let _guard = STATE.lock().unwrap_or_else(|p| p.into_inner());
     let mut counts = load();
     if contract.is_empty() {
@@ -108,6 +110,29 @@ pub fn before(key: &str, text: &str) -> Result<Vec<Value>, String> {
         MAX_REFUSALS,
         rows.join("\n")
     ))
+}
+
+/// Escapes left over from writing the text as JSON (`\"`, `\n`): a tool
+/// writes them into the manuscript as they are. Not a kfiction rule, since
+/// people do not type them; only text from tools has them.
+fn escapes(text: &str) -> Vec<check::Finding> {
+    text.split('\n')
+        .enumerate()
+        .filter_map(|(i, line)| {
+            let at = ["\\\"", "\\'", "\\n", "\\t"]
+                .iter()
+                .filter_map(|e| line.find(e))
+                .min()?;
+            Some(check::Finding {
+                rule: "E1",
+                name: "이스케이프 흔적",
+                severity: Severity::Contract,
+                line: Some(i + 1),
+                matched: line[at..].chars().take(12).collect(),
+                hint: "따옴표 앞의 \\나 \\n 같은 글자를 지우고 실제 따옴표와 줄바꿈으로 쓴다",
+            })
+        })
+        .collect()
 }
 
 /// The chapter's warnings after a save, for the tool's answer.
