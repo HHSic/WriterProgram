@@ -83,6 +83,15 @@ node plugins/kfiction/bin/kfiction.js levels 1화.md
 - 같은 원고를 두 컴퓨터에서 동시에 고치면 Drive가 사본을 따로 만들 수 있다.
 - Codex 연동은 아직 이 설정을 읽지 않는다.
 
+## WriterProgram 작품과 함께 쓰기
+
+WriterProgram 앱의 작품 폴더를 Claude가 직접 읽고 쓰게 하려면 `writer-mcp`를 MCP 서버로 붙인다. 회차 목차·본문·설정집·메모를 다루고, 본문을 고치기 전에 앱에서 되돌릴 수 있는 기록을 남긴다. 설치와 도구는 [AI 도우미 연결](../../docs/mcp.md).
+
+```
+cargo install --path crates/mcp
+claude mcp add writerprogram -- writer-mcp serve --project "<작품 폴더>"
+```
+
 ## 원고 점검 hook
 
 `.md`나 `.txt` 원고를 쓰거나 고치면 점검기가 돈다. 기술문서나 메모는 건드리지 않는다(한글 비율, 대사와 서술 문장으로 소설 원고인지 먼저 본다).

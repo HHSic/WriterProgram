@@ -32,7 +32,7 @@ jobs:
       - run: npm --prefix app ci
       # The app crate embeds the built screens, so they must exist first.
       - run: npm --prefix app run build
-      - run: cargo fmt -p writer-core -p writer-sync -p writer-app -p writer-ai --check
+      - run: cargo fmt -p writer-core -p writer-sync -p writer-app -p writer-ai -p writer-mcp --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - run: npm --prefix app run typecheck

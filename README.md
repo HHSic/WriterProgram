@@ -40,6 +40,7 @@ Supabase Free 플랜으로 시작할 수 있으며 SAML SSO는 Pro 이상이다.
 | `app/` | 데스크톱 앱 (화면: React + Tiptap, `app/src-tauri`: Tauri) |
 | `crates/core` | 작품 폴더 형식, 저장, 기록, 분량, 설정집, 메모, 찾기/바꾸기, 원고 서식, 내보내기 |
 | `crates/revise` | 퇴고 점검 엔진 시제품 |
+| `crates/mcp` | AI 도우미가 작품 폴더를 읽고 쓰는 MCP 서버·CLI ([AI 도우미 연결](docs/mcp.md)) |
 | `crates/evals`, `evals/` | 맥락 문장 후보 평가 실행기(`context-eval`)와 평가셋 |
 | `plugins/kfiction` | 한국어 소설 작문 플러그인 (Claude Code, Codex) |
 | `docs/` | 설계 문서 |

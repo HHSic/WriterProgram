@@ -1,0 +1,18 @@
+[package]
+name = "writer-mcp"
+version = "0.1.0"
+edition.workspace = true
+description = "MCP server and CLI that let an AI assistant read and write WriterProgram project folders"
+publish = false
+
+[[bin]]
+name = "writer-mcp"
+path = "src/main.rs"
+
+[dependencies]
+chrono = "0.4"
+serde_json = "1"
+writer-core = { path = "../core" }
+
+[dev-dependencies]
+tempfile = "3"

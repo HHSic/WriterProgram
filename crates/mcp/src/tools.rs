@@ -1,0 +1,650 @@
+//! The tools: what an assistant can do with a project folder. The MCP server
+//! and the CLI both call [`call`], so they behave the same.
+//!
+//! Everything goes through writer-core, the same code the app saves with:
+//! atomic writes, records, and the fingerprint check that notices text changed
+//! elsewhere. The app watches an open project's folder, so what a tool writes
+//! shows up on screen.
+
+use std::path::{Path, PathBuf};
+
+use serde_json::{Value, json};
+use writer_core::cards::{self, Card};
+use writer_core::doc::{self, MetaPatch, SaveGuard, Section};
+use writer_core::notes::{self, Anchor, NewNote};
+use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
+use writer_core::{markup::Block, snapshot};
+
+use crate::text::{has_formatting, to_blocks, to_text};
+
+/// Same interval as the app's editor (`app/src-tauri/src/commands/doc.rs`).
+const AUTO_RECORD_EVERY_MINUTES: i64 = 10;
+
+/// Name of the record kept before a tool changes a body. It is a "manual"
+/// record (지금 원고 보관), so it stays until the writer removes it.
+pub const RECORD_NAME: &str = "Claude가 고치기 전";
+
+pub type Outcome = Result<Value, String>;
+
+/// Tool list for MCP `tools/list`.
+pub fn list() -> Value {
+    let project = json!({"type": "string", "description": "작품 폴더 경로 (project.json이 있는 폴더). 서버를 켤 때 정했으면 생략"});
+    let tool = |name: &str, description: &str, props: Value, required: &[&str]| {
+        let mut props = props;
+        props["project"] = project.clone();
+        json!({
+            "name": name,
+            "description": description,
+            "inputSchema": {"type": "object", "properties": props, "required": required},
+        })
+    };
+    Value::Array(vec![
+        tool(
+            "outline",
+            "작품 목차: 부와 회차(id, 제목, 상태, 글자 수, 잠금), 기획 문서, 설정 카드 목록, 전체 글자 수.",
+            json!({}),
+            &[],
+        ),
+        tool(
+            "read_doc",
+            "회차나 기획 문서 하나를 읽는다. 본문은 한 줄에 한 문단, 장면 나눔은 ***. rev는 write_doc에 base_rev로 넘긴다.",
+            json!({"id": {"type": "string"}}),
+            &["id"],
+        ),
+        tool(
+            "add_doc",
+            "새 회차(또는 기획 문서)를 만든다. text를 주면 본문으로 넣는다. 작가가 쓰라고 했을 때만 쓴다.",
+            json!({
+                "title": {"type": "string"},
+                "text": {"type": "string", "description": "본문. 한 줄에 한 문단, 장면 나눔은 ***"},
+                "section": {"type": "string", "enum": ["manuscript", "planning"], "description": "기본 manuscript(회차)"},
+                "part_id": {"type": "string", "description": "넣을 부. 기본은 마지막 부"},
+                "after": {"type": "string", "description": "이 문서 바로 뒤에 넣음"},
+            }),
+            &["title"],
+        ),
+        tool(
+            "write_doc",
+            "회차 본문을 고친다. mode=append는 끝에 덧붙이고 replace는 통째로 바꾼다. 고치기 직전 본문을 '지금 원고 보관' 기록으로 남기므로 앱의 기록에서 되돌릴 수 있다. 잠근 회차는 고치지 않는다. 작가가 넣어 달라고 했을 때만 쓴다.",
+            json!({
+                "id": {"type": "string"},
+                "text": {"type": "string", "description": "한 줄에 한 문단, 장면 나눔은 ***"},
+                "mode": {"type": "string", "enum": ["append", "replace"]},
+                "base_rev": {"type": "string", "description": "read_doc에서 받은 rev. 그 뒤에 앱이나 다른 기기에서 바뀌었으면 고치지 않는다"},
+                "allow_plain": {"type": "boolean", "description": "replace로 굵게·방점·메모 구간·문단 여백 같은 서식이 사라져도 된다고 작가가 확인했을 때만 true"},
+            }),
+            &["id", "text", "mode"],
+        ),
+        tool(
+            "set_meta",
+            "회차의 제목, 시놉시스, 상태(draft, revise, done 등)를 바꾼다. 본문은 건드리지 않는다.",
+            json!({
+                "id": {"type": "string"},
+                "title": {"type": "string"},
+                "synopsis": {"type": "string"},
+                "status": {"type": "string"},
+            }),
+            &["id"],
+        ),
+        tool(
+            "cards",
+            "설정집 카드 전부: 분류, 이름, 다른 이름, 항목, 설명.",
+            json!({}),
+            &[],
+        ),
+        tool(
+            "save_card",
+            "설정 카드를 만들거나 고친다. id가 없으면 새로 만든다. fields는 {항목: 값}으로, 준 항목만 바꾼다.",
+            json!({
+                "id": {"type": "string"},
+                "type": {"type": "string", "description": "분류 id. 기본 person(인물), place(장소), term(용어)"},
+                "name": {"type": "string"},
+                "aliases": {"type": "array", "items": {"type": "string"}},
+                "fields": {"type": "object", "additionalProperties": {"type": "string"}},
+                "description": {"type": "string"},
+            }),
+            &[],
+        ),
+        tool(
+            "notes",
+            "메모 목록: 붙은 곳(작품, 회차, 본문 구간), 인용, 내용, 완료 여부.",
+            json!({}),
+            &[],
+        ),
+        tool(
+            "add_note",
+            "메모를 남긴다. doc_id를 주면 그 회차에, 없으면 작품에 붙는다. 문장 후보나 제안을 본문 대신 남길 때 쓴다.",
+            json!({
+                "text": {"type": "string"},
+                "doc_id": {"type": "string"},
+            }),
+            &["text"],
+        ),
+        json!({
+                "name": "create_project",
+                "description": "새 작품 폴더를 만든다. Google Drive 같은 동기화 폴더 안에 만들면 앱과 다른 기기에서 함께 열린다.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "parent": {"type": "string", "description": "작품 폴더를 만들 상위 폴더"},
+                        "title": {"type": "string"},
+                        "kind": {"type": "string", "enum": ["webnovel", "print"], "description": "웹소설 또는 출판 원고. 기본 print"},
+                    },
+                    "required": ["parent", "title"],
+                },
+        }),
+    ])
+}
+
+/// Runs a tool. `default_project` is the folder given when the server started.
+pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome {
+    if name == "create_project" {
+        return create_project(args);
+    }
+    let root = project_root(args, default_project)?;
+    match name {
+        "outline" => outline(&root),
+        "read_doc" => read_doc(&root, args),
+        "add_doc" => add_doc(&root, args),
+        "write_doc" => write_doc(&root, args),
+        "set_meta" => set_meta(&root, args),
+        "cards" => list_cards(&root),
+        "save_card" => save_card(&root, args),
+        "notes" => list_notes(&root),
+        "add_note" => add_note(&root, args),
+        _ => Err(format!("알 수 없는 도구: {name}")),
+    }
+}
+
+fn err(e: writer_core::Error) -> String {
+    e.to_string()
+}
+
+fn str_arg<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
+    args.get(key).and_then(Value::as_str)
+}
+
+fn required<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    str_arg(args, key).ok_or_else(|| format!("{key}를 주세요"))
+}
+
+/// The project folder: the `project` argument, else the server's, else the
+/// current folder when it is a project.
+fn project_root(args: &Value, default_project: Option<&Path>) -> Result<PathBuf, String> {
+    let given = str_arg(args, "project").map(PathBuf::from);
+    let root = given
+        .or_else(|| default_project.map(Path::to_path_buf))
+        .or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .filter(|d| d.join("project.json").is_file())
+        })
+        .ok_or("작품 폴더를 정해 주세요 (project 인자, 또는 서버를 켤 때 --project)")?;
+    if !root.join("project.json").is_file() {
+        return Err(format!(
+            "작품 폴더가 아님 (project.json 없음): {}",
+            root.display()
+        ));
+    }
+    Ok(root)
+}
+
+fn outline(root: &Path) -> Outcome {
+    let o = project::overview(root).map_err(err)?;
+    let summary = |d: &project::DocSummary| {
+        json!({
+            "id": d.id,
+            "title": d.title,
+            "status": d.status,
+            "chars": d.counts.with_spaces,
+            "locked": d.locked,
+            "synopsis": d.synopsis,
+        })
+    };
+    Ok(json!({
+        "root": o.root,
+        "title": o.project.title,
+        "kind": o.project.kind,
+        "parts": o.parts.iter().map(|p| json!({
+            "id": p.id,
+            "title": p.title,
+            "docs": p.docs.iter().map(summary).collect::<Vec<_>>(),
+        })).collect::<Vec<_>>(),
+        "planning": o.planning.iter().map(summary).collect::<Vec<_>>(),
+        "cards": o.cards.iter().map(|c| json!({"id": c.id, "type": c.card_type, "name": c.name, "summary": c.summary})).collect::<Vec<_>>(),
+        "total_chars": o.total.with_spaces,
+        "unreadable": o.unreadable.iter().map(|u| json!({"id": u.id, "reason": u.reason})).collect::<Vec<_>>(),
+    }))
+}
+
+fn read_doc(root: &Path, args: &Value) -> Outcome {
+    let id = required(args, "id")?;
+    let (section, _) = doc::locate(root, id).map_err(err)?;
+    let d = doc::load(root, id).map_err(err)?;
+    Ok(json!({
+        "id": d.meta.id,
+        "section": section,
+        "title": d.meta.title,
+        "synopsis": d.meta.synopsis,
+        "status": d.meta.status,
+        "locked": d.meta.locked,
+        "rev": d.rev(),
+        "formatted": has_formatting(&d.body),
+        "text": to_text(&d.body),
+    }))
+}
+
+fn add_doc(root: &Path, args: &Value) -> Outcome {
+    let section = match str_arg(args, "section") {
+        None | Some("manuscript") => Section::Manuscript,
+        Some("planning") => Section::Planning,
+        Some(other) => return Err(format!("section은 manuscript나 planning: {other}")),
+    };
+    let spec = NewDoc {
+        section: Some(section),
+        part_id: str_arg(args, "part_id").map(String::from),
+        after: str_arg(args, "after").map(String::from),
+        title: required(args, "title")?.to_string(),
+    };
+    let id = project::add_doc(root, &spec).map_err(err)?;
+    let blocks = str_arg(args, "text").map(to_blocks).unwrap_or_default();
+    let chars = if blocks.is_empty() {
+        0
+    } else {
+        save(root, &id, blocks, None)?.counts.with_spaces
+    };
+    Ok(json!({"id": id, "chars": chars}))
+}
+
+fn write_doc(root: &Path, args: &Value) -> Outcome {
+    let id = required(args, "id")?;
+    let new = to_blocks(required(args, "text")?);
+    let current = doc::load(root, id).map_err(err)?;
+    if current.meta.locked {
+        return Err("잠근 회차라 고치지 않음. 작가가 앱에서 잠금을 풀어야 함".into());
+    }
+    if let Some(base) = str_arg(args, "base_rev")
+        && base != current.rev()
+    {
+        return Err(
+            "read_doc 뒤에 앱이나 다른 기기에서 본문이 바뀌었음. 다시 읽고 고쳐 주세요".into(),
+        );
+    }
+    let body = match required(args, "mode")? {
+        "append" => {
+            let mut body = current.body.clone();
+            body.extend(new);
+            body
+        }
+        "replace" => {
+            let allow_plain = args.get("allow_plain").and_then(Value::as_bool) == Some(true);
+            if has_formatting(&current.body) && !allow_plain {
+                return Err("이 회차에는 굵게·방점·메모 구간·문단 여백 같은 서식이 있어 통째로 바꾸면 사라짐. append를 쓰거나, 작가가 괜찮다고 하면 allow_plain: true로 다시 부르세요".into());
+            }
+            new
+        }
+        other => return Err(format!("mode는 append나 replace: {other}")),
+    };
+    let record = keep_before(root, &current)?;
+    let outcome = save(root, id, body, Some(&current.rev()))?;
+    Ok(json!({
+        "id": id,
+        "rev": outcome.rev,
+        "chars": outcome.counts.with_spaces,
+        "record": record,
+    }))
+}
+
+/// Keeps the body as it is before a tool changes it, unless the newest record
+/// already has it. Returns the record id when one was made.
+fn keep_before(root: &Path, current: &doc::DocFile) -> Result<Option<String>, String> {
+    let id = &current.meta.id;
+    if current.body.is_empty() {
+        return Ok(None);
+    }
+    if let Some(newest) = snapshot::list(root, id).map_err(err)?.first()
+        && snapshot::load(root, id, &newest.id).map_err(err)?.body == current.body
+    {
+        return Ok(None);
+    }
+    let info = snapshot::create(root, current, "manual", RECORD_NAME).map_err(err)?;
+    Ok(Some(info.id))
+}
+
+fn save(
+    root: &Path,
+    id: &str,
+    body: Vec<Block>,
+    base: Option<&str>,
+) -> Result<doc::SaveOutcome, String> {
+    let outcome = doc::save_body(
+        root,
+        id,
+        body,
+        chrono::Duration::minutes(AUTO_RECORD_EVERY_MINUTES),
+        SaveGuard { base, force: false },
+    )
+    .map_err(err)?;
+    if outcome.conflict {
+        return Err(
+            "저장하는 사이 다른 곳에서 본문이 바뀌어 저장하지 않음. 쓰려던 글은 기록에 남겼음. 다시 읽고 고쳐 주세요"
+                .into(),
+        );
+    }
+    Ok(outcome)
+}
+
+fn set_meta(root: &Path, args: &Value) -> Outcome {
+    let id = required(args, "id")?;
+    let patch = MetaPatch {
+        title: str_arg(args, "title").map(String::from),
+        synopsis: str_arg(args, "synopsis").map(String::from),
+        status: str_arg(args, "status").map(String::from),
+        ..MetaPatch::default()
+    };
+    let meta = doc::update_meta(root, id, &patch).map_err(err)?;
+    Ok(
+        json!({"id": meta.id, "title": meta.title, "synopsis": meta.synopsis, "status": meta.status}),
+    )
+}
+
+fn card_json(c: &Card) -> Value {
+    let fields: serde_json::Map<String, Value> = c
+        .fields
+        .iter()
+        .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+        .collect();
+    json!({
+        "id": c.id,
+        "type": c.card_type,
+        "name": c.name,
+        "aliases": c.aliases,
+        "fields": fields,
+        "description": c.description,
+    })
+}
+
+fn list_cards(root: &Path) -> Outcome {
+    let cards = cards::load_all(root).map_err(err)?;
+    Ok(Value::Array(cards.iter().map(card_json).collect()))
+}
+
+fn save_card(root: &Path, args: &Value) -> Outcome {
+    let mut card = match str_arg(args, "id") {
+        Some(id) => cards::load(root, id).map_err(err)?,
+        None => cards::create(
+            root,
+            str_arg(args, "type").unwrap_or("person"),
+            required(args, "name")?,
+        )
+        .map_err(err)?,
+    };
+    if let Some(name) = str_arg(args, "name") {
+        card.name = name.to_string();
+    }
+    if let Some(aliases) = args.get("aliases").and_then(Value::as_array) {
+        card.aliases = aliases
+            .iter()
+            .filter_map(Value::as_str)
+            .map(String::from)
+            .collect();
+    }
+    if let Some(fields) = args.get("fields").and_then(Value::as_object) {
+        for (key, value) in fields {
+            let value = value.as_str().unwrap_or_default().to_string();
+            match card.fields.iter_mut().find(|(k, _)| k == key) {
+                Some(field) => field.1 = value,
+                None => card.fields.push((key.clone(), value)),
+            }
+        }
+    }
+    if let Some(description) = str_arg(args, "description") {
+        card.description = description.to_string();
+    }
+    cards::save(root, &card).map_err(err)?;
+    Ok(card_json(&card))
+}
+
+fn list_notes(root: &Path) -> Outcome {
+    let notes = notes::list(root).map_err(err)?;
+    Ok(Value::Array(
+        notes
+            .iter()
+            .map(|n| {
+                json!({
+                    "id": n.id,
+                    "anchor": n.anchor,
+                    "target": n.target,
+                    "quote": n.quote,
+                    "text": n.text,
+                    "done": n.done,
+                })
+            })
+            .collect(),
+    ))
+}
+
+fn add_note(root: &Path, args: &Value) -> Outcome {
+    let doc_id = str_arg(args, "doc_id");
+    let spec = NewNote {
+        id: None,
+        anchor: if doc_id.is_some() {
+            Anchor::Doc
+        } else {
+            Anchor::Project
+        },
+        target: doc_id.unwrap_or_default().to_string(),
+        quote: String::new(),
+        text: required(args, "text")?.to_string(),
+    };
+    let note = notes::create(root, &spec).map_err(err)?;
+    Ok(json!({"id": note.id, "anchor": note.anchor, "target": note.target}))
+}
+
+fn create_project(args: &Value) -> Outcome {
+    let kind = match str_arg(args, "kind") {
+        None | Some("print") => ProjectKind::Print,
+        Some("webnovel") => ProjectKind::Webnovel,
+        Some(other) => return Err(format!("kind는 webnovel이나 print: {other}")),
+    };
+    let spec = NewProject {
+        parent: required(args, "parent")?.to_string(),
+        title: required(args, "title")?.to_string(),
+        kind,
+        per_doc_goal: None,
+        count_spaces: true,
+        first_chapter: true,
+        platform: None,
+    };
+    let root = project::create(&spec).map_err(err)?;
+    Ok(json!({"project": root.display().to_string()}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_project() -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let made = call(
+            "create_project",
+            &json!({"parent": dir.path().to_str().unwrap(), "title": "사흘째 맑음"}),
+            None,
+        )
+        .unwrap();
+        let root = PathBuf::from(made["project"].as_str().unwrap());
+        (dir, root)
+    }
+
+    fn run(root: &Path, name: &str, args: Value) -> Outcome {
+        call(name, &args, Some(root))
+    }
+
+    fn first_chapter(root: &Path) -> String {
+        let o = run(root, "outline", json!({})).unwrap();
+        o["parts"][0]["docs"][0]["id"].as_str().unwrap().to_string()
+    }
+
+    #[test]
+    fn writes_a_new_chapter_and_reads_it_back() {
+        let (_dir, root) = new_project();
+        let made = run(
+            &root,
+            "add_doc",
+            json!({"title": "2", "text": "노인이 왔다.\n\n“하나 깎아 줘.”\n***\n비가 왔다."}),
+        )
+        .unwrap();
+        let id = made["id"].as_str().unwrap();
+        let read = run(&root, "read_doc", json!({"id": id})).unwrap();
+        assert_eq!(read["title"], "2");
+        assert_eq!(
+            read["text"],
+            "노인이 왔다.\n\n“하나 깎아 줘.”\n\n***\n\n비가 왔다."
+        );
+        let o = run(&root, "outline", json!({})).unwrap();
+        assert_eq!(o["parts"][0]["docs"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn changing_a_body_keeps_the_text_before() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "첫 문단.", "mode": "append"}),
+        )
+        .unwrap();
+        let rev = run(&root, "read_doc", json!({"id": id})).unwrap()["rev"].clone();
+        let w = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "둘째 문단.", "mode": "append", "base_rev": rev}),
+        )
+        .unwrap();
+        let record = w["record"].as_str().unwrap();
+        let kept = snapshot::load(&root, &id, record).unwrap();
+        assert_eq!(to_text(&kept.body), "첫 문단.");
+        let info = &snapshot::list(&root, &id).unwrap()[0];
+        assert_eq!(
+            (info.kind.as_str(), info.name.as_str()),
+            ("manual", RECORD_NAME)
+        );
+        let text = run(&root, "read_doc", json!({"id": id})).unwrap()["text"].clone();
+        assert_eq!(text, "첫 문단.\n\n둘째 문단.");
+    }
+
+    #[test]
+    fn a_stale_rev_or_a_locked_chapter_is_refused() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        let stale = run(&root, "read_doc", json!({"id": id})).unwrap()["rev"].clone();
+        run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "앱에서 쓴 글.", "mode": "append"}),
+        )
+        .unwrap();
+        let e = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "x", "mode": "replace", "base_rev": stale}),
+        )
+        .unwrap_err();
+        assert!(e.contains("다시 읽고"), "{e}");
+
+        doc::update_meta(
+            &root,
+            &id,
+            &MetaPatch {
+                locked: Some(true),
+                ..MetaPatch::default()
+            },
+        )
+        .unwrap();
+        let e = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "x", "mode": "append"}),
+        )
+        .unwrap_err();
+        assert!(e.contains("잠근 회차"), "{e}");
+    }
+
+    #[test]
+    fn replacing_formatted_text_needs_consent() {
+        let (_dir, root) = new_project();
+        let id = first_chapter(&root);
+        doc::save_body(
+            &root,
+            &id,
+            writer_core::markup::parse_body("그는 **분명히** 말했다."),
+            chrono::Duration::minutes(10),
+            SaveGuard::default(),
+        )
+        .unwrap();
+        let e = run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "새 글.", "mode": "replace"}),
+        )
+        .unwrap_err();
+        assert!(e.contains("allow_plain"), "{e}");
+        run(
+            &root,
+            "write_doc",
+            json!({"id": id, "text": "새 글.", "mode": "replace", "allow_plain": true}),
+        )
+        .unwrap();
+        assert_eq!(
+            run(&root, "read_doc", json!({"id": id})).unwrap()["text"],
+            "새 글."
+        );
+    }
+
+    #[test]
+    fn cards_and_notes() {
+        let (_dir, root) = new_project();
+        let made = run(
+            &root,
+            "save_card",
+            json!({"name": "윤재", "aliases": ["윤재 씨"], "fields": {"나이": "28", "말투": "손님에게 해요체"}}),
+        )
+        .unwrap();
+        assert_eq!(made["type"], "person");
+        assert_eq!(made["fields"]["나이"], "28");
+        let id = made["id"].as_str().unwrap();
+        run(
+            &root,
+            "save_card",
+            json!({"id": id, "fields": {"직업": "열쇠 가게"}}),
+        )
+        .unwrap();
+        let cards = run(&root, "cards", json!({})).unwrap();
+        assert_eq!(cards[0]["fields"]["직업"], "열쇠 가게");
+        assert_eq!(cards[0]["fields"]["나이"], "28");
+
+        let chapter = first_chapter(&root);
+        run(
+            &root,
+            "add_note",
+            json!({"text": "후보 ① …", "doc_id": chapter}),
+        )
+        .unwrap();
+        run(&root, "add_note", json!({"text": "제목 다시 생각"})).unwrap();
+        let notes = run(&root, "notes", json!({})).unwrap();
+        assert_eq!(notes.as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_folder_that_is_not_a_project_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let e = call(
+            "outline",
+            &json!({"project": dir.path().to_str().unwrap()}),
+            None,
+        )
+        .unwrap_err();
+        assert!(e.contains("project.json"), "{e}");
+    }
+}

@@ -6262,6 +6262,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "writer-mcp"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde_json",
+ "tempfile",
+ "writer-core",
+]
+
+[[package]]
 name = "writer-revise"
 version = "0.1.0"
 dependencies = [
