@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TextSelection } from '@tiptap/pm/state';
 import { DecorationSet } from '@tiptap/pm/view';
-import { InterpretHighlight, cursorPlace, placeAt, setInterpretMarks } from './interpret';
+import { InterpretHighlight, cursorPlace, placeAt, sentenceAt, setInterpretMarks } from './interpret';
 import { chapter, fakeEditor } from './testing';
 
 const plugins = InterpretHighlight.config.addProseMirrorPlugins!.call({} as never);
@@ -43,5 +43,15 @@ describe('해석 모드 in the editor', () => {
     expect(found).toEqual(['interpret-mark', 'interpret-mark on']);
     setInterpretMarks(editor, null);
     expect((plugins[0].getState(editor.state) as DecorationSet).find()).toHaveLength(0);
+  });
+
+  it('gives the sentence under the cursor for reading it or linking to it', () => {
+    const doc = chapter('손을 뻗으려다 말았다.', '“어디 가?” 하고 물었다. 비가 왔다.');
+    const editor = fakeEditor(doc, []);
+    expect(sentenceAt(editor.state, 1, 3)).toEqual({ block: 1, start: 0, end: 15, text: '“어디 가?” 하고 물었다.' });
+    expect(sentenceAt(editor.state, 1, 18)).toEqual({ block: 1, start: 16, end: 22, text: '비가 왔다.' });
+    // Just after the full stop, as a click at the end of a sentence puts it.
+    expect(sentenceAt(editor.state, 0, 12)?.text).toBe('손을 뻗으려다 말았다.');
+    expect(sentenceAt(editor.state, 5, 0)).toBeNull();
   });
 });

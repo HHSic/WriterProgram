@@ -13,7 +13,7 @@ import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/m
 import { setWhitespaceMarks } from '../editor/marks';
 import { setAutoType } from '../editor/autoType';
 import { setFocusLook } from '../editor/focus';
-import { cursorPlace, placeAt, setInterpretMarks } from '../editor/interpret';
+import { cursorPlace, placeAt, sentenceAt, setInterpretMarks } from '../editor/interpret';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
 import { showMatch } from '../editor/search';
@@ -132,7 +132,7 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
         const { from, to, empty } = editor.state.selection;
         if (useApp.getState().interpretMode && isFocusedTab(tabKey)) {
           const at = cursorPlace(editor.state);
-          if (at) pickSentence(docId, at.block, at.offset);
+          if (at) pickSentence(docId, at.block, at.offset, sentenceAt(editor.state, at.block, at.offset));
         }
         if (isFocusedTab(tabKey)) {
           useApp.setState({ selection: empty ? null : countChars(editor.state.doc.textBetween(from, to, '\n', '\n')) });
@@ -205,8 +205,10 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   }, [interpretMode, interpretVersion, docId, tabKey]);
   useEffect(() => {
     if (!interpretMode || !interpret) return setInterpretMarks(editor, null);
-    const current = pick ? (placeAt(interpret.places, pick.block, pick.offset)?.id ?? null) : null;
-    setInterpretMarks(editor, { places: interpret.places, current });
+    // Sentences other chapters link into are marked too.
+    const places = [...interpret.places, ...interpret.incoming.flatMap((l, i) => (l.place ? [{ ...l.place, id: `in${i}` }] : []))];
+    const current = pick ? (placeAt(places, pick.block, pick.offset)?.id ?? null) : null;
+    setInterpretMarks(editor, { places, current });
   }, [editor, interpretMode, interpret, pick]);
 
   // The manuscript format's first-line rules, for chapters (planning documents follow no rules).

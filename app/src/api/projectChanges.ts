@@ -18,4 +18,5 @@ export const PROJECT_MUTATIONS = new Set([
   'card_create', 'card_save', 'card_trash', 'card_type_add', 'card_type_update', 'card_type_remove',
   'note_create', 'note_save', 'note_trash', 'copy_resolve', 'project_sync',
   'journal_event', 'journal_flush', 'journal_anchor',
+  'interpret_save',
 ]);

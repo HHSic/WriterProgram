@@ -3,7 +3,7 @@
 
 export type { Pane, SplitDir, Target } from '../lib/tabs';
 export { useApp } from './state';
-export type { HeldRemovals, Reading, SaveState, RightTab, FindScope, FindRequest, Jump, SettingsTab, Dialog, DocConflict, Toast, CornerNote, AiRequest } from './state';
+export type { HeldRemovals, Reading, SaveState, RightTab, FindScope, FindRequest, Jump, InterpretTarget, InterpretLinking, SettingsTab, Dialog, DocConflict, Toast, CornerNote, AiRequest } from './state';
 export { findDoc, allManuscript, saveEverything, saveNow, confirmClose, showToast, toastError, openDialog, closeDialog, openFind, jumpTo, setView, patchSummary } from './ui';
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, transferTab, resizeTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
@@ -20,7 +20,22 @@ export { loadJournal, setJournalEnabled, setAnchorAllowed, setAnchorWay, anchorN
 export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';
 export type { WebPage } from './web';
 export { setFocusMode, toggleFocusMode } from './focus';
-export { setInterpretMode, toggleInterpretMode, loadInterpretation, pickSentence } from './interpret';
+export {
+  setInterpretMode,
+  toggleInterpretMode,
+  loadInterpretation,
+  pickSentence,
+  emptyReading,
+  saveSentence,
+  newSentence,
+  removeSentence,
+  removeLink,
+  removeIncoming,
+  startLinking,
+  setLinking,
+  cancelLinking,
+  finishLinking,
+} from './interpret';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
 export { offerRescues, setRescueAside, takeRescue } from './rescue';

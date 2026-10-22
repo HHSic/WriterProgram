@@ -65,7 +65,8 @@ function onChanges(root: string, changes: Change[]) {
         if (c.docId === get().activeDocId) set({ recordsVersion: get().recordsVersion + 1 });
         break;
       case 'reading':
-        if (c.docId === get().activeDocId) set({ interpretVersion: get().interpretVersion + 1 });
+        // Another chapter's reading can link into the open one.
+        set({ interpretVersion: get().interpretVersion + 1 });
         break;
       default:
         refresh = true;

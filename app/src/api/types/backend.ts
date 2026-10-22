@@ -5,7 +5,7 @@ import type { JSONContent } from '@tiptap/core';
 import type { Bounds, PageClip, PageEvent } from './browser';
 import type { AiCheck, AiPreview, AiProvider, AiSettings, AiSettingsPatch, AiSummary, AiTask } from './ai';
 import type { Appearances, Card, CardSummary, CardType, Discovered, DiscoveredPick } from './cards';
-import type { InterpretView } from './interpret';
+import type { Interpretation, InterpretView } from './interpret';
 import type {
   Change,
   CopyAction,
@@ -113,6 +113,8 @@ export interface Backend {
   mcpServer(): Promise<string | null>;
   /** 작품 해석 of a chapter, placed in its text as it is now; null when not read yet. */
   interpretLoad(root: string, docId: string): Promise<InterpretView | null>;
+  /** Keeps the writer's changes to a reading (its own chapter's, or the one a link starts from). */
+  interpretSave(root: string, reading: Interpretation): Promise<InterpretView | null>;
   trashList(root: string): Promise<TrashItem[]>;
   trashRestore(root: string, trashId: string): Promise<void>;
   trashDelete(root: string, trashId: string): Promise<void>;

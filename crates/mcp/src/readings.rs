@@ -22,7 +22,7 @@ pub fn list() -> Vec<Value> {
         ),
         tool(
             "save_reading",
-            "작품 해석을 저장한다. guide(\"reading\") 절차를 따른다. 인용(quote)은 본문 그대로여야 하고, 없는 인용이나 없는 문장을 가리키는 연결이 있으면 저장하지 않는다. 같은 회차의 해석은 새로 덮어쓴다. 앱의 해석 모드에서 문장을 누르면 보인다.",
+            "작품 해석을 저장한다. guide(\"reading\") 절차를 따른다. 인용(quote)은 본문 그대로여야 하고, 없는 인용이나 없는 문장을 가리키는 연결이 있으면 저장하지 않는다. 같은 회차의 해석은 새로 덮어쓴다. 다른 회차의 문장과 이으려면 link에 doc과 quote를 준다(그 회차 본문으로 검증). 앱의 해석 모드에서 문장을 누르면 보인다.",
             json!({
                 "id": {"type": "string", "description": "회차 id"},
                 "summary": {"type": "string", "description": "회차가 밑바닥에서 묻는 것, 두세 문장"},
@@ -37,16 +37,21 @@ pub fn list() -> Vec<Value> {
                     "meaning": {"type": "string"},
                     "intent": {"type": "string"},
                     "links": {"type": "array", "items": {"type": "object", "properties": {
-                        "to": {"type": "string"}, "kind": {"type": "string"}, "note": {"type": "string"}},
-                        "required": ["to", "kind"]}},
+                        "to": {"type": "string", "description": "같은 회차의 다른 문장 id"},
+                        "kind": {"type": "string", "description": "회수, 복선, 같은 이미지, 대비, 변화 등"},
+                        "note": {"type": "string"},
+                        "doc": {"type": "string", "description": "다른 회차로 이을 때 그 회차 id. 그 회차가 아직 해석되지 않았어도 된다"},
+                        "quote": {"type": "string", "description": "다른 회차로 이을 때 그 회차 본문 그대로의 문장"}},
+                        "required": ["kind"]}},
                     "unclear": {"type": "string", "description": "의도가 흐려 보이면 그 이유. 작가가 판단한다"}},
                     "required": ["id", "block", "quote", "roles", "meaning", "intent"]}},
+                "overwrite": {"type": "boolean", "description": "작가가 앱에서 고친 해석을 덮어쓸 때만 true. 먼저 reading으로 보고 작가에게 묻는다"},
             }),
             &["id", "sentences"],
         ),
         tool(
             "reading",
-            "저장된 작품 해석. 문장마다 지금 본문에서의 자리(places)와, 본문이 바뀌어 찾지 못한 문장(gone)을 함께 준다.",
+            "저장된 작품 해석. 문장마다 지금 본문에서의 자리(places), 본문이 바뀌어 찾지 못한 문장(gone), 다른 회차로 가는 연결(remote)과 다른 회차에서 이 회차로 오는 연결(incoming)을 함께 준다.",
             json!({"id": {"type": "string"}}),
             &["id"],
         ),
@@ -83,6 +88,17 @@ fn paragraphs(root: &Path, args: &Value) -> Outcome {
 fn save(root: &Path, args: &Value) -> Outcome {
     guide::check_read()?;
     let id = required(args, "id")?;
+    let overwrite = args.get("overwrite").and_then(Value::as_bool) == Some(true);
+    if !overwrite
+        && let Some(edited) = reading::load(root, id)
+            .map_err(err)?
+            .filter(|v| v.read)
+            .and_then(|v| v.reading.edited)
+    {
+        return Err(format!(
+            "작가가 앱에서 이 회차 해석을 고쳤다({edited}). 새로 저장하면 고친 것이 사라진다. reading으로 고친 해석을 보고 작가에게 물은 뒤, 덮어쓰기로 했으면 overwrite: true로 다시 저장한다"
+        ));
+    }
     let reading = Reading {
         doc: id.to_string(),
         rev: String::new(),
@@ -97,6 +113,7 @@ fn save(root: &Path, args: &Value) -> Outcome {
             .map_err(|e| format!("scenes를 읽지 못함: {e}"))?,
         sentences: serde_json::from_value(args.get("sentences").cloned().unwrap_or(json!([])))
             .map_err(|e| format!("sentences를 읽지 못함: {e}"))?,
+        edited: None,
     };
     let saved = reading::save(root, reading).map_err(err)?;
     let linked = saved
@@ -187,5 +204,83 @@ mod tests {
         )
         .unwrap_err();
         assert!(e.contains("본문에 없는 인용"), "{e}");
+    }
+
+    #[test]
+    fn a_link_reaches_into_another_chapter() {
+        let dir = tempfile::tempdir().unwrap();
+        let made = call(
+            "create_project",
+            &json!({"parent": dir.path().to_str().unwrap(), "title": "연결"}),
+            None,
+        )
+        .unwrap();
+        let root = PathBuf::from(made["project"].as_str().unwrap());
+        let add = |title: &str, text: &str| {
+            call(
+                "add_doc",
+                &with_context("add_doc", json!({"title": title, "text": text})),
+                Some(&root),
+            )
+            .unwrap()["id"]
+                .as_str()
+                .unwrap()
+                .to_string()
+        };
+        let one = add("1", "전단지를 서랍에 넣었다.");
+        let five = add("5", "서랍이 두꺼워졌다.");
+        let sentences = json!([{"id": "a", "block": 0, "quote": "전단지를 서랍에 넣었다.", "roles": ["복선"], "meaning": "", "intent": "",
+            "links": [{"doc": five, "quote": "서랍이 두꺼워졌다.", "kind": "회수"}]}]);
+        call(
+            "save_reading",
+            &json!({"id": one, "sentences": sentences}),
+            Some(&root),
+        )
+        .unwrap();
+        let back = call("reading", &json!({"id": five}), Some(&root)).unwrap();
+        assert_eq!(back["read"], false);
+        assert_eq!(back["incoming"][0]["fromQuote"], "전단지를 서랍에 넣었다.");
+    }
+
+    #[test]
+    fn the_writers_edits_are_not_overwritten_without_asking() {
+        let dir = tempfile::tempdir().unwrap();
+        let made = call(
+            "create_project",
+            &json!({"parent": dir.path().to_str().unwrap(), "title": "고침"}),
+            None,
+        )
+        .unwrap();
+        let root = PathBuf::from(made["project"].as_str().unwrap());
+        let added = call(
+            "add_doc",
+            &with_context("add_doc", json!({"title": "1", "text": "비가 왔다."})),
+            Some(&root),
+        )
+        .unwrap();
+        let id = added["id"].as_str().unwrap();
+        let sentences = json!([{"id": "a", "block": 0, "quote": "비가 왔다.", "roles": [], "meaning": "", "intent": ""}]);
+        let save = |extra: serde_json::Value| {
+            let mut args = json!({"id": id, "sentences": sentences});
+            args.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            call("save_reading", &args, Some(&root))
+        };
+        save(json!({})).unwrap();
+        // The writer changes it in the app.
+        let mut kept = writer_core::reading::load(&root, id)
+            .unwrap()
+            .unwrap()
+            .reading;
+        kept.sentences[0].meaning = "작가의 읽기".into();
+        writer_core::reading::save_edit(&root, kept).unwrap();
+
+        let e = save(json!({})).unwrap_err();
+        assert!(e.contains("작가가 앱에서"), "{e}");
+        save(json!({"overwrite": true})).unwrap();
+        let back = call("reading", &json!({"id": id}), Some(&root)).unwrap();
+        assert_eq!(back["reading"]["sentences"][0]["meaning"], "");
+        assert!(back["reading"].get("edited").is_none());
     }
 }

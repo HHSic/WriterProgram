@@ -6,7 +6,9 @@ import type { EditorState } from '@tiptap/pm/state';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import type { InterpretPlace } from '../api/types';
+import type { InterpretTarget } from '../store/state';
 import { blockText, rangeInBlock } from './search';
+import { splitSentences } from './sentences';
 
 const interpretKey = new PluginKey<DecorationSet>('interpret');
 
@@ -68,4 +70,17 @@ export function cursorPlace(state: EditorState): { block: number; offset: number
 /** The reading's sentence at `offset` in `block`, if any. */
 export function placeAt(places: InterpretPlace[], block: number, offset: number): InterpretPlace | null {
   return places.find((p) => p.block === block && p.start <= offset && offset <= p.end) ?? null;
+}
+
+/** The sentence at `offset` in `block`, as 소리 내어 읽기 splits them. */
+export function sentenceAt(state: EditorState, block: number, offset: number): InterpretTarget | null {
+  if (block >= state.doc.childCount) return null;
+  const node = state.doc.child(block);
+  if (!node.isTextblock) return null;
+  let pos = 0;
+  for (let i = 0; i < block; i += 1) pos += state.doc.child(i).nodeSize;
+  const { text } = blockText(node, pos);
+  const spans = splitSentences(text);
+  const span = spans.find((s) => s.start <= offset && offset < s.end) ?? spans.find((s) => s.end === offset);
+  return span ? { block, start: span.start, end: span.end, text: text.slice(span.start, span.end) } : null;
 }

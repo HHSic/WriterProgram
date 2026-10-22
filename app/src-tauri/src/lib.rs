@@ -71,6 +71,7 @@ pub fn run() {
             commands::project::project_size,
             commands::project::mcp_server,
             commands::interpret::interpret_load,
+            commands::interpret::interpret_save,
             commands::project::reveal,
             commands::rescue::rescue_save,
             commands::rescue::rescue_list,

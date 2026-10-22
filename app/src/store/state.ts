@@ -38,6 +38,22 @@ export interface AiRequest {
 }
 
 /** A place to move to once its document has opened. */
+/** A sentence of the text as the editor split it (editor/sentences.ts). */
+export interface InterpretTarget {
+  block: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
+export interface InterpretLinking {
+  fromDoc: string;
+  fromId: string;
+  fromQuote: string;
+  kind: string;
+  note: string;
+}
+
 export interface Jump {
   docId: string;
   block: number;
@@ -165,10 +181,13 @@ interface AppState {
   interpretMode: boolean;
   /** The open chapter's reading (작품 해석), once loaded; `view` is null when not read yet. */
   interpret: { docId: string; view: InterpretView | null } | null;
-  /** Where the cursor was last put in 해석 모드: block and UTF-16 offset there. */
-  interpretPick: { docId: string; block: number; offset: number } | null;
+  /** Where the cursor was last put in 해석 모드: block and UTF-16 offset there,
+   * and the sentence there when the editor told it. */
+  interpretPick: { docId: string; block: number; offset: number; sentence?: InterpretTarget | null } | null;
   /** Bumped when a reading changes on disk (an assistant wrote it). */
   interpretVersion: number;
+  /** 연결 추가 under way: the sentence it starts from, waiting for the one to link to. */
+  interpretLinking: InterpretLinking | null;
   view: ViewSettings;
   dialog: Dialog | null;
   toast: Toast | null;
@@ -252,6 +271,7 @@ export const useApp = create<AppState>(() => ({
   interpret: null,
   interpretPick: null,
   interpretVersion: 0,
+  interpretLinking: null,
   view: loadView(),
   dialog: null,
   toast: null,

@@ -1,9 +1,10 @@
 // 작품 해석 in the stand-in: the sample chapter 「비에 젖은 손님」 comes with a
-// reading, so 해석 모드 can be tried in the browser preview.
+// reading, one of whose links reaches back into 「문 닫는 시간」, so 해석 모드
+// can be tried in the browser preview. The writer's changes are kept in memory.
 
 import type { JSONContent } from '@tiptap/core';
-import type { Backend, Interpretation, InterpretPlace, InterpretView } from '../types';
-import { doc, now, project } from './state';
+import type { Backend, Interpretation, InterpretIncoming, InterpretPlace, InterpretRemote, InterpretSpot, InterpretView } from '../types';
+import { clone, doc, now, project } from './state';
 
 /** Each top-level block's text as the editor counts it (line breaks as "\n"). */
 function blockTexts(body: JSONContent): string[] {
@@ -29,7 +30,7 @@ function place(texts: string[], id: string, block: number, quote: string): Inter
   return null;
 }
 
-function sample(docId: string): Interpretation {
+function sample(docId: string, first: string | undefined): Interpretation {
   return {
     doc: docId,
     rev: '',
@@ -59,7 +60,12 @@ function sample(docId: string): Interpretation {
       {
         id: 's4', block: 3, quote: '그런데 들어오세요.', roles: ['인물', '전환'],
         meaning: '규칙보다 앞서는 무언가가 서하에게 있다.', intent: '서하가 처음으로 규칙을 깬다. 이야기가 움직이기 시작하는 자리.',
-        links: [{ to: 's1', kind: '대비', note: '' }],
+        links: [
+          { to: 's1', kind: '대비', note: '' },
+          ...(first
+            ? [{ to: '', kind: '대비', note: '1화에서 매일 지키던 폐점 시간을 처음 어긴다', doc: first, quote: '서하는 매일 밤 열한 시에 서점 문을 닫았다.' }]
+            : []),
+        ],
       },
       {
         id: 's5', block: 5, quote: '누렇게 바랜 칸마다 같은 이름이 적혀 있었다.', roles: ['회수', '복선'],
@@ -75,20 +81,75 @@ function sample(docId: string): Interpretation {
   };
 }
 
+/** Each project's readings by chapter, the sample one put in when first asked. */
+const readings = new Map<string, Map<string, Interpretation>>();
+
+function readingsOf(root: string, p: ReturnType<typeof project>): Map<string, Interpretation> {
+  let all = readings.get(root);
+  if (!all) {
+    all = new Map();
+    readings.set(root, all);
+    const docs = [...p.docs.values()];
+    const first = docs.find((d) => d.meta.title === '문 닫는 시간')?.meta.id;
+    const guest = docs.find((d) => d.meta.title === '비에 젖은 손님');
+    if (guest) all.set(guest.meta.id, sample(guest.meta.id, first));
+  }
+  return all;
+}
+
+/** Like crates/core/src/reading.rs `load`. */
+function viewOf(root: string, docId: string): InterpretView | null {
+  const p = project(root);
+  const all = readingsOf(root, p);
+  const here = blockTexts(doc(p, docId).body);
+  const spot = (other: string, quote: string): [string, InterpretSpot | null] => {
+    const d = p.docs.get(other);
+    if (!d) return ['', null];
+    const found = place(blockTexts(d.body), '', 0, quote);
+    return [d.meta.title, found && { doc: other, title: d.meta.title, block: found.block, start: found.start, end: found.end }];
+  };
+  const incoming: InterpretIncoming[] = [];
+  for (const [other, r] of all) {
+    if (other === docId) continue;
+    for (const s of r.sentences) {
+      for (const l of s.links) {
+        if (l.doc !== docId || !l.quote) continue;
+        const [title, fromSpot] = spot(other, s.quote);
+        incoming.push({
+          doc: other, title, from: s.id, fromQuote: s.quote, fromSpot,
+          kind: l.kind, note: l.note, quote: l.quote, place: place(here, '', 0, l.quote),
+        });
+      }
+    }
+  }
+  const own = all.get(docId);
+  if (!own && !incoming.length) return null;
+  const reading = clone(own ?? { doc: docId, rev: '', made: '', by: '', summary: '', scenes: [], sentences: [] });
+  const places: InterpretPlace[] = [];
+  const gone: string[] = [];
+  const remote: InterpretRemote[] = [];
+  for (const s of reading.sentences) {
+    const found = place(here, s.id, s.block, s.quote);
+    if (found) places.push(found);
+    else gone.push(s.id);
+    s.links.forEach((l, i) => {
+      if (!l.doc || l.doc === docId) return;
+      const [title, at] = spot(l.doc, l.quote ?? '');
+      remote.push({ from: s.id, link: i, doc: l.doc, title, quote: l.quote ?? '', kind: l.kind, note: l.note, spot: at });
+    });
+  }
+  return { reading, read: !!own, places, gone, changed: false, remote, incoming };
+}
+
 export const interpretMethods = {
   async interpretLoad(root, docId) {
-    const d = doc(project(root), docId);
-    if (d.meta.title !== '비에 젖은 손님') return null;
-    const reading = sample(docId);
-    const texts = blockTexts(d.body);
-    const places: InterpretPlace[] = [];
-    const gone: string[] = [];
-    for (const s of reading.sentences) {
-      const p = place(texts, s.id, s.block, s.quote);
-      if (p) places.push(p);
-      else gone.push(s.id);
-    }
-    const view: InterpretView = { reading, places, gone, changed: false };
-    return view;
+    return viewOf(root, docId);
+  },
+  async interpretSave(root, reading) {
+    const kept = clone(reading);
+    for (const s of kept.sentences) for (const l of s.links) if (l.doc === kept.doc) delete l.doc;
+    kept.edited = now();
+    readingsOf(root, project(root)).set(kept.doc, kept);
+    return viewOf(root, kept.doc);
   },
 } satisfies Partial<Backend>;

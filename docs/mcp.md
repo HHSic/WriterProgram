@@ -41,7 +41,7 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 | `trash_doc`, `trash`, `restore_trash` | 휴지통으로 보내기(30일 보관), 휴지통 목록, 되살리기 |
 | `search`, `replace_all` | 작품 전체나 고른 문서에서 찾기(앞뒤 문맥), 모두 바꾸기 |
 | `records`, `restore_record` | 문서의 기록 목록, 기록으로 되돌리기 |
-| `paragraphs`, `save_reading`, `reading` | 작품 해석: 문단 번호가 붙은 본문, 인용을 검증해 해석 저장, 저장된 해석과 지금 본문에서의 자리 ([reading.md](reading.md)) |
+| `paragraphs`, `save_reading`, `reading` | 작품 해석: 문단 번호가 붙은 본문, 인용을 검증해 해석 저장(다른 회차로 가는 연결은 그 회차 본문으로 검증), 저장된 해석과 지금 본문에서의 자리, 다른 회차와 오가는 연결 ([reading.md](reading.md)) |
 | `export` | txt, docx(Word), hwpx(한글) 내보내기. 회차마다 파일 하나도 된다 |
 
 MCP 프롬프트 `candidates`(문장·대사 후보 3개), `check`(회차 점검 리포트), `interpret`(회차 해석)도 있다. Claude Code에서는 `/mcp__writerprogram__candidates`처럼 부른다.
