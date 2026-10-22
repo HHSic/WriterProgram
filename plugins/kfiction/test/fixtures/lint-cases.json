@@ -92,6 +92,71 @@
    ]
   },
   {
+   "name": "assistant talk",
+   "text": "물론이죠. 다음과 같이 이어 썼습니다.\n\n네, 요청하신 대로 장면을 이어 썼습니다.\n\n좋습니다. 하진의 시점으로 다음 장면을 써 봤어요.\n\n알겠습니다! 초안을 다듬어 드렸습니다.\n\n아래와 같이 대사를 고쳤습니다.\n\n이어서 써 봤습니다.\n\n문장을 조금 다듬었습니다.\n\n마음에 드시면 다음 회차도 이어 갈게요.\n\n말씀하신 대로 시점을 하진으로 바꿨습니다.",
+   "findings": [
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 1,
+     "match": "물론이죠. 다음과 같이 이어 썼습니다."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 3,
+     "match": "네, 요청하신 대로 장면을 이어 썼습니다."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 5,
+     "match": "좋습니다. 하진의 시점으로 다음 장면을 써 봤어요."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 7,
+     "match": "알겠습니다! 초안을 다듬어 드렸습니다."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 9,
+     "match": "아래와 같이 대사를 고쳤습니다."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 11,
+     "match": "이어서 써 봤습니다."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 13,
+     "match": "문장을 조금 다듬었습니다."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 15,
+     "match": "마음에 드시면 다음 회차도 이어 갈게요."
+    },
+    {
+     "rule": "F1",
+     "severity": "contract",
+     "line": 17,
+     "match": "말씀하신 대로 시점을 하진으로 바꿨습니다."
+    }
+   ]
+  },
+  {
+   "name": "fiction that sounds like talk",
+   "text": "편지에는 다음과 같이 적혀 있었습니다.\n\n나는 그날 밤 편지를 다시 썼습니다.\n\n“물론이죠. 다음과 같이 이어 썼습니다.” 그녀가 웃으며 말했다.\n\n네 시가 넘어서야 비가 그쳤다.\n\n알겠습니다. 저는 그렇게 대답하고 방을 나왔습니다.\n\n원고는 책상 위에 그대로 있었다.\n\n물론이죠, 하고 그는 웃었다.\n\n그는 시계를 고쳐 놓았습니다.",
+   "findings": []
+  },
+  {
    "name": "even endings",
    "text": "문을 열었다. 비가 왔다. 길이 젖었다. 등이 켜졌다. 차가 섰다. 개가 짖었다.",
    "findings": [

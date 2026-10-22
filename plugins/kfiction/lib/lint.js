@@ -8,6 +8,9 @@ import { mixesPoliteness } from './speech.js';
 import {
   META_START,
   META_ANY,
+  META_WRITE,
+  META_OPENER,
+  META_TOPIC,
   DOUBLE_PASSIVE,
   UI_NOUNS,
   TRANSLATIONESE,
@@ -62,7 +65,8 @@ export function lint(text) {
 
   // F1 메타 문장
   for (const p of prose) {
-    if (META_START.test(p.text) || META_ANY.test(p.narration)) add('F1', '어시스턴트 말투', 'contract', p.line, cut(p.text), '원고 밖의 설명이나 인사는 지운다');
+    const talk = META_ANY.test(p.narration) || META_WRITE.test(p.narration) || (META_OPENER.test(p.narration.trim()) && META_TOPIC.test(p.narration));
+    if (META_START.test(p.text) || talk) add('F1', '어시스턴트 말투', 'contract', p.line, cut(p.text), '원고 밖의 설명이나 인사는 지운다');
   }
   // F2 마크다운
   for (const p of prose) {

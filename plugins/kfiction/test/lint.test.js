@@ -18,6 +18,14 @@ test('assistant talk and markdown are contract breaks', () => {
   assert.deepEqual(contract, ['F1', 'F2', 'F1']);
 });
 
+test('an answer about the writing is assistant talk, fiction that sounds like it is not', () => {
+  const f1 = (t) => lint(t).findings.filter((f) => f.rule === 'F1').length;
+  for (const t of ['물론이죠. 다음과 같이 이어 썼습니다.', '요청하신 대로 장면을 이어 썼습니다.', '이어서 써 봤어요.', '문장을 조금 다듬었습니다.'])
+    assert.equal(f1(t), 1, t);
+  for (const t of ['편지에는 다음과 같이 적혀 있었습니다.', '“물론이죠. 다음과 같이 이어 썼습니다.” 그녀가 웃었다.', '알겠습니다. 저는 그렇게 대답했습니다.', '나는 편지를 다시 썼습니다.'])
+    assert.equal(f1(t), 0, t);
+});
+
 test('dialogue breaks a run of endings, and uneven lengths are not flagged', () => {
   const even = '문을 열었다. 비가 왔다. 길이 젖었다. 등이 켜졌다. 차가 섰다. 개가 짖었다.';
   assert.ok(rules(even).includes('F5'));

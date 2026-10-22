@@ -71,8 +71,21 @@ static META_START: LazyLock<Regex> = LazyLock::new(|| {
 });
 static META_ANY: LazyLock<Regex> = LazyLock::new(|| {
     re(
-        r"(원하시면|필요하시면|도움이 되었으면|더 다듬어 드릴|어떠신가요\?|말씀해 주세요|수정해 드릴게요)",
+        r"(원하시면|필요하시면|도움이 되었으면|더 다듬어 드릴|어떠신가요\?|말씀해 주세요|수정해 드릴게요|요청하신|말씀하신 대로|마음에 드시면|마음에 드셨으면|다른 버전|피드백)",
     )
+});
+/// Talk about the writing: "장면을 이어 썼습니다", "다음과 같이 고쳤습니다".
+static META_WRITE: LazyLock<Regex> = LazyLock::new(|| {
+    re(
+        r"(장면|문장|원고|초안|본문|대사|버전|회차|후보|단락|문단)(을|를|은|는|도)? ?((조금|좀|살짝|약간|모두|전부|한 번 더) )?(이어 ?|이어서 |다시 |새로 |고쳐 ?|다듬어 ?)?(썼|써 ?봤|써 ?보았|작성했|수정했|고쳤|다듬었|바꿨|바꾸었|정리했|이어 ?갔)(습니다|어요|어 드렸|드렸)|(다음|아래)(과|와) 같이 .{0,15}(썼|작성했|고쳤|다듬었|바꿨|정리했|이어 ?갔)(습니다|어요)|이어서? 써 ?(봤|보았)(습니다|어요)",
+    )
+});
+/// An answer's opening; talk only when the paragraph is about the writing.
+static META_OPENER: LazyLock<Regex> = LazyLock::new(|| {
+    re(r"^(물론이죠|물론입니다|물론이에요|좋습니다|좋아요|알겠습니다|알겠어요|네)[.!,]")
+});
+static META_TOPIC: LazyLock<Regex> = LazyLock::new(|| {
+    re(r"(장면|원고|초안|본문|버전|요청|작성|이어 ?쓰|이어 ?썼|이어서|써 ?봤|써 ?보았|고쳐|다듬)")
 });
 static MARKDOWN_MARK: LazyLock<Regex> = LazyLock::new(|| re(r"\*\*|__"));
 static MARKDOWN_LIST: LazyLock<Regex> = LazyLock::new(|| re(r"^[-*+]\s|^\d+\.\s"));
@@ -248,7 +261,10 @@ pub fn lint(text: &str) -> Vec<Finding> {
         .join("\n");
 
     for p in &prose {
-        if META_START.is_match(&p.text) || META_ANY.is_match(&p.narration) {
+        let talk = META_ANY.is_match(&p.narration)
+            || META_WRITE.is_match(&p.narration)
+            || (META_OPENER.is_match(p.narration.trim()) && META_TOPIC.is_match(&p.narration));
+        if META_START.is_match(&p.text) || talk {
             add(
                 "F1",
                 "어시스턴트 말투",
