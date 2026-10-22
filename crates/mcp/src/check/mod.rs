@@ -351,7 +351,7 @@ pub fn lint(text: &str) -> Vec<Finding> {
                 Severity::Warn,
                 line,
                 format!("{key} {}번, 길이도 비슷함", run.len()),
-                "한 문장은 다른 끝맺음으로, 또는 두 문장을 합친다",
+                "끝맺음만 바꾸기 전에 이어지는 동작을 한 문장으로 이을 수 있는지 먼저 본다",
             );
         }
     }
@@ -461,14 +461,22 @@ pub fn lint(text: &str) -> Vec<Finding> {
         }
     }
     let narr_chars: usize = narr.iter().map(|s| len(&s.text)).sum();
-    if narr_chars >= 3000 && !narr.iter().any(|s| len(&s.text) >= 80) {
+    // Narration in short sentences only. Model fiction ran 20-odd characters
+    // a sentence with 0-3% over 60; human short stories (현진건, 이효석) 39-43
+    // with 14-19% over 60.
+    let long_ones = narr.iter().filter(|s| len(&s.text) >= 60).count();
+    if narr_chars >= 1000 && narr.len() >= 15 && long_ones * 20 < narr.len() {
+        let mean = (narr_chars as f64 / narr.len() as f64).round();
         add(
             "F13",
-            "긴 문장이 없음",
-            Severity::Info,
+            "긴 문장이 적음",
+            Severity::Warn,
             None,
-            "80자 넘는 지문 문장 0개".into(),
-            "동작이 이어지는 긴 문장을 하나쯤 섞는다",
+            format!(
+                "60자 넘는 지문 문장 {long_ones}개 / {}문장 · 평균 {mean}자",
+                narr.len()
+            ),
+            "이어지는 동작, 쌓이는 감각, 흘러가는 시간은 한 문장으로 잇는다. 짧게 끊은 데 이유가 있는 곳은 둔다",
         );
     }
     for (run, _) in runs(

@@ -89,7 +89,7 @@ export function lint(text) {
   // F5 같은 끝맺음이 여섯 번 넘게, 길이까지 고르게 이어짐. 과거형 서술은 '-었다'가 기본이라
   // 횟수만 세면 사람 글도 다 걸린다(1924년 「운수 좋은 날」에서 확인).
   runs(flow, (s) => (s ? endingClass(s.text) : ''), 6, (run, key) => {
-    if (variation(run.map((s) => s.text.length)) < 0.35) add('F5', '같은 끝맺음', 'warn', run[0].line, `${key} ${run.length}번, 길이도 비슷함`, '한 문장은 다른 끝맺음으로, 또는 두 문장을 합친다');
+    if (variation(run.map((s) => s.text.length)) < 0.35) add('F5', '같은 끝맺음', 'warn', run[0].line, `${key} ${run.length}번, 길이도 비슷함`, '끝맺음만 바꾸기 전에 이어지는 동작을 한 문장으로 이을 수 있는지 먼저 본다');
   });
   // F6 같은 말로 시작 세 번
   runs(flow, (s) => (s && firstWord(s.text).length >= 2 ? firstWord(s.text) : ''), 3, (run, key) => add('F6', '같은 말로 시작', 'warn', run[0].line, `${key} ${run.length}번`, '주어를 빼거나 문장을 합친다'));
@@ -118,7 +118,13 @@ export function lint(text) {
   // F12, F13 문장 길이
   for (const s of narr) if (s.text.length > 100) add('F12', '긴 문장', 'info', s.line, `${s.text.length}자`, '끊을 곳이 있는지 본다');
   const narrChars = narr.reduce((n, s) => n + s.text.length, 0);
-  if (narrChars >= 3000 && !narr.some((s) => s.text.length >= 80)) add('F13', '긴 문장이 없음', 'info', null, '80자 넘는 지문 문장 0개', '동작이 이어지는 긴 문장을 하나쯤 섞는다');
+  // 지문이 짧은 문장으로만 이어짐. 모델 소설은 지문 평균 20자대, 60자 넘는 문장이 0~3%였고
+  // 사람 단편(현진건, 이효석)은 평균 39~43자, 60자 넘는 문장이 14~19%였다.
+  const longOnes = narr.filter((s) => s.text.length >= 60).length;
+  if (narrChars >= 1000 && narr.length >= 15 && longOnes * 20 < narr.length) {
+    const mean = Math.round(narrChars / narr.length);
+    add('F13', '긴 문장이 적음', 'warn', null, `60자 넘는 지문 문장 ${longOnes}개 / ${narr.length}문장 · 평균 ${mean}자`, '이어지는 동작, 쌓이는 감각, 흘러가는 시간은 한 문장으로 잇는다. 짧게 끊은 데 이유가 있는 곳은 둔다');
+  }
   // F14 대사만 이어짐
   runs(prose, (p) => (p.dialogueOnly ? 'd' : ''), 6, (run) => add('F14', '대사만 이어짐', 'info', run[0].line, `대사 문단 ${run.length}개`, '중간에 행동이나 누가 말했는지를 넣는다'));
   // F15 한 대사 안에서 높임과 안높임이 섞임
