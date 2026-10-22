@@ -114,7 +114,7 @@ KSTE와 달리 문체 경고로 모델을 막지 않는다. 문체 수치를 0�
 | 위치 | 내용 |
 |---|---|
 | `skills/kfiction/SKILL.md` | 작문 지침: 과제, 순서, 확인 목록, 문체 카드 |
-| `skills/kfiction/references/` | 맥락 잡기, 말 단계와 호칭, 비유 절차, 어휘, 고치기 |
+| `skills/kfiction/references/` | 맥락 잡기, 말 단계와 호칭, 비유 절차, 어휘, 고치기, 작품 해석 |
 | `lib/` | 점검기(문단·문장 나누기, 말 단계 어림, 규칙, 리포트) |
 | `hooks/` | Claude Code PostToolUse hook |
 | `commands/` | `/kfiction:candidates`, `/kfiction:check`, `/kfiction:set` |

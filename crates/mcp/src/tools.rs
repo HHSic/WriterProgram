@@ -17,7 +17,7 @@ use writer_core::project::{self, NewDoc, NewProject, ProjectKind};
 use writer_core::{markup::Block, snapshot};
 
 use crate::text::{has_formatting, to_blocks, to_text};
-use crate::{context, guide, manage, review};
+use crate::{context, guide, manage, readings, review};
 
 /// Same interval as the app's editor (`app/src-tauri/src/commands/doc.rs`).
 const AUTO_RECORD_EVERY_MINUTES: i64 = 10;
@@ -46,8 +46,8 @@ pub fn list() -> Value {
     let mut tools = vec![
         json!({
             "name": "guide",
-            "description": "kfiction 한국어 소설 작문 지침. 글을 쓰거나 고치거나 후보를 내기 전에 먼저 읽는다(읽기 전에는 회차를 쓸 수 없다). topic을 주면 참고 문서 하나(context, speech-levels, figurative, vocabulary, revision).",
-            "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["context", "speech-levels", "figurative", "vocabulary", "revision"]}}, "required": []},
+            "description": "kfiction 한국어 소설 작문 지침. 글을 쓰거나 고치거나 후보를 내기 전에 먼저 읽는다(읽기 전에는 회차를 쓸 수 없다). topic을 주면 참고 문서 하나(context, speech-levels, figurative, vocabulary, revision, reading=작품 해석 절차).",
+            "inputSchema": {"type": "object", "properties": {"topic": {"type": "string", "enum": ["context", "speech-levels", "figurative", "vocabulary", "revision", "reading"]}}, "required": []},
         }),
         tool(
             "outline",
@@ -155,6 +155,7 @@ pub fn list() -> Value {
         }),
     ];
     tools.extend(manage::list());
+    tools.extend(readings::list());
     Value::Array(tools)
 }
 
@@ -178,6 +179,7 @@ pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome
         "add_note" => add_note(&root, args),
         "check" => check_doc(&root, args),
         _ => manage::call(name, &root, args)
+            .or_else(|| readings::call(name, &root, args))
             .unwrap_or_else(|| Err(format!("알 수 없는 도구: {name}"))),
     }
 }

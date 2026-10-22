@@ -13,6 +13,7 @@
 @import './find.css'; /* Find and replace. */
 @import './ai.css'; /* AI 점검 tab and AI 연결 settings. */
 @import './read.css'; /* 소리 내어 읽기: the sentence being read, the floating bar. */
+@import './interpret.css'; /* 해석 모드: marked sentences, the 해석 tab. */
 @import './cards.css'; /* 설정집: cards, names in the manuscript, card preview. */
 @import './panes.css'; /* Panes and tabs in the middle. */
 @import './notes.css'; /* 메모, 메모함 and 개요 표, tab strip. */

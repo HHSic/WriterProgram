@@ -2,7 +2,7 @@
 
 import type { Editor } from '@tiptap/core';
 import { create } from 'zustand';
-import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, Note, Overview, Recovery, RescueFile, SnapshotInfo } from '../api/types';
+import type { AiSettings, AiTask, CopyInfo, Counts, DriveLink, FormatCatalog, InterpretView, Note, Overview, Recovery, RescueFile, SnapshotInfo } from '../api/types';
 import type { Pane, SplitDir, Target } from '../lib/tabs';
 import { type ViewSettings, loadView } from '../lib/view';
 
@@ -19,7 +19,7 @@ export interface SaveState {
   /** Where the unsaved text was kept when saves kept failing (비상 보관). */
   rescued?: string;
 }
-export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'records' | 'ai';
+export type RightTab = 'outline' | 'notes' | 'cast' | 'find' | 'records' | 'ai' | 'interpret';
 export type FindScope = 'doc' | 'part' | 'all';
 
 /** Asks the find panel to open with a search (from the sidebar or Ctrl+F). */
@@ -161,6 +161,14 @@ interface AppState {
   rightOpen: boolean;
   /** 집중 모드: the page alone, without the side columns, tabs and bars. */
   focusMode: boolean;
+  /** 해석 모드: clicking a sentence shows its reading in the right column. */
+  interpretMode: boolean;
+  /** The open chapter's reading (작품 해석), once loaded; `view` is null when not read yet. */
+  interpret: { docId: string; view: InterpretView | null } | null;
+  /** Where the cursor was last put in 해석 모드: block and UTF-16 offset there. */
+  interpretPick: { docId: string; block: number; offset: number } | null;
+  /** Bumped when a reading changes on disk (an assistant wrote it). */
+  interpretVersion: number;
   view: ViewSettings;
   dialog: Dialog | null;
   toast: Toast | null;
@@ -240,6 +248,10 @@ export const useApp = create<AppState>(() => ({
   rightTab: 'outline',
   rightOpen: true,
   focusMode: false,
+  interpretMode: false,
+  interpret: null,
+  interpretPick: null,
+  interpretVersion: 0,
   view: loadView(),
   dialog: null,
   toast: null,

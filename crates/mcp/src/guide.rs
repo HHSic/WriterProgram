@@ -9,7 +9,7 @@ use std::cell::Cell;
 const SKILL: &str = include_str!("../../../plugins/kfiction/skills/kfiction/SKILL.md");
 
 /// Reference documents, by the name `guide` takes.
-pub const TOPICS: [(&str, &str); 5] = [
+pub const TOPICS: [(&str, &str); 6] = [
     (
         "context",
         include_str!("../../../plugins/kfiction/skills/kfiction/references/context.md"),
@@ -29,6 +29,10 @@ pub const TOPICS: [(&str, &str); 5] = [
     (
         "revision",
         include_str!("../../../plugins/kfiction/skills/kfiction/references/revision.md"),
+    ),
+    (
+        "reading",
+        include_str!("../../../plugins/kfiction/skills/kfiction/references/reading.md"),
     ),
 ];
 
@@ -126,6 +130,11 @@ pub fn prompts() -> serde_json::Value {
             "description": "회차를 kfiction으로 점검하고 리포트를 보인다. 고치지 않는다",
             "arguments": [{"name": "chapter", "description": "회차 제목이나 id", "required": false}],
         },
+        {
+            "name": "interpret",
+            "description": "회차를 해석해 문장마다 하는 일과 의도, 복선과 회수를 남긴다. 앱의 해석 모드에서 본다",
+            "arguments": [{"name": "chapter", "description": "회차 제목이나 id", "required": false}],
+        },
     ])
 }
 
@@ -144,6 +153,10 @@ pub fn prompt(name: &str, args: &serde_json::Value) -> Result<String, String> {
         )),
         "check" => Ok(format!(
             "회차 {}을(를) check 도구로 점검한다. 정하지 않았으면 가장 최근에 다룬 회차, 그것도 없으면 어느 회차인지 묻는다.\n1. 계약 위반과 경고는 줄이지 말고 보인다. 참고는 작가가 원할 때만.\n2. 점검기가 보지 못하는 것(말 단계와 관계, 시점, 숨은 의도, 설정 모순)은 지침의 확인 목록으로 직접 보고, 의심스러운 곳만 한두 줄로 말한다.\n3. 원고는 고치지 않는다. 고치려면 작가가 고를 문장을 정해 달라고 한 줄로 안내한다.",
+            arg("chapter")
+        )),
+        "interpret" => Ok(format!(
+            "회차 {}을(를) 해석한다. 정하지 않았으면 outline으로 보고 어느 회차인지 묻는다.\n1. guide와 guide(\"reading\")를 읽는다.\n2. paragraphs로 문단 번호가 붙은 본문을 읽는다.\n3. 절차대로 장면, 문장의 하는 일·의미·의도, 연결, 의도가 흐린 문장을 정리해 save_reading으로 남긴다. 인용은 본문 그대로.\n4. 작가에게는 회차 요약, 연결 몇 쌍, 흐린 문장을 짧게 보이고 앱의 해석 모드에서 볼 수 있다고 알린다. 원고는 고치지 않는다.",
             arg("chapter")
         )),
         _ => Err(format!("알 수 없는 프롬프트: {name}")),

@@ -4,7 +4,7 @@ import type { Editor } from '@tiptap/core';
 import { openMenu } from '../components/Menu';
 import { FONT_LABEL, type BodyFont } from '../lib/view';
 import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/markButtons';
-import { addTextNote, openDialog, openFind, openWeb, saveNow, saveProjectFileAs, setView, splitView, toggleReading, unsplit, toggleFocusMode, updateProject, useApp } from '../store';
+import { addTextNote, openDialog, openFind, openWeb, saveNow, saveProjectFileAs, setView, splitView, toggleReading, unsplit, toggleFocusMode, toggleInterpretMode, updateProject, useApp } from '../store';
 import { api } from '../api';
 import { loadRibbon, saveRibbon } from '../lib/preferences';
 import { PREFERENCES_CHANGED } from '../lib/preferenceEvents';
@@ -20,6 +20,7 @@ export function Ribbon() {
   const rightOpen=useApp(s=>s.rightOpen);
   const split=useApp(s=>s.panes.length>1?s.split:null);
   const reading=useApp(s=>s.reading!==null&&s.reading.status!=='noVoice'&&s.reading.editor===s.editor);
+  const interpretMode=useApp(s=>s.interpretMode);
   const view = useApp(s => s.view);
   const [{tab,collapsed},setPrefs]=useState(loadRibbon);
   useEffect(()=>saveRibbon({tab,collapsed}),[tab,collapsed]);
@@ -61,6 +62,7 @@ export function Ribbon() {
       </Group><Group label="읽기·미리보기">
         <Button label="책 미리보기" glyph="▣" run={() => openDialog({kind:'reader'})}/>
         <Button label={reading?'읽기 멈춤':'소리 내어 읽기'} glyph="♪" disabled={!editor} active={reading} run={toggleReading}/>
+        <Button label="해석 모드" glyph="❡" active={interpretMode} run={toggleInterpretMode}/>
       </Group></>}
       {(tab==='서식'||tab==='보기') && <Group label="화면 글꼴·크기">
         <select aria-label="화면 글꼴" value={view.font} onChange={e => setView({font:e.target.value as BodyFont})}>{Object.entries(FONT_LABEL).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select>
@@ -85,6 +87,7 @@ export function Ribbon() {
 function Group({label,children}:{label:string;children:React.ReactNode}) { return <div className="ribbon-group"><div className="ribbon-group-tools">{children}</div><span className="ribbon-group-label">{label}</span></div>; }
 function Button({label,glyph,run,disabled=false,active}:{label:string;glyph:React.ReactNode;run:()=>void;disabled?:boolean;active?:boolean}) { return <button className="ribbon-button" aria-label={label} aria-pressed={active} disabled={disabled} onMouseDown={e=>e.preventDefault()} onClick={run}><span className="ribbon-glyph" aria-hidden="true">{glyph}</span><span>{label}</span></button>; }
 function EditorTools({editor,tab}:{editor:Editor;tab:Tab}) {
+  const interpretMode=useApp(s=>s.interpretMode);
   const state = useEditorState({editor,selector:({editor:e}) => ({editable:e.isEditable,undo:e.can().undo(),redo:e.can().redo(),heading:e.getAttributes('paragraph').heading,marks:activeMarks(e),color:e.getAttributes('textColor').color,align:e.getAttributes('paragraph').align,pageBreak:e.getAttributes('paragraph').pageBreakBefore})});
   const chain=()=>editor.chain().focus();
   return <>
@@ -109,5 +112,6 @@ function EditorTools({editor,tab}:{editor:Editor;tab:Tab}) {
     </Group></>}
     {tab==='쪽' && <Group label="쪽 나누기"><Button label="쪽 나눔" glyph="쪽↵" disabled={!state.editable} run={()=>{chain().insertPageBreak().run();}}/><Button label="쪽 나눔 지우기" glyph="쪽×" disabled={!state.editable||!editor.isActive('paragraph',{pageBreakBefore:true})} run={()=>{chain().removePageBreak().run();}}/></Group>}
     {tab==='검토' && <Group label="메모"><Button label="새 메모" glyph="▱" disabled={!state.editable} run={()=>void addTextNote()}/><Button label="메모 보기" glyph="☷" run={()=>useApp.setState({rightOpen:true,rightTab:'notes',previewCardId:null})}/></Group>}
+    {tab==='검토' && <Group label="해석"><Button label="해석 모드" glyph="❡" active={interpretMode} run={toggleInterpretMode}/></Group>}
   </>;
 }

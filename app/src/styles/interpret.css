@@ -1,0 +1,154 @@
+/* 해석 모드 (editor/interpret.ts, workspace/InterpretTab.tsx) ---------------- */
+
+/* Sentences that have a reading; the one being looked at. */
+.interpret-mark {
+  text-decoration: underline;
+  text-decoration-color: var(--amber);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.interpret-mark.on {
+  background: var(--amber-soft);
+  text-decoration-thickness: 2px;
+  border-radius: 2px;
+}
+
+.interpret {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.interpret-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.interpret-stale {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 12px;
+}
+
+.interpret h4 {
+  margin: 6px 0 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.interpret-card,
+.interpret-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.interpret-card p,
+.interpret-overview p {
+  margin: 0;
+}
+
+.interpret-card blockquote {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--amber);
+  background: var(--surface);
+  color: var(--body-text);
+}
+
+.interpret-scene {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.interpret-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.interpret-role {
+  background: var(--chip-violet-bg);
+  color: var(--chip-violet-fg);
+  font-size: 11px;
+}
+
+.interpret-label {
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.interpret-unclear {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--chip-red-bg);
+  color: var(--chip-red-fg);
+}
+
+.interpret-unclear .interpret-label {
+  color: inherit;
+}
+
+.interpret-summary {
+  color: var(--text-2);
+}
+
+.interpret-links,
+.interpret-scenes {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.interpret-scenes {
+  padding-left: 18px;
+  list-style: decimal;
+}
+
+.interpret-scenes li span {
+  display: block;
+  color: var(--text-2);
+}
+
+.interpret-kind {
+  margin: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue);
+  white-space: nowrap;
+}
+
+.interpret .link-like {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted var(--muted);
+  text-underline-offset: 3px;
+}
+
+.interpret .link-like:hover {
+  color: var(--blue-strong);
+}
+
+.interpret-by {
+  margin: 0;
+}

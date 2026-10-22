@@ -63,6 +63,7 @@ export const tauriBackend: Backend = {
   recordsTidy: (root) => invoke('records_tidy', { root }),
   projectSize: (root) => invoke('project_size', { root }),
   mcpServer: () => invoke('mcp_server'),
+  interpretLoad: (root, docId) => invoke('interpret_load', { root, docId }),
   trashList: (root) => invoke('trash_list', { root }),
   trashRestore: (root, trashId) => invoke('trash_restore', { root, trashId }),
   trashDelete: (root, trashId) => invoke('trash_delete', { root, trashId }),

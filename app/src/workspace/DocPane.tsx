@@ -13,6 +13,7 @@ import { MARK_BUTTONS, activeMarks, toggleMark, type MarkKey } from '../editor/m
 import { setWhitespaceMarks } from '../editor/marks';
 import { setAutoType } from '../editor/autoType';
 import { setFocusLook } from '../editor/focus';
+import { cursorPlace, placeAt, setInterpretMarks } from '../editor/interpret';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
 import { showMatch } from '../editor/search';
@@ -30,7 +31,9 @@ import {
   findDoc,
   focusNote,
   isFocusedTab,
+  loadInterpretation,
   patchSummary,
+  pickSentence,
   previewCard,
   registerEditor,
   setLocked,
@@ -83,6 +86,7 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
   const sessionRef = useRef<SaveSession | null>(null);
   const countTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const cursorTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const interpretTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const extensions = useMemo(
     () =>
       manuscriptExtensions(sceneSymbol, {
@@ -111,6 +115,11 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       onUpdate: ({ editor, transaction }) => {
         // Text loaded from disk (another device's) needs no saving.
         if (!transaction.getMeta(RELOAD)) sessionRef.current?.changed();
+        // In 해석 모드 the sentences move with the writing: find them again once it has been saved.
+        if (useApp.getState().interpretMode && transaction.docChanged) {
+          clearTimeout(interpretTimer.current);
+          interpretTimer.current = setTimeout(() => void loadInterpretation(docId), 2500);
+        }
         clearTimeout(countTimer.current);
         // Counted once the Korean syllable being composed is done (editor/composition.ts).
         countTimer.current = setTimeout(() => {
@@ -121,6 +130,10 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
       },
       onSelectionUpdate: ({ editor }) => {
         const { from, to, empty } = editor.state.selection;
+        if (useApp.getState().interpretMode && isFocusedTab(tabKey)) {
+          const at = cursorPlace(editor.state);
+          if (at) pickSentence(docId, at.block, at.offset);
+        }
         if (isFocusedTab(tabKey)) {
           useApp.setState({ selection: empty ? null : countChars(editor.state.doc.textBetween(from, to, '\n', '\n')) });
         }
@@ -181,6 +194,20 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
     () => setFocusLook(editor, focusMode ? { dim: focusDim, typewriter } : null),
     [editor, focusMode, focusDim, typewriter],
   );
+
+  // 해석 모드: the chapter's reading, its sentences marked, the one looked at strongly.
+  const interpretMode = useApp((s) => s.interpretMode);
+  const interpretVersion = useApp((s) => s.interpretVersion);
+  const interpret = useApp((s) => (s.interpret?.docId === docId ? s.interpret.view : null));
+  const pick = useApp((s) => (s.interpretPick?.docId === docId ? s.interpretPick : null));
+  useEffect(() => {
+    if (interpretMode && isFocusedTab(tabKey)) void loadInterpretation(docId);
+  }, [interpretMode, interpretVersion, docId, tabKey]);
+  useEffect(() => {
+    if (!interpretMode || !interpret) return setInterpretMarks(editor, null);
+    const current = pick ? (placeAt(interpret.places, pick.block, pick.offset)?.id ?? null) : null;
+    setInterpretMarks(editor, { places: interpret.places, current });
+  }, [editor, interpretMode, interpret, pick]);
 
   // The manuscript format's first-line rules, for chapters (planning documents follow no rules).
   const rules = useApp((s) => s.overview!.project.manuscriptFormat.indentRules);

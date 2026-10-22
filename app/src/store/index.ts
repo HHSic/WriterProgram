@@ -20,6 +20,7 @@ export { loadJournal, setJournalEnabled, setAnchorAllowed, setAnchorWay, anchorN
 export { reviewDraft, keepReviewDraft, noteSent, openReview, takeBackCorrected, applyReview } from './exchange';
 export type { WebPage } from './web';
 export { setFocusMode, toggleFocusMode } from './focus';
+export { setInterpretMode, toggleInterpretMode, loadInterpretation, pickSentence } from './interpret';
 export { startReading, pauseReading, resumeReading, stopReading, toggleReading, closeReadingNotice } from './reading';
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
 export { offerRescues, setRescueAside, takeRescue } from './rescue';

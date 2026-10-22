@@ -12,6 +12,7 @@ export type * from './docs';
 export type * from './exchange';
 export type * from './format';
 export type * from './import';
+export type * from './interpret';
 export type * from './journal';
 export type * from './notes';
 export type * from './project';

@@ -29,6 +29,7 @@ pub mod notes;
 pub mod places;
 pub mod project;
 pub mod proof;
+pub mod reading;
 pub mod recent;
 pub mod rescue;
 pub mod search;

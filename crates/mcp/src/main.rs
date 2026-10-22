@@ -14,6 +14,7 @@ mod check;
 mod context;
 mod guide;
 mod manage;
+mod readings;
 mod review;
 mod text;
 mod tools;
@@ -41,6 +42,7 @@ const INSTRUCTIONS: &str = "WriterProgram 작품 폴더를 읽고 쓰는 도구�
 - 잠근 회차는 고치지 않는다. 서식이 있는 회차를 replace로 바꾸려면 작가에게 서식이 사라져도 되는지 먼저 묻는다.
 - trash_doc, replace_all, restore_record, export는 작가가 시켰을 때만 쓴다. replace_all 전에는 search로 몇 곳인지 보인다.
 - write_doc, add_doc은 보낸 글에 설명·인사·마크다운이 섞이면 저장하지 않고 고칠 줄을 돌려준다. 그 줄만 고쳐 다시 보낸다. 저장 뒤 돌아오는 check의 경고는 작가에게 보이고, 작가가 원할 때만 고친다.
+- 작가가 작품 해석을 원하면 guide(\"reading\") 절차로 paragraphs를 읽고 save_reading으로 남긴다. 원고는 고치지 않는다.
 - 잘못 고쳤으면 records로 기록을 찾아 restore_record로 되돌린다. 지운 문서는 trash와 restore_trash로 되살린다.";
 
 fn main() {

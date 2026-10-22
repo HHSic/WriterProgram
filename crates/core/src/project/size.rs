@@ -86,6 +86,7 @@ pub fn sizes(root: &Path) -> Result<Sizes> {
         PLANNING_DIR,
         CARDS_DIR,
         NOTES_DIR,
+        crate::reading::READINGS_DIR,
     ]
     .iter()
     .map(|p| size_of(&root.join(p)))

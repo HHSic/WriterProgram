@@ -11,6 +11,7 @@ use crate::cards::CARDS_DIR;
 use crate::doc::{self, body_rev};
 use crate::notes::NOTES_DIR;
 use crate::project::{MANUSCRIPT_DIR, PLANNING_DIR, PROJECT_FILE};
+use crate::reading::READINGS_DIR;
 use crate::snapshot::SNAPSHOT_DIR;
 use crate::trash::TRASH_DIR;
 
@@ -41,6 +42,11 @@ pub enum Change {
         doc_id: String,
     },
     Trash,
+    /// A chapter's reading (작품 해석, reading.rs).
+    #[serde(rename_all = "camelCase")]
+    Reading {
+        doc_id: String,
+    },
 }
 
 /// Describes a change to `rel` (a path inside the project folder) whose
@@ -87,6 +93,9 @@ pub fn describe(rel: &Path, bytes: Option<&[u8]>) -> Option<Change> {
         }),
         [SNAPSHOT_DIR] => None,
         [TRASH_DIR, ..] => Some(Change::Trash),
+        [READINGS_DIR, _] => Some(Change::Reading {
+            doc_id: name.strip_suffix(".json")?.to_string(),
+        }),
         _ => None,
     }
 }
@@ -141,6 +150,13 @@ mod tests {
             Some(Change::Trash)
         );
         assert_eq!(describe(&p("exports/a.txt"), Some(b"")), None);
+        assert_eq!(
+            describe(&p("readings/k7q2m9x4t1ab.json"), Some(b"{}")),
+            Some(Change::Reading {
+                doc_id: "k7q2m9x4t1ab".into()
+            })
+        );
+        assert_eq!(describe(&p("readings/notes.txt"), Some(b"")), None);
         // The creation journal is not something the screen shows.
         assert_eq!(describe(&p(".journal/k7q2m9x4t1ab.jsonl"), Some(b"")), None);
         assert_eq!(

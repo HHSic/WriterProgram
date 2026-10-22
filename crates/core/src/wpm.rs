@@ -25,6 +25,7 @@ const DIRS: &[&str] = &[
     "planning",
     "cards",
     "notes",
+    "readings",
     ".snapshots",
     ".trash",
     ".journal",

@@ -28,6 +28,7 @@ import {
 import type { MenuItem } from '../components/Menu';
 import { AiTab } from './AiTab';
 import { Appearances, CardPreview, CastTab } from './CardPanels';
+import { InterpretTab } from './InterpretTab';
 import { NotesTab } from './Notes';
 import { SearchTab } from './SearchTab';
 
@@ -40,6 +41,7 @@ const CHAPTER_TABS: TabList = [
   { id: 'records', label: '문서 이력' },
   { id: 'find', label: '찾기' },
   { id: 'ai', label: 'AI 점검' },
+  { id: 'interpret', label: '해석' },
 ];
 const PLANNING_TABS: TabList = [
   { id: 'outline', label: '개요' },
@@ -139,6 +141,8 @@ export function RightPanel() {
           editor ? <CastTab editor={editor} /> : null
         ) : tab === 'ai' ? (
           <AiTab docId={activeDocId} />
+        ) : tab === 'interpret' ? (
+          <InterpretTab key={activeDocId} docId={activeDocId} />
         ) : (
           <RecordsTab docId={activeDocId} />
         )}

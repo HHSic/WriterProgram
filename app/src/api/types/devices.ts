@@ -115,4 +115,5 @@ export type Change =
   | { kind: 'card'; id: string }
   | { kind: 'note'; id: string }
   | { kind: 'records'; docId: string }
-  | { kind: 'trash' };
+  | { kind: 'trash' }
+  | { kind: 'reading'; docId: string };

@@ -8,6 +8,7 @@ pub mod anchor;
 pub mod cards;
 pub mod doc;
 pub mod exchange;
+pub mod interpret;
 pub mod journal;
 pub mod mend;
 pub mod notes;

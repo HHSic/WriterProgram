@@ -26,7 +26,7 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 
 | 도구 | 하는 일 |
 |---|---|
-| `guide` | kfiction 작문 지침(SKILL.md)과 참고 문서 5개. 서버로 쓸 때는 이것을 읽기 전에 회차를 쓸 수 없다 |
+| `guide` | kfiction 작문 지침(SKILL.md)과 참고 문서 6개(작품 해석 절차 포함). 서버로 쓸 때는 이것을 읽기 전에 회차를 쓸 수 없다 |
 | `outline` | 부·회차(id, 제목, 상태, 글자 수, 잠금), 기획 문서, 설정 카드 목록 |
 | `read_doc` | 회차 하나. 본문은 한 줄에 한 문단, 장면 나눔은 `***`. `rev`(본문 지문)를 함께 준다 |
 | `add_doc` | 새 회차나 기획 문서, `text`를 주면 본문까지 |
@@ -41,15 +41,16 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 | `trash_doc`, `trash`, `restore_trash` | 휴지통으로 보내기(30일 보관), 휴지통 목록, 되살리기 |
 | `search`, `replace_all` | 작품 전체나 고른 문서에서 찾기(앞뒤 문맥), 모두 바꾸기 |
 | `records`, `restore_record` | 문서의 기록 목록, 기록으로 되돌리기 |
+| `paragraphs`, `save_reading`, `reading` | 작품 해석: 문단 번호가 붙은 본문, 인용을 검증해 해석 저장, 저장된 해석과 지금 본문에서의 자리 ([reading.md](reading.md)) |
 | `export` | txt, docx(Word), hwpx(한글) 내보내기. 회차마다 파일 하나도 된다 |
 
-MCP 프롬프트 `candidates`(문장·대사 후보 3개)와 `check`(회차 점검 리포트)도 있다. Claude Code에서는 `/mcp__writerprogram__candidates`처럼 부른다.
+MCP 프롬프트 `candidates`(문장·대사 후보 3개), `check`(회차 점검 리포트), `interpret`(회차 해석)도 있다. Claude Code에서는 `/mcp__writerprogram__candidates`처럼 부른다.
 
 명령줄에서는 `writer-mcp call <도구> '<JSON 인자>' [--project <폴더>]`로 같은 도구를 부른다. 인자 자리에 `-`를 주면 표준 입력에서 JSON을 읽는다. `writer-mcp tools`는 도구 목록을 보인다.
 
 ## 작문 지침 (kfiction)
 
-kfiction 플러그인의 `skills/kfiction/SKILL.md`와 `references/` 다섯 개를 빌드할 때 `writer-mcp`에 넣는다(`guide.rs`, `include_str!`). 원본은 플러그인 파일 하나이고, 플러그인 전용 부분(명령줄 점검기, hook, 참고 문서 링크)만 이 도구들에 맞게 바꾼다. 플러그인을 깔지 않고 서버만 연결해도 같은 지침이 적용된다.
+kfiction 플러그인의 `skills/kfiction/SKILL.md`와 `references/` 여섯 개를 빌드할 때 `writer-mcp`에 넣는다(`guide.rs`, `include_str!`). 원본은 플러그인 파일 하나이고, 플러그인 전용 부분(명령줄 점검기, hook, 참고 문서 링크)만 이 도구들에 맞게 바꾼다. 플러그인을 깔지 않고 서버만 연결해도 같은 지침이 적용된다.
 
 - 서버(`serve`)는 이번 연결에서 `guide`를 한 번 읽기 전에는 회차 본문을 쓰지 않는다. 연결할 때 주는 안내에도 먼저 읽으라고 적었다. 명령줄 `call`은 사람이 쓰므로 묻지 않는다.
 - SKILL.md 문장을 바꾸면 `guide.rs`의 시험이 플러그인 전용 표현(`hook`, `references/`, `CLAUDE_PLUGIN_ROOT`)이 남았는지 확인한다.

@@ -16,6 +16,7 @@ import { FocusWriting } from './focus';
 import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
+import { InterpretHighlight } from './interpret';
 import { ReadAloudHighlight } from './readAloud';
 import { SearchHighlight } from './search';
 
@@ -203,6 +204,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     IndentRulesExtension,
     SearchHighlight,
     ReadAloudHighlight,
+    InterpretHighlight,
     PageScroll,
     VerticalPages,
     FocusWriting,
