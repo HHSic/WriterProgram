@@ -21,8 +21,9 @@ const J_NIEUN = 4;
 const J_RIEUL = 8;
 const J_BIEUP = 17;
 
-/** 어절 하나의 끝으로 말 단계 후보를 고른다. 빈 배열은 판정 불가. */
-export function readWord(w, question = false) {
+/** 어절 하나의 끝으로 말 단계 후보를 고른다. 빈 배열은 판정 불가.
+ * loose가 거짓이면 어미가 분명할 때만 읽고, 받침 없는 끝 모음만으로 해체라 짐작하지 않는다. */
+export function readWord(w, question = false, loose = true) {
   if (!w || FRAGMENTS.has(w)) return [];
   const last = w.at(-1);
   const prev = w.at(-2);
@@ -41,7 +42,7 @@ export function readWord(w, question = false) {
   if (last === '다' || ['냐', '니', '라', '자'].includes(last) || ends('구나')) return ['해라체'];
   if (['어', '아', '여', '야', '지', '래', '대', '데', '걸', '군', '게', '까', '든'].includes(last)) return ['해체'];
   // 가, 봐, 해, 줘, 돼, 했어 처럼 아/어 계열 모음으로 끝나고 받침이 없으면 해체.
-  if (jong(last) === 0 && [0, 1, 4, 6, 9, 10, 14].includes(vowel(last))) return ['해체'];
+  if (loose && jong(last) === 0 && [0, 1, 4, 6, 9, 10, 14].includes(vowel(last))) return ['해체'];
   return [];
 }
 
@@ -51,7 +52,8 @@ export function readLine(line) {
     const trailsOff = /(…|\.\.)$/.test(s);
     const w = lastWord(s);
     // 말줄임표로 흐린 문장은 연결 어미에서 끊긴 경우가 많아 읽지 않는다(시원찮은데…).
-    const levels = trailsOff && /(는데|은데|고|며|서|니까|면|지만)$/.test(w) ? [] : readWord(w, s.endsWith('?'));
+    // 어미 없이 끊긴 조각(할머니, 그거…)은 끝 모음만으로 해체라 읽지 않는다.
+    const levels = trailsOff && /(는데|은데|고|며|서|니까|면|지만)$/.test(w) ? [] : readWord(w, s.endsWith('?'), !trailsOff);
     return { text: s, levels };
   });
 }

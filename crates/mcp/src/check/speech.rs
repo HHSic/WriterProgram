@@ -37,7 +37,9 @@ fn vowel(c: Option<char>) -> i32 {
 }
 
 /// Candidate levels for one word's ending; empty when it cannot be read.
-pub fn read_word(w: &str, question: bool) -> Vec<&'static str> {
+/// Unless `loose`, only a clear ending is read: a bare final vowel is not
+/// taken for 해체.
+pub fn read_word(w: &str, question: bool, loose: bool) -> Vec<&'static str> {
     if w.is_empty() || FRAGMENTS.contains(&w) {
         return vec![];
     }
@@ -83,7 +85,7 @@ pub fn read_word(w: &str, question: bool) -> Vec<&'static str> {
     if last.is_some_and(|c| "어아여야지래대데걸군게까든".contains(c)) {
         return vec!["해체"];
     }
-    if jong(last) == 0 && [0, 1, 4, 6, 9, 10, 14].contains(&vowel(last)) {
+    if loose && jong(last) == 0 && [0, 1, 4, 6, 9, 10, 14].contains(&vowel(last)) {
         return vec!["해체"];
     }
     vec![]
@@ -95,10 +97,13 @@ pub fn read_line(line: &str) -> Vec<(String, Vec<&'static str>)> {
         .into_iter()
         .map(|s| {
             let w = last_word(&s);
-            let levels = if TRAILS_OFF.is_match(&s) && CONNECTIVE_END.is_match(&w) {
+            let trails_off = TRAILS_OFF.is_match(&s);
+            // A fragment cut off without an ending (할머니, 그거…) is not read
+            // from its last vowel.
+            let levels = if trails_off && CONNECTIVE_END.is_match(&w) {
                 vec![]
             } else {
-                read_word(&w, s.ends_with('?'))
+                read_word(&w, s.ends_with('?'), !trails_off)
             };
             (s, levels)
         })

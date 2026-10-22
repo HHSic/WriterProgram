@@ -343,7 +343,8 @@ pub fn lint(text: &str) -> Vec<Finding> {
         6,
     ) {
         let lengths: Vec<usize> = run.iter().flatten().map(|s| len(&s.text)).collect();
-        if variation(&lengths) < 0.35 {
+        // Any six in a row as even as a metronome; see the JS checker for the numbers.
+        if lengths.windows(6).any(|w| variation(w) < 0.25) {
             let line = run[0].as_ref().map(|s| s.line);
             add(
                 "F5",
@@ -449,14 +450,14 @@ pub fn lint(text: &str) -> Vec<Finding> {
         );
     }
     for s in &narr {
-        if len(&s.text) > 100 {
+        if len(&s.text) > 150 {
             add(
                 "F12",
-                "긴 문장",
+                "아주 긴 문장",
                 Severity::Info,
                 Some(s.line),
                 format!("{}자", len(&s.text)),
-                "끊을 곳이 있는지 본다",
+                "한 숨에 읽히는지 본다. 이어지는 동작이나 생각이면 둔다",
             );
         }
     }

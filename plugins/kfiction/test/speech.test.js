@@ -44,3 +44,8 @@ test('agrees with the eval set gold lines on polite vs plain', () => {
   assert.ok(read >= 65, `read ${read}`);
   assert.ok(agree / read >= 0.95, `agree ${agree}/${read}`);
 });
+
+test('a fragment cut off without an ending is not read as 해체', () => {
+  assert.equal(mixesPoliteness('할머니, 그거… 제 거죠.'), false);
+  assert.deepEqual(readLine('알았어… 갈게.').map((s) => s.levels), [['해체'], ['해체']]);
+});

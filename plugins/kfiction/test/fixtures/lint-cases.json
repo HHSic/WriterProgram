@@ -18,12 +18,6 @@
      "match": "카드의 할머니의 서점의 골목의 골목의"
     },
     {
-     "rule": "F12",
-     "severity": "info",
-     "line": 11,
-     "match": "118자"
-    },
-    {
      "rule": "F3",
      "severity": "warn",
      "line": 15,
@@ -331,14 +325,7 @@
   {
    "name": "long sentence",
    "text": "그는 시장 끝 골목에서 오래된 열쇠 가게의 셔터를 반쯤 올리고 허리를 숙여 안으로 들어간 뒤 어둠 속에서 손을 더듬어 전등 줄을 찾아 당기고 나서야 카운터 위에 놓인 낯선 열쇠 꾸러미를 보았는데 그 꾸러미는 어제 문을 닫을 때까지만 해도 분명히 거기에 없었다.",
-   "findings": [
-    {
-     "rule": "F12",
-     "severity": "info",
-     "line": 1,
-     "match": "145자"
-    }
-   ]
+   "findings": []
   },
   {
    "name": "long narration",
@@ -349,6 +336,12 @@
      "severity": "warn",
      "line": null,
      "match": "60자 넘는 지문 문장 6개 / 132문장 · 평균 23자"
+    },
+    {
+     "rule": "F5",
+     "severity": "warn",
+     "line": 1,
+     "match": "-었다 132번, 길이도 비슷함"
     },
     {
      "rule": "F6",
@@ -367,12 +360,6 @@
      "severity": "warn",
      "line": 7,
      "match": "6번"
-    },
-    {
-     "rule": "F12",
-     "severity": "info",
-     "line": 7,
-     "match": "118자"
     },
     {
      "rule": "F3",
@@ -405,12 +392,6 @@
      "match": "카드의 할머니의 서점의 골목의 골목의"
     },
     {
-     "rule": "F12",
-     "severity": "info",
-     "line": 27,
-     "match": "118자"
-    },
-    {
      "rule": "F3",
      "severity": "warn",
      "line": 29,
@@ -439,12 +420,6 @@
      "severity": "warn",
      "line": 47,
      "match": "카드의 할머니의 서점의 골목의 골목의"
-    },
-    {
-     "rule": "F12",
-     "severity": "info",
-     "line": 47,
-     "match": "118자"
     },
     {
      "rule": "F3",
@@ -477,12 +452,6 @@
      "match": "카드의 할머니의 서점의 골목의 골목의"
     },
     {
-     "rule": "F12",
-     "severity": "info",
-     "line": 67,
-     "match": "118자"
-    },
-    {
      "rule": "F3",
      "severity": "warn",
      "line": 69,
@@ -513,12 +482,6 @@
      "match": "카드의 할머니의 서점의 골목의 골목의"
     },
     {
-     "rule": "F12",
-     "severity": "info",
-     "line": 87,
-     "match": "118자"
-    },
-    {
      "rule": "F3",
      "severity": "warn",
      "line": 89,
@@ -547,12 +510,6 @@
      "severity": "warn",
      "line": 107,
      "match": "카드의 할머니의 서점의 골목의 골목의"
-    },
-    {
-     "rule": "F12",
-     "severity": "info",
-     "line": 107,
-     "match": "118자"
     },
     {
      "rule": "F3",
@@ -718,6 +675,26 @@
    "levels": [
     [
      "해라체"
+    ]
+   ]
+  },
+  {
+   "line": "할머니, 그거… 제 거죠.",
+   "levels": [
+    [],
+    [
+     "해요체"
+    ]
+   ]
+  },
+  {
+   "line": "알았어… 갈게.",
+   "levels": [
+    [
+     "해체"
+    ],
+    [
+     "해체"
     ]
    ]
   },

@@ -86,10 +86,13 @@ export function lint(text) {
     const ui = s.text.split(/\s+/).filter((w) => w.length >= 2 && w.endsWith('의') && !UI_NOUNS.has(w) && ![...UI_NOUNS].some((n) => w.endsWith(n)));
     if (ui.length >= 3 || /[가-힣]+의 [가-힣]+의 /.test(s.text)) add('F4', "'의'가 이어짐", 'warn', s.line, ui.join(' '), "‘할머니의 서점 → 할머니 서점’처럼 하나를 뺀다");
   }
-  // F5 같은 끝맺음이 여섯 번 넘게, 길이까지 고르게 이어짐. 과거형 서술은 '-었다'가 기본이라
-  // 횟수만 세면 사람 글도 다 걸린다(1924년 「운수 좋은 날」에서 확인).
+  // F5 같은 끝맺음이 여섯 번 넘게 이어지고 그 안의 연이은 여섯 문장이 길이까지 고름. 과거형
+  // 서술은 '-었다'가 기본이라 횟수만 세면 사람 글도 다 걸린다. 연속 전체의 변동계수 0.35로
+  // 보면 사람 단편 6편 중 3편이 걸렸고, 여섯 문장 구간의 변동계수 0.25로 보면 1편, 모델 단편은
+  // 7편 중 6편이었다(scripts/calibrate.mjs, references/revision.md).
   runs(flow, (s) => (s ? endingClass(s.text) : ''), 6, (run, key) => {
-    if (variation(run.map((s) => s.text.length)) < 0.35) add('F5', '같은 끝맺음', 'warn', run[0].line, `${key} ${run.length}번, 길이도 비슷함`, '끝맺음만 바꾸기 전에 이어지는 동작을 한 문장으로 이을 수 있는지 먼저 본다');
+    const lengths = run.map((s) => s.text.length);
+    if (lengths.some((_, i) => i + 6 <= lengths.length && variation(lengths.slice(i, i + 6)) < 0.25)) add('F5', '같은 끝맺음', 'warn', run[0].line, `${key} ${run.length}번, 길이도 비슷함`, '끝맺음만 바꾸기 전에 이어지는 동작을 한 문장으로 이을 수 있는지 먼저 본다');
   });
   // F6 같은 말로 시작 세 번
   runs(flow, (s) => (s && firstWord(s.text).length >= 2 ? firstWord(s.text) : ''), 3, (run, key) => add('F6', '같은 말로 시작', 'warn', run[0].line, `${key} ${run.length}번`, '주어를 빼거나 문장을 합친다'));
@@ -116,7 +119,8 @@ export function lint(text) {
   const dashes = (allText.match(/[가-힣.,!?]\s?[—–―]\s?[가-힣]/g) ?? []).length;
   if (dashes >= 3) add('F11', '줄표', 'info', null, `${dashes}개`, '한국어 소설에서는 드물다. 쉼표나 문장 나누기로');
   // F12, F13 문장 길이
-  for (const s of narr) if (s.text.length > 100) add('F12', '긴 문장', 'info', s.line, `${s.text.length}자`, '끊을 곳이 있는지 본다');
+  // 100자 넘는 문장은 사람 단편 6편 모두에 있었다. 아주 긴 것만 짚는다.
+  for (const s of narr) if (s.text.length > 150) add('F12', '아주 긴 문장', 'info', s.line, `${s.text.length}자`, '한 숨에 읽히는지 본다. 이어지는 동작이나 생각이면 둔다');
   const narrChars = narr.reduce((n, s) => n + s.text.length, 0);
   // 지문이 짧은 문장으로만 이어짐. 모델 소설은 지문 평균 20자대, 60자 넘는 문장이 0~3%였고
   // 사람 단편(현진건, 이효석)은 평균 39~43자, 60자 넘는 문장이 14~19%였다.
