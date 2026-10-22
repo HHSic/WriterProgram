@@ -43,6 +43,7 @@ const IN_WRITERPROGRAM: &str = "## WriterProgram 작품에 쓰기
 - 회차에 넣을 때는 write_doc이나 add_doc에 context(시점 인물, 시제, 대사가 있으면 화자→청자 말 단계와 호칭)를 함께 보낸다. 작가에게 보인 맥락 메모와 같은 내용이다. 지어낸 이름이나 사실은 new_facts로 보낸다. 회차에 메모로 남아 작가가 앱에서 본다.
 - 보낸 글에 설명·인사·마크다운이 섞이면 저장하지 않고 고칠 줄을 돌려준다. 그 줄만 고쳐 다시 보낸다.
 - 저장하면 check가 온다. context는 보낸 맥락과 본문이 어긋나 보이는 곳(시제, 말 단계)이니 먼저 본다. 끝 글자로 어림한 것이라 틀릴 수 있다. warn은 문체 경고로, 작가에게 보이고 작가가 원할 때만 고친다.
+- 터미널의 writer 명령으로 쓸 때도 같다. write_doc은 writer write, add_doc은 writer add, context는 --pov, --tense, --speech 화자>청자:말단계[:호칭], new_facts는 --new-facts다(writer help write).
 - 회차를 따로 점검하려면 check 도구를 쓴다. 점검기가 보지 못하는 시점, 숨은 의도, 설정 모순은 위의 확인 목록으로 직접 본다.
 ";
 
@@ -57,10 +58,15 @@ pub fn require() {
     REQUIRED.set(true);
 }
 
+/// The guide counts as read: the `writer` command read it in an earlier call.
+pub fn mark_read() {
+    READ.set(true);
+}
+
 /// Refuses writing a chapter until the guide has been read, when required.
 pub fn check_read() -> Result<(), String> {
     if REQUIRED.get() && !READ.get() {
-        return Err("회차를 쓰기 전에 guide 도구로 kfiction 작문 지침을 한 번 읽어 주세요. 지침의 순서(맥락 메모, 서로 다른 후보 3개, 확인 목록)대로 쓴 글만 넣습니다.".into());
+        return Err("회차를 쓰기 전에 guide 도구(터미널에서는 writer guide)로 kfiction 작문 지침을 한 번 읽어 주세요. 지침의 순서(맥락 메모, 서로 다른 후보 3개, 확인 목록)대로 쓴 글만 넣습니다.".into());
     }
     Ok(())
 }

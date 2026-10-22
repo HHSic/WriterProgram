@@ -118,6 +118,54 @@ pub async fn mcp_server() -> Res<Option<String>> {
         .map(|path| path.display().to_string()))
 }
 
+/// The `writer` command next to the app (docs/cli.md) and whether its folder
+/// is on the user's PATH, so a terminal finds it by name.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliCommand {
+    path: String,
+    on: bool,
+    /// PATH can be changed from here (Windows); elsewhere the shell's own
+    /// settings do it.
+    can_change: bool,
+}
+
+fn cli_command_now() -> Res<Option<CliCommand>> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let Some(dir) = exe.parent() else {
+        return Ok(None);
+    };
+    let path = dir.join(if cfg!(windows) {
+        "writer.exe"
+    } else {
+        "writer"
+    });
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let dir = writer_mcp::path::shown(dir);
+    Ok(Some(CliCommand {
+        on: writer_mcp::path::is_on(&dir)?,
+        path: writer_mcp::path::shown(&path),
+        can_change: cfg!(windows),
+    }))
+}
+
+/// None when `writer` is not next to the app, as in a build without it.
+#[tauri::command]
+pub async fn cli_command() -> Res<Option<CliCommand>> {
+    cli_command_now()
+}
+
+/// Puts the app's folder on the user's PATH or takes it off (Windows).
+#[tauri::command]
+pub async fn cli_path_set(on: bool) -> Res<Option<CliCommand>> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let dir = exe.parent().ok_or("앱 폴더를 알 수 없음")?;
+    writer_mcp::path::set(&writer_mcp::path::shown(dir), on)?;
+    cli_command_now()
+}
+
 /// Shows a file or folder in the system file manager.
 #[tauri::command]
 pub async fn reveal(app: AppHandle, path: String) -> Res<()> {

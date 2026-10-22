@@ -10,19 +10,11 @@
 //! The server speaks JSON-RPC 2.0, one message per line on stdin and stdout
 //! (the MCP stdio transport). Only tools are offered.
 
-mod check;
-mod context;
-mod guide;
-mod manage;
-mod readings;
-mod review;
-mod text;
-mod tools;
-
 use std::io::{self, BufRead, Read, Write};
 use std::path::PathBuf;
 
 use serde_json::{Value, json};
+use writer_mcp::{guide, tools};
 
 const USAGE: &str = "사용법:
   writer-mcp serve [--project <작품 폴더>]

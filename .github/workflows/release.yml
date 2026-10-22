@@ -80,13 +80,15 @@ jobs:
           cargo test --workspace --locked
           npm --prefix app test
 
-      # writer-mcp goes into the installer next to the app (docs/mcp.md). Tauri
+      # writer-mcp (MCP server, docs/mcp.md) and writer (the same tools as
+      # commands, docs/cli.md) go into the installer next to the app. Tauri
       # takes sidecars named for the target and strips the suffix when bundling.
-      - name: Build writer-mcp for the installer
+      - name: Build writer-mcp and writer for the installer
         run: |
-          cargo build --release --locked -p writer-mcp
+          cargo build --release --locked -p writer-mcp --bins
           mkdir -p app/src-tauri/binaries
           cp target/release/writer-mcp.exe app/src-tauri/binaries/writer-mcp-x86_64-pc-windows-msvc.exe
+          cp target/release/writer.exe app/src-tauri/binaries/writer-x86_64-pc-windows-msvc.exe
 
       - name: Build, sign and draft the release
         uses: tauri-apps/tauri-action@v0

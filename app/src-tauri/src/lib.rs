@@ -70,6 +70,8 @@ pub fn run() {
             commands::project::project_move,
             commands::project::project_size,
             commands::project::mcp_server,
+            commands::project::cli_command,
+            commands::project::cli_path_set,
             commands::interpret::interpret_load,
             commands::interpret::interpret_save,
             commands::project::reveal,

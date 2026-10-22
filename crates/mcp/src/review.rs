@@ -12,7 +12,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
@@ -27,20 +26,13 @@ const LISTED: usize = 20;
 /// `WRITER_MCP_STATE_DIR` or the system's temporary folder. Losing it only
 /// starts the counts again.
 fn state_file() -> PathBuf {
-    std::env::var_os("WRITER_MCP_STATE_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("writer-mcp"))
-        .join("refusals.json")
+    crate::state::dir().join("refusals.json")
 }
 
 /// One read-change-write at a time within this process.
 static STATE: Mutex<()> = Mutex::new(());
 
-fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| d.as_secs())
-}
+use crate::state::now;
 
 fn load() -> HashMap<String, (u32, u64)> {
     std::fs::read_to_string(state_file())
@@ -52,13 +44,11 @@ fn load() -> HashMap<String, (u32, u64)> {
 fn store(mut counts: HashMap<String, (u32, u64)>) {
     let now = now();
     counts.retain(|_, (_, at)| now.saturating_sub(*at) < STALE_SECS);
-    let path = state_file();
-    let Some(dir) = path.parent() else { return };
-    let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
     // Best effort: a count that cannot be kept only means more refusals.
-    let _ = std::fs::create_dir_all(dir)
-        .and_then(|()| std::fs::write(&tmp, serde_json::to_string(&counts).unwrap_or_default()))
-        .and_then(|()| std::fs::rename(&tmp, &path));
+    crate::state::write(
+        &state_file(),
+        &serde_json::to_string(&counts).unwrap_or_default(),
+    );
 }
 
 /// Checks `text` about to be written under `key` (project and document).

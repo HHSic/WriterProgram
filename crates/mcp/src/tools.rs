@@ -164,6 +164,12 @@ pub fn call(name: &str, args: &Value, default_project: Option<&Path>) -> Outcome
     match name {
         "create_project" => return create_project(args),
         "guide" => return guide::read(str_arg(args, "topic")).map(Value::String),
+        // Text alone needs no project.
+        "check" if str_arg(args, "id").is_none() => {
+            return str_arg(args, "text")
+                .map(review::full)
+                .ok_or_else(|| "id나 text를 주세요".into());
+        }
         _ => {}
     }
     let root = project_root(args, default_project)?;
@@ -216,7 +222,7 @@ fn project_root(args: &Value, default_project: Option<&Path>) -> Result<PathBuf,
                 .ok()
                 .filter(|d| d.join("project.json").is_file())
         })
-        .ok_or("작품 폴더를 정해 주세요 (project 인자, 또는 서버를 켤 때 --project)")?;
+        .ok_or("작품 폴더를 정해 주세요 (project 인자, 서버나 writer 명령의 --project, 또는 작품 폴더 안에서 실행)")?;
     if !root.join("project.json").is_file() {
         return Err(format!(
             "작품 폴더가 아님 (project.json 없음): {}",
@@ -418,13 +424,10 @@ fn report(
 }
 
 fn check_doc(root: &Path, args: &Value) -> Outcome {
-    match (str_arg(args, "id"), str_arg(args, "text")) {
-        (Some(id), _) => Ok(review::full(&to_text(
-            &doc::load(root, id).map_err(err)?.body,
-        ))),
-        (None, Some(text)) => Ok(review::full(text)),
-        (None, None) => Err("id나 text를 주세요".into()),
-    }
+    let id = required(args, "id")?;
+    Ok(review::full(&to_text(
+        &doc::load(root, id).map_err(err)?.body,
+    )))
 }
 
 /// Keeps the body as it is before a tool changes it, unless the newest record

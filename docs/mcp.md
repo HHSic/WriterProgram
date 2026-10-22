@@ -6,7 +6,7 @@
 
 ## 설치와 연결
 
-Windows 설치판은 `writer-mcp.exe`를 앱 옆에 함께 설치한다. 작품을 열고 **작품 설정 → 기본 → AI 도우미 연결**에서 **명령 복사**를 누르면 그 작품에 맞춘 명령이 복사된다. Claude Code를 쓰는 터미널에 붙여 넣는다.
+Windows 설치판은 `writer-mcp.exe`와 터미널 명령 `writer.exe`([cli.md](cli.md))를 앱 옆에 함께 설치한다. 작품을 열고 **작품 설정 → 기본 → AI 도우미 연결**에서 **명령 복사**를 누르면 그 작품에 맞춘 명령이 복사된다. Claude Code를 쓰는 터미널에 붙여 넣는다.
 
 ```bash
 claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve --project "G:\내 드라이브\소설\사흘째 맑음"
@@ -46,13 +46,13 @@ claude mcp add --scope user writerprogram -- "<앱 폴더>\writer-mcp.exe" serve
 
 MCP 프롬프트 `candidates`(문장·대사 후보 3개), `check`(회차 점검 리포트), `interpret`(회차 해석)도 있다. Claude Code에서는 `/mcp__writerprogram__candidates`처럼 부른다.
 
-명령줄에서는 `writer-mcp call <도구> '<JSON 인자>' [--project <폴더>]`로 같은 도구를 부른다. 인자 자리에 `-`를 주면 표준 입력에서 JSON을 읽는다. `writer-mcp tools`는 도구 목록을 보인다.
+명령줄에서는 `writer` 명령으로 같은 도구를 셸 명령처럼 부른다(`writer help`, `writer write <회차> append --pov … < 장면.md`). [cli.md](cli.md). 낮은 단계로는 `writer-mcp call <도구> '<JSON 인자>' [--project <폴더>]`도 된다. 인자 자리에 `-`를 주면 표준 입력에서 JSON을 읽는다. `writer-mcp tools`는 도구 목록을 보인다.
 
 ## 작문 지침 (kfiction)
 
 kfiction 플러그인의 `skills/kfiction/SKILL.md`와 `references/` 여섯 개를 빌드할 때 `writer-mcp`에 넣는다(`guide.rs`, `include_str!`). 원본은 플러그인 파일 하나이고, 플러그인 전용 부분(명령줄 점검기, hook, 참고 문서 링크)만 이 도구들에 맞게 바꾼다. 플러그인을 깔지 않고 서버만 연결해도 같은 지침이 적용된다.
 
-- 서버(`serve`)는 이번 연결에서 `guide`를 한 번 읽기 전에는 회차 본문을 쓰지 않는다. 연결할 때 주는 안내에도 먼저 읽으라고 적었다. 명령줄 `call`은 사람이 쓰므로 묻지 않는다.
+- 서버(`serve`)는 이번 연결에서 `guide`를 한 번 읽기 전에는 회차 본문을 쓰지 않는다. 연결할 때 주는 안내에도 먼저 읽으라고 적었다. 명령줄 `writer-mcp call`은 사람이 쓰므로 묻지 않는다. `writer` 명령은 묻는다([cli.md](cli.md) "지침 읽기").
 - SKILL.md 문장을 바꾸면 `guide.rs`의 시험이 플러그인 전용 표현(`hook`, `references/`, `CLAUDE_PLUGIN_ROOT`)이 남았는지 확인한다.
 
 ## 맥락 메모

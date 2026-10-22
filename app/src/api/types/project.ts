@@ -147,3 +147,12 @@ export interface ProjectPatch {
   /** null takes the platform away. */
   platform?: Platform | null;
 }
+
+/** The `writer` command next to the app (docs/cli.md). */
+export interface CliCommand {
+  path: string;
+  /** Its folder is on the user's PATH: a terminal finds `writer` by name. */
+  on: boolean;
+  /** PATH can be changed from the app (Windows). */
+  canChange: boolean;
+}

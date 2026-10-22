@@ -46,7 +46,7 @@ import type {
   ProofWritten,
 } from './journal';
 import type { NewNote, Note } from './notes';
-import type { NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem, RecoverWay, Recovery } from './project';
+import type { CliCommand, NewProject, Overview, ProjectInfo, ProjectPatch, ProjectSizes, RecentItem, RecoverWay, Recovery } from './project';
 import type { RescueContent, RescueFile } from './rescue';
 import type { DocOptions, ExportItem, FileKind, ReplaceOutcome, SearchQuery, SearchResult, TextOptions } from './search-export';
 import type { UpdateInfo, UpdateProgress } from './update';
@@ -111,6 +111,10 @@ export interface Backend {
   projectSize(root: string): Promise<ProjectSizes>;
   /** writer-mcp installed next to the app, for connecting an AI assistant (docs/mcp.md); null when absent. */
   mcpServer(): Promise<string | null>;
+  /** The `writer` command next to the app and whether it is on PATH (docs/cli.md); null when absent. */
+  cliCommand(): Promise<CliCommand | null>;
+  /** Puts the app's folder on the user's PATH or takes it off (Windows). */
+  cliPathSet(on: boolean): Promise<CliCommand | null>;
   /** 작품 해석 of a chapter, placed in its text as it is now; null when not read yet. */
   interpretLoad(root: string, docId: string): Promise<InterpretView | null>;
   /** Keeps the writer's changes to a reading (its own chapter's, or the one a link starts from). */

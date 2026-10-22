@@ -6219,6 +6219,7 @@ dependencies = [
  "windows-native-keyring-store",
  "writer-ai",
  "writer-core",
+ "writer-mcp",
  "writer-sync",
 ]
 
@@ -6269,6 +6270,7 @@ dependencies = [
  "regex",
  "serde_json",
  "tempfile",
+ "windows-sys 0.61.2",
  "writer-core",
 ]
 

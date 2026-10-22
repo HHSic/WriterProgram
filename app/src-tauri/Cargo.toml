@@ -31,6 +31,8 @@ writer-ai = { path = "../../crates/ai" }
 ureq = "3"
 writer-core = { path = "../../crates/core" }
 writer-sync = { path = "../../crates/sync" }
+# The `writer` command's PATH registration (작품 설정 → AI 도우미 연결).
+writer-mcp = { path = "../../crates/mcp" }
 tauri-plugin-updater = "2"
 time = { version = "0.3", features = ["formatting"] }
 
