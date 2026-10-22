@@ -12,7 +12,10 @@ const mock = vi.hoisted(() => ({
     interpret: null as { docId: string; view: InterpretView | null } | null,
     interpretPick: null as { docId: string; block: number; offset: number; sentence?: { block: number; start: number; end: number; text: string } | null } | null,
     interpretLinking: null as { fromDoc: string; fromId: string; fromQuote: string; kind: string; note: string } | null,
+    interpretLengths: false,
+    rhythmCount: null as { docId: string; sentences: number; mean: number; long: number; shortRuns: number } | null,
   },
+  lengths: vi.fn(),
   load: vi.fn(),
   pick: vi.fn(),
   jump: vi.fn(),
@@ -39,6 +42,7 @@ vi.mock('../store', () => ({
   startLinking: mock.startLinking,
   finishLinking: mock.finishLinking,
   setLinking: vi.fn(),
+  setInterpretLengths: mock.lengths,
   cancelLinking: vi.fn(),
 }));
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -76,6 +80,8 @@ beforeEach(() => {
   mock.state.interpret = { docId: 'd1', view };
   mock.state.interpretPick = null;
   mock.state.interpretLinking = null;
+  mock.state.interpretLengths = false;
+  mock.state.rhythmCount = null;
   mock.save.mockResolvedValue(true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -205,4 +211,64 @@ it('links the sentence picked while 연결 추가 is under way', async () => {
   expect(document.body.textContent).toContain('이을 문장“비가 왔다.”');
   await act(async () => buttonWith('이 문장과 잇기').click());
   expect(mock.finishLinking).toHaveBeenCalledWith('d1', target);
+});
+
+const rhythmic: InterpretView = {
+  ...view,
+  reading: {
+    ...view.reading,
+    rhythm: '망설이는 동작은 길게, 결정은 짧게 끊었다.',
+    sentences: view.reading.sentences.map((x) =>
+      x.id === 'a'
+        ? { ...x, rhythm: { kind: '이어지는 동작', note: '망설임이 한 문장에서 되풀이된다', advice: "'말았다'에서 끊어 결정을 세운다" } }
+        : x,
+    ),
+  },
+};
+
+it('shows what the length of a sentence does and where to cut or join', async () => {
+  mock.state.interpret = { docId: 'd1', view: rhythmic };
+  // The whole sentence clicked, though the reading quotes only part of it.
+  mock.state.interpretPick = { docId: 'd1', block: 0, offset: 4, sentence: { block: 0, start: 0, end: 20, text: '손을 뻗으려다 말았다, 비가 그칠 때까지.' } };
+  await show();
+  const text = document.body.textContent!;
+  expect(text).toContain('호흡 · 23자');
+  expect(text).toContain('이어지는 동작');
+  expect(text).toContain("끊거나 잇기'말았다'에서 끊어 결정을 세운다");
+});
+
+it('sums up the rhythm of the chapter with the places to cut or join', async () => {
+  mock.state.interpret = { docId: 'd1', view: rhythmic };
+  await show();
+  const text = document.body.textContent!;
+  expect(text).toContain('망설이는 동작은 길게, 결정은 짧게 끊었다.');
+  expect(text).toContain('호흡을 읽은 문장 1개 · 끊거나 이을 곳 1');
+});
+
+it('lets the writer read the rhythm of a sentence', async () => {
+  mock.state.interpretPick = { docId: 'd1', block: 0, offset: 4 };
+  await show();
+  await act(async () => buttonWith('고치기').click());
+  const select = [...document.querySelectorAll('select')].at(-1)!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, '충격');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const note = [...document.querySelectorAll('textarea')].at(-2)!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(note, ' 짧게 끊어 멈춘다 ');
+    note.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => buttonWith('저장').click());
+  expect(mock.save).toHaveBeenCalledWith('d1', expect.objectContaining({ rhythm: { kind: '충격', note: '짧게 끊어 멈춘다', advice: undefined } }));
+});
+
+it('turns 길이 보기 on and shows the counts', async () => {
+  await show();
+  await act(async () => buttonWith('길이 보기').click());
+  expect(mock.lengths).toHaveBeenCalledWith(true);
+  mock.state.interpretLengths = true;
+  mock.state.rhythmCount = { docId: 'd1', sentences: 71, mean: 23, long: 0, shortRuns: 3 };
+  await show();
+  expect(document.body.textContent).toContain('지문 71문장 · 평균 23자 · 긴 문장 0개 · 짧게 이어진 곳 3곳');
 });

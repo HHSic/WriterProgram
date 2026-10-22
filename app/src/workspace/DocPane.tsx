@@ -14,6 +14,7 @@ import { setWhitespaceMarks } from '../editor/marks';
 import { setAutoType } from '../editor/autoType';
 import { setFocusLook } from '../editor/focus';
 import { cursorPlace, placeAt, sentenceAt, setInterpretMarks } from '../editor/interpret';
+import { countRhythm, setRhythmMarks } from '../editor/rhythm';
 import { blocksFromNode, countBlocks, countChars } from '../editor/counts';
 import { manuscriptExtensions } from '../editor/extensions';
 import { showMatch } from '../editor/search';
@@ -210,6 +211,30 @@ function LoadedDoc({ root, data, tabKey, locked }: { root: string; data: DocData
     const current = pick ? (placeAt(places, pick.block, pick.offset)?.id ?? null) : null;
     setInterpretMarks(editor, { places, current });
   }, [editor, interpretMode, interpret, pick]);
+
+  // 길이 보기: long sentences and runs of short ones, counted again as the text changes.
+  const lengths = useApp((s) => s.interpretLengths);
+  useEffect(() => {
+    setRhythmMarks(editor, lengths);
+    if (!lengths) return;
+    const count = () => {
+      if (!isFocusedTab(tabKey)) return;
+      const c = countRhythm(editor.state.doc);
+      useApp.setState({ rhythmCount: { docId, sentences: c.sentences, mean: c.mean, long: c.long.length, shortRuns: c.shortRuns.length } });
+    };
+    count();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const later = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+      if (!transaction.docChanged) return;
+      clearTimeout(timer);
+      timer = setTimeout(count, 400);
+    };
+    editor.on('update', later);
+    return () => {
+      clearTimeout(timer);
+      editor.off('update', later);
+    };
+  }, [editor, lengths, docId, tabKey]);
 
   // The manuscript format's first-line rules, for chapters (planning documents follow no rules).
   const rules = useApp((s) => s.overview!.project.manuscriptFormat.indentRules);

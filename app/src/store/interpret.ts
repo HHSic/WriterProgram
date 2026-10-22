@@ -13,12 +13,18 @@ export function setInterpretMode(on: boolean) {
   set(
     on
       ? { interpretMode: true, rightOpen: true, rightTab: 'interpret' }
-      : { interpretMode: false, interpretPick: null, interpretLinking: null },
+      : { interpretMode: false, interpretPick: null, interpretLinking: null, interpretLengths: false },
   );
 }
 
 export function toggleInterpretMode() {
   setInterpretMode(!get().interpretMode);
+}
+
+/** 길이 보기 on or off; on turns 해석 모드 on too. */
+export function setInterpretLengths(on: boolean) {
+  if (on) setInterpretMode(true);
+  set({ interpretLengths: on, ...(on ? {} : { rhythmCount: null }) });
 }
 
 /** Loads the open chapter's reading. A newer call (or save) wins over a slower older one. */

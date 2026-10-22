@@ -68,6 +68,37 @@ impl Link {
     }
 }
 
+/// What a sentence's length does in the scene (리듬 읽기): why it runs long
+/// or stops short, and whether cutting or joining would serve it better.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Rhythm {
+    /// One of [`RHYTHMS`], or the reader's own words.
+    pub kind: String,
+    /// What the length does here, in a line.
+    #[serde(default)]
+    pub note: String,
+    /// Where to cut or what to join, with the line as it would read; none
+    /// when the length serves the scene.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advice: Option<String>,
+}
+
+/// Why a sentence is long, or short, as the kfiction guide names it.
+pub const RHYTHMS: [&str; 11] = [
+    "이어지는 동작",
+    "멈추지 못하는 생각",
+    "쌓이는 감각",
+    "흘러가는 시간",
+    "숨을 모으는 대목",
+    "정보를 한꺼번에 넘김",
+    "이유 없이 김",
+    "충격",
+    "결정",
+    "깨달음",
+    "침묵",
+];
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SentenceReading {
@@ -90,6 +121,9 @@ pub struct SentenceReading {
     /// For the writer to judge, not a verdict.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unclear: Option<String>,
+    /// Why it is as long as it is (리듬 읽기).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rhythm: Option<Rhythm>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -119,6 +153,10 @@ pub struct Reading {
     pub scenes: Vec<SceneReading>,
     #[serde(default)]
     pub sentences: Vec<SentenceReading>,
+    /// The chapter's rhythm in a few lines: where it runs long, where it
+    /// stops short, and whether that serves the scenes.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub rhythm: String,
     /// When the writer last changed it in the app.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edited: Option<String>,
@@ -436,6 +474,7 @@ pub fn load(root: &Path, doc_id: &str) -> Result<Option<ReadingView>> {
         summary: String::new(),
         scenes: Vec::new(),
         sentences: Vec::new(),
+        rhythm: String::new(),
         edited: None,
     });
     let mut places = Vec::new();
@@ -548,6 +587,7 @@ mod tests {
             intent: String::new(),
             links,
             unclear: None,
+            rhythm: None,
         }
     }
 
@@ -560,6 +600,7 @@ mod tests {
             summary: String::new(),
             scenes: vec![],
             sentences,
+            rhythm: String::new(),
             edited: None,
         }
     }
@@ -717,5 +758,39 @@ mod tests {
         assert_eq!(view.reading.sentences[0].meaning, "작가가 고친 뜻");
         assert_eq!(view.gone, ["b"]);
         assert!(!view.changed);
+    }
+
+    #[test]
+    fn a_rhythm_reading_is_kept_and_old_files_still_read() {
+        let (_dir, root, ids) = project_with(&["손을 뻗었다가 거두고 다시 뻗었다."]);
+        let id = &ids[0];
+        let mut s = sentence("a", 0, "손을 뻗었다가 거두고 다시 뻗었다.", vec![]);
+        s.rhythm = Some(Rhythm {
+            kind: "이어지는 동작".into(),
+            note: "망설임이 한 문장 안에서 되풀이된다".into(),
+            advice: None,
+        });
+        let mut r = reading(id, vec![s]);
+        r.rhythm = "망설이는 동작은 길게, 결정은 짧게.".into();
+        save(&root, r).unwrap();
+        let back = load(&root, id).unwrap().unwrap().reading;
+        assert_eq!(back.rhythm, "망설이는 동작은 길게, 결정은 짧게.");
+        assert_eq!(
+            back.sentences[0].rhythm.as_ref().unwrap().kind,
+            "이어지는 동작"
+        );
+
+        // A reading written before 리듬 읽기 has neither field.
+        let file = path(&root, id).unwrap();
+        let mut json: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+        json.as_object_mut().unwrap().remove("rhythm");
+        json["sentences"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("rhythm");
+        fs::write(&file, json.to_string()).unwrap();
+        let old = load(&root, id).unwrap().unwrap().reading;
+        assert!(old.rhythm.is_empty() && old.sentences[0].rhythm.is_none());
     }
 }

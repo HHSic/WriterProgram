@@ -36,6 +36,7 @@ function sample(docId: string, first: string | undefined): Interpretation {
     rev: '',
     made: now(),
     by: 'Claude',
+    rhythm: '짧은 문장으로 닫힌 시간(삼 년)을 세우고, 손님이 들어오는 대목에서 처음 길게 잇는다. 봉투 문장은 끊어 세울 수도 있다.',
     summary: '닫으려던 문을 다시 여는 이야기다. 서하가 지켜 온 규칙(열한 시 폐점)이 처음 깨지는 밤이고, 그 틈으로 할머니의 시간이 들어온다.',
     scenes: [
       { block: 0, title: '닫히지 않은 문', purpose: '삼 년 동안 지켜 온 폐점 시간을 처음 어기게 만든다. 이 장면이 없으면 손님은 그냥 손님이다.' },
@@ -50,11 +51,17 @@ function sample(docId: string, first: string | undefined): Interpretation {
       {
         id: 's2', block: 0, quote: '적어도 지난 삼 년 동안은 그랬다.', roles: ['복선', '시점'],
         meaning: '삼 년 전에 무언가가 있었다. 서하는 그 해를 세고 있다.', intent: '말하지 않은 과거를 숫자 하나로 남긴다.',
+        rhythm: { kind: '깨달음', note: '앞 문장을 짧게 한 번 더 받아 삼 년이라는 숫자만 남긴다.' },
         links: [{ to: 's5', kind: '회수', note: '바랜 대여 카드가 그 이전의 시간을 꺼낸다' }],
       },
       {
         id: 's3', block: 1, quote: '품에 안은 종이봉투만은 이상하리만치 말라 있었다', roles: ['이미지', '긴장'],
         meaning: '남자에게는 젖은 자기 몸보다 봉투가 중요하다.', intent: '봉투를 장면의 중심에 놓는다. 독자가 봉투를 보게 한다.',
+        rhythm: {
+          kind: '숨을 모으는 대목',
+          note: '젖은 남자에서 마른 봉투로 시선을 한 문장 안에서 옮기며 봉투를 끝에 세운다.',
+          advice: "'젖어 있었고,'에서 끊어 '품에 안은 종이봉투만은 이상하리만치 말라 있었다.'를 따로 세우면 봉투가 더 또렷해진다. 지금도 맞으니 작가가 고른다.",
+        },
         links: [{ to: 's5', kind: '회수', note: '봉투 안에서 나온 것' }],
       },
       {

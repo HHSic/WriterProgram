@@ -23,6 +23,7 @@ export { setFocusMode, toggleFocusMode } from './focus';
 export {
   setInterpretMode,
   toggleInterpretMode,
+  setInterpretLengths,
   loadInterpretation,
   pickSentence,
   emptyReading,

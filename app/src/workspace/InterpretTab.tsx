@@ -5,8 +5,9 @@
 // out, read a sentence themselves and link sentences, also across chapters.
 
 import { useEffect, useState } from 'react';
-import type { InterpretIncoming, InterpretPlace, InterpretRemote, InterpretSentence, InterpretSpot, InterpretView } from '../api/types';
+import type { InterpretIncoming, InterpretPlace, InterpretRemote, InterpretRhythm, InterpretSentence, InterpretSpot, InterpretView } from '../api/types';
 import { placeAt } from '../editor/interpret';
+import { LONG, SHORT, SHORT_RUN } from '../editor/rhythm';
 import { timeLabel } from '../lib/format';
 import {
   cancelLinking,
@@ -20,6 +21,7 @@ import {
   removeLink,
   removeSentence,
   saveSentence,
+  setInterpretLengths,
   setInterpretMode,
   setLinking,
   startLinking,
@@ -29,6 +31,8 @@ import {
 /** What a sentence can do, as the kfiction guide names them (references/reading.md). */
 export const ROLES = ['복선', '회수', '인물', '관계', '긴장', '정보', '분위기', '이미지', '리듬', '전환', '주제', '시점'];
 const KINDS = ['회수', '복선', '같은 이미지', '대비', '변화', '되풀이'];
+/** Why a sentence is as long as it is (리듬 읽기; RHYTHMS in crates/core/src/reading.rs). */
+export const RHYTHMS = ['이어지는 동작', '멈추지 못하는 생각', '쌓이는 감각', '흘러가는 시간', '숨을 모으는 대목', '정보를 한꺼번에 넘김', '이유 없이 김', '충격', '결정', '깨달음', '침묵'];
 
 function emptyView(docId: string): InterpretView {
   return { reading: emptyReading(docId), read: false, places: [], gone: [], changed: false, remote: [], incoming: [] };
@@ -40,6 +44,8 @@ export function InterpretTab({ docId }: { docId: string }) {
   const loaded = useApp((s) => (s.interpret?.docId === docId ? s.interpret : null));
   const pick = useApp((s) => (s.interpretPick?.docId === docId ? s.interpretPick : null));
   const linking = useApp((s) => s.interpretLinking);
+  const lengths = useApp((s) => s.interpretLengths);
+  const counted = useApp((s) => (s.rhythmCount?.docId === docId ? s.rhythmCount : null));
   const [draft, setDraft] = useState<InterpretSentence | null>(null);
 
   // With the mode on, the document pane loads it (it needs it for the marks).
@@ -55,6 +61,22 @@ export function InterpretTab({ docId }: { docId: string }) {
         해석 모드 {mode ? '끄기' : '켜기'}
       </button>
       <small className="hint">{mode ? '문장을 누르면 그 문장의 해석이 여기 나옵니다.' : '켜고 문장을 누르면 그 문장의 해석과 연결된 문장이 나옵니다.'}</small>
+      <div className="interpret-lengths">
+        <button type="button" className={`btn small${lengths ? ' dark' : ''}`} aria-pressed={lengths} onClick={() => setInterpretLengths(!lengths)}>
+          길이 보기
+        </button>
+        {lengths && (
+          <small className="hint">
+            <span className="rhythm-long">긴 문장</span>(지문 {LONG}자 이상) · <span className="rhythm-short">짧은 문장이 이어진 곳</span>({SHORT}자 이하 {SHORT_RUN}개 이상)
+            {counted && (
+              <>
+                <br />
+                지문 {counted.sentences}문장 · 평균 {counted.mean}자 · 긴 문장 {counted.long}개 · 짧게 이어진 곳 {counted.shortRuns}곳
+              </>
+            )}
+          </small>
+        )}
+      </div>
     </div>
   );
 
@@ -85,7 +107,18 @@ export function InterpretTab({ docId }: { docId: string }) {
       />
     );
   } else if (sentence && current) {
-    body = <SentenceCard docId={docId} view={view} sentence={sentence} go={go} goHere={goHere} edit={() => setDraft(structuredClone(sentence))} />;
+    const length = pick?.sentence ? [...pick.sentence.text].length : null;
+    body = (
+      <SentenceCard
+        docId={docId}
+        view={view}
+        sentence={sentence}
+        length={length}
+        go={go}
+        goHere={goHere}
+        edit={() => setDraft(structuredClone(sentence))}
+      />
+    );
   } else if (pick && mode) {
     const target = pick.sentence ?? null;
     body = (
@@ -222,7 +255,10 @@ function SentenceForm({
         e.preventDefault();
         setBusy(true);
         const unclear = s.unclear?.trim();
-        await onSave({ ...s, meaning: s.meaning.trim(), intent: s.intent.trim(), unclear: unclear || undefined });
+        const rhythm: InterpretRhythm | undefined = s.rhythm?.kind.trim()
+          ? { kind: s.rhythm.kind.trim(), note: s.rhythm.note.trim(), advice: s.rhythm.advice?.trim() || undefined }
+          : undefined;
+        await onSave({ ...s, meaning: s.meaning.trim(), intent: s.intent.trim(), unclear: unclear || undefined, rhythm });
         setBusy(false);
       }}
     >
@@ -247,6 +283,32 @@ function SentenceForm({
         <span className="field-label">의도가 흐릴 수 있음</span>
         <textarea rows={2} value={s.unclear ?? ''} placeholder="비워 두면 흐리지 않은 문장" onChange={(e) => setS({ ...s, unclear: e.target.value })} />
       </label>
+      <label className="field">
+        <span className="field-label">호흡</span>
+        <select value={s.rhythm?.kind ?? ''} onChange={(e) => setS({ ...s, rhythm: { note: '', ...s.rhythm, kind: e.target.value } })}>
+          <option value="">읽지 않음</option>
+          {[...new Set([...RHYTHMS, ...(s.rhythm?.kind ? [s.rhythm.kind] : [])])].map((k) => (
+            <option key={k}>{k}</option>
+          ))}
+        </select>
+      </label>
+      {s.rhythm?.kind && (
+        <>
+          <label className="field">
+            <span className="field-label">길이가 하는 일</span>
+            <textarea rows={2} value={s.rhythm.note} onChange={(e) => setS({ ...s, rhythm: { ...s.rhythm!, note: e.target.value } })} />
+          </label>
+          <label className="field">
+            <span className="field-label">끊거나 잇기</span>
+            <textarea
+              rows={2}
+              value={s.rhythm.advice ?? ''}
+              placeholder="길이가 장면에 맞으면 비워 둔다"
+              onChange={(e) => setS({ ...s, rhythm: { ...s.rhythm!, advice: e.target.value } })}
+            />
+          </label>
+        </>
+      )}
       <div className="interpret-actions">
         <button type="submit" className="btn small primary" disabled={busy}>
           {isNew ? '해석 남기기' : '저장'}
@@ -263,6 +325,7 @@ function SentenceCard({
   docId,
   view,
   sentence,
+  length,
   go,
   goHere,
   edit,
@@ -270,6 +333,8 @@ function SentenceCard({
   docId: string;
   view: InterpretView;
   sentence: InterpretSentence;
+  /** Length of the whole sentence clicked, the quote being maybe a part of it. */
+  length: number | null;
   go: Go;
   goHere: GoHere;
   edit: () => void;
@@ -348,6 +413,7 @@ function SentenceCard({
           {sentence.unclear}
         </p>
       )}
+      {sentence.rhythm && <RhythmNote rhythm={sentence.rhythm} length={length} />}
       {count > 0 && (
         <>
           <h4>연결된 문장</h4>
@@ -386,6 +452,24 @@ function SentenceCard({
         )}
       </div>
     </section>
+  );
+}
+
+/** 리듬 읽기 of one sentence: what its length does, and a cut or join when one would serve. */
+function RhythmNote({ rhythm, length }: { rhythm: InterpretRhythm; length: number | null }) {
+  return (
+    <div className="interpret-rhythm">
+      <p>
+        <span className="interpret-label">호흡{length ? ` · ${length}자` : ''}</span>
+        <span className="chip interpret-rhythm-kind">{rhythm.kind}</span> {rhythm.note}
+      </p>
+      {rhythm.advice && (
+        <p className="interpret-advice">
+          <span className="interpret-label">끊거나 잇기</span>
+          {rhythm.advice}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -454,6 +538,8 @@ function Overview({ view, go, goHere }: { view: InterpretView; go: Go; goHere: G
     .flatMap((s) => s.links.filter((l) => !l.doc).map((l) => ({ from: s, to: byId.get(l.to), kind: l.kind })))
     .filter((p) => p.to);
   const unclear = reading.sentences.filter((s) => s.unclear);
+  const rhythmic = reading.sentences.filter((s) => s.rhythm);
+  const advised = rhythmic.filter((s) => s.rhythm!.advice);
   const sentenceButton = (s: InterpretSentence) => {
     const place = view.places.find((p) => p.id === s.id);
     return place ? (
@@ -514,6 +600,28 @@ function Overview({ view, go, goHere }: { view: InterpretView; go: Go; goHere: G
               <IncomingRow key={`i${l.doc}${l.from}${l.kind}${l.quote}`} docId={reading.doc} link={l} go={go} showHere />
             ))}
           </ul>
+        </>
+      )}
+      {(reading.rhythm || rhythmic.length > 0) && (
+        <>
+          <h4>리듬</h4>
+          {reading.rhythm && <p className="interpret-summary">{reading.rhythm}</p>}
+          {advised.length > 0 && (
+            <ul className="interpret-links">
+              {advised.map((s) => (
+                <li key={s.id}>
+                  {sentenceButton(s)}
+                  <small className="hint">
+                    <span className="interpret-kind">{s.rhythm!.kind}</span>
+                    {s.rhythm!.advice}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="meta">
+            호흡을 읽은 문장 {rhythmic.length}개{advised.length ? ` · 끊거나 이을 곳 ${advised.length}` : ''}
+          </p>
         </>
       )}
       {view.read && (

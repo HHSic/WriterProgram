@@ -22,6 +22,16 @@ export interface InterpretSentence {
   links: InterpretLink[];
   /** Why the sentence seems to do little, for the writer to judge. */
   unclear?: string;
+  /** 리듬 읽기: what its length does in the scene. */
+  rhythm?: InterpretRhythm;
+}
+
+export interface InterpretRhythm {
+  /** 이어지는 동작, 쌓이는 감각, 충격 … (RHYTHMS in crates/core/src/reading.rs). */
+  kind: string;
+  note: string;
+  /** Where to cut or what to join, with the line rewritten; absent when the length serves. */
+  advice?: string;
 }
 
 export interface InterpretScene {
@@ -39,6 +49,8 @@ export interface Interpretation {
   summary: string;
   scenes: InterpretScene[];
   sentences: InterpretSentence[];
+  /** The chapter's rhythm in a few lines (리듬 읽기). */
+  rhythm?: string;
   /** When the writer last changed it in the app. */
   edited?: string;
 }

@@ -9,6 +9,7 @@ use writer_core::doc;
 use writer_core::markup::Block;
 use writer_core::reading::{self, Reading};
 
+use crate::check::text::{self as prose, sentences};
 use crate::guide;
 use crate::tools::{Outcome, err, required, tool};
 
@@ -16,7 +17,7 @@ pub fn list() -> Vec<Value> {
     vec![
         tool(
             "paragraphs",
-            "작품 해석용: 회차 본문을 문단 번호([0], [1], …)와 함께 보인다. 장면 나눔도 번호를 차지한다. save_reading의 block은 이 번호다.",
+            "작품 해석용: 회차 본문을 문단 번호([0], [1], …)와 함께 보인다. 장면 나눔도 번호를 차지한다. save_reading의 block은 이 번호다. 끝에 리듬 읽기용으로 60자 이상 지문 문장과 짧은 지문 문장이 이어지는 곳을 센 것을 붙인다.",
             json!({"id": {"type": "string"}}),
             &["id"],
         ),
@@ -26,6 +27,7 @@ pub fn list() -> Vec<Value> {
             json!({
                 "id": {"type": "string", "description": "회차 id"},
                 "summary": {"type": "string", "description": "회차가 밑바닥에서 묻는 것, 두세 문장"},
+                "rhythm": {"type": "string", "description": "리듬 읽기: 회차의 호흡을 두세 줄로. 어디서 길게 잇고 어디서 짧게 끊는지, 그것이 장면에 맞는지"},
                 "scenes": {"type": "array", "items": {"type": "object", "properties": {
                     "block": {"type": "integer"}, "title": {"type": "string"}, "purpose": {"type": "string"}},
                     "required": ["block", "title", "purpose"]}},
@@ -43,7 +45,12 @@ pub fn list() -> Vec<Value> {
                         "doc": {"type": "string", "description": "다른 회차로 이을 때 그 회차 id. 그 회차가 아직 해석되지 않았어도 된다"},
                         "quote": {"type": "string", "description": "다른 회차로 이을 때 그 회차 본문 그대로의 문장"}},
                         "required": ["kind"]}},
-                    "unclear": {"type": "string", "description": "의도가 흐려 보이면 그 이유. 작가가 판단한다"}},
+                    "unclear": {"type": "string", "description": "의도가 흐려 보이면 그 이유. 작가가 판단한다"},
+                    "rhythm": {"type": "object", "description": "리듬 읽기: 이 문장의 길이가 장면에서 하는 일", "properties": {
+                        "kind": {"type": "string", "enum": ["이어지는 동작", "멈추지 못하는 생각", "쌓이는 감각", "흘러가는 시간", "숨을 모으는 대목", "정보를 한꺼번에 넘김", "이유 없이 김", "충격", "결정", "깨달음", "침묵"]},
+                        "note": {"type": "string", "description": "길이가 여기서 하는 일, 한 줄"},
+                        "advice": {"type": "string", "description": "끊거나 잇는 편이 나을 때만: 어디서 끊을지(또는 무엇과 이을지)와 고친 문장"}},
+                        "required": ["kind", "note"]}},
                     "required": ["id", "block", "quote", "roles", "meaning", "intent"]}},
                 "overwrite": {"type": "boolean", "description": "작가가 앱에서 고친 해석을 덮어쓸 때만 true. 먼저 reading으로 보고 작가에게 묻는다"},
             }),
@@ -82,7 +89,70 @@ fn paragraphs(root: &Path, args: &Value) -> Outcome {
             Block::Paragraph { .. } => out.push(format!("[{i}] {}", text.replace('\n', " / "))),
         }
     }
+    out.push(String::new());
+    out.extend(rhythm_lines(&d.body, &texts));
     Ok(Value::String(out.join("\n")))
+}
+
+/// A narration sentence of this many characters or more is long, of
+/// [`SHORT`] or fewer short (the kfiction guide's 문체 카드 and check F13).
+const LONG: usize = 60;
+const SHORT: usize = 20;
+/// Short sentences in a row that make a stretch worth reading.
+const SHORT_RUN: usize = 4;
+
+/// For 리듬 읽기: the chapter's narration sentences counted, the long ones,
+/// and the stretches of short ones, by paragraph number.
+fn rhythm_lines(body: &[Block], texts: &[String]) -> Vec<String> {
+    let mut all: Vec<(usize, String)> = Vec::new();
+    for (i, (block, text)) in body.iter().zip(texts).enumerate() {
+        if !matches!(block, Block::Paragraph { .. }) {
+            continue;
+        }
+        for p in prose::paragraphs(text).into_iter().filter(|p| !p.excluded) {
+            all.extend(sentences(&p.narration).into_iter().map(|s| (i, s)));
+        }
+    }
+    let len = |s: &str| s.chars().count();
+    if all.is_empty() {
+        return vec!["[리듬] 지문 문장이 없음".into()];
+    }
+    let total: usize = all.iter().map(|(_, s)| len(s)).sum();
+    let long: Vec<&(usize, String)> = all.iter().filter(|(_, s)| len(s) >= LONG).collect();
+    let mut out = vec![format!(
+        "[리듬] 지문 {}문장 · 평균 {}자 · {LONG}자 이상 문장 {}개",
+        all.len(),
+        (total as f64 / all.len() as f64).round(),
+        long.len()
+    )];
+    for (block, s) in &long {
+        out.push(format!("- [{block}] ({}자) {s}", len(s)));
+    }
+    let mut runs: Vec<&[(usize, String)]> = Vec::new();
+    let mut start = 0;
+    for i in 0..=all.len() {
+        if i == all.len() || len(&all[i].1) > SHORT {
+            if i - start >= SHORT_RUN {
+                runs.push(&all[start..i]);
+            }
+            start = i + 1;
+        }
+    }
+    if !runs.is_empty() {
+        out.push(format!(
+            "{SHORT}자 이하 지문 문장이 {SHORT_RUN}개 이상 이어지는 곳:"
+        ));
+        for run in runs {
+            let quoted: Vec<&str> = run.iter().map(|(_, s)| s.as_str()).collect();
+            out.push(format!(
+                "- [{}] {}문장: {}",
+                run[0].0,
+                run.len(),
+                quoted.join(" ")
+            ));
+        }
+    }
+    out
 }
 
 fn save(root: &Path, args: &Value) -> Outcome {
@@ -113,6 +183,11 @@ fn save(root: &Path, args: &Value) -> Outcome {
             .map_err(|e| format!("scenes를 읽지 못함: {e}"))?,
         sentences: serde_json::from_value(args.get("sentences").cloned().unwrap_or(json!([])))
             .map_err(|e| format!("sentences를 읽지 못함: {e}"))?,
+        rhythm: args
+            .get("rhythm")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
         edited: None,
     };
     let saved = reading::save(root, reading).map_err(err)?;
@@ -126,12 +201,18 @@ fn save(root: &Path, args: &Value) -> Outcome {
         .iter()
         .filter(|s| s.unclear.is_some())
         .count();
+    let rhythm = saved
+        .sentences
+        .iter()
+        .filter(|s| s.rhythm.is_some())
+        .count();
     Ok(json!({
         "id": id,
         "scenes": saved.scenes.len(),
         "sentences": saved.sentences.len(),
         "linked": linked,
         "unclear": unclear,
+        "rhythm": rhythm,
         "note": "앱의 해석 모드에서 문장을 누르면 보인다.",
     }))
 }
@@ -174,6 +255,13 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("[1] ***\n[2] 손이 머뭇거리지 않았다."),
+            "{numbered}"
+        );
+        assert!(
+            numbered
+                .as_str()
+                .unwrap()
+                .contains("[리듬] 지문 2문장 · 평균 13자 · 60자 이상 문장 0개"),
             "{numbered}"
         );
 

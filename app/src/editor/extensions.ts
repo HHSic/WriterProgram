@@ -17,6 +17,7 @@ import { IndentRulesExtension } from './indent';
 import { WhitespaceMarks } from './marks';
 import { ParagraphMargins, SpecialSpaces } from './paragraph';
 import { InterpretHighlight } from './interpret';
+import { RhythmHighlight } from './rhythm';
 import { ReadAloudHighlight } from './readAloud';
 import { SearchHighlight } from './search';
 
@@ -205,6 +206,7 @@ export function manuscriptExtensions(sceneSymbol: string, hooks: ExtensionHooks)
     SearchHighlight,
     ReadAloudHighlight,
     InterpretHighlight,
+    RhythmHighlight,
     PageScroll,
     VerticalPages,
     FocusWriting,

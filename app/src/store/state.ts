@@ -188,6 +188,10 @@ interface AppState {
   interpretVersion: number;
   /** 연결 추가 under way: the sentence it starts from, waiting for the one to link to. */
   interpretLinking: InterpretLinking | null;
+  /** 길이 보기: long sentences and runs of short ones marked in the text (editor/rhythm.ts). */
+  interpretLengths: boolean;
+  /** The open chapter's sentence lengths, counted while 길이 보기 is on. */
+  rhythmCount: { docId: string; sentences: number; mean: number; long: number; shortRuns: number } | null;
   view: ViewSettings;
   dialog: Dialog | null;
   toast: Toast | null;
@@ -272,6 +276,8 @@ export const useApp = create<AppState>(() => ({
   interpretPick: null,
   interpretVersion: 0,
   interpretLinking: null,
+  interpretLengths: false,
+  rhythmCount: null,
   view: loadView(),
   dialog: null,
   toast: null,
