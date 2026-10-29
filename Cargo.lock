@@ -6196,7 +6196,7 @@ dependencies = [
 
 [[package]]
 name = "writer-app"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "base64 0.22.1",
  "chrono",
