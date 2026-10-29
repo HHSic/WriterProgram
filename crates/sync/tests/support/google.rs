@@ -77,6 +77,18 @@ impl Google {
         json!({ "id": id, "name": f.name, "mimeType": if f.folder { "application/vnd.google-apps.folder" } else { "application/octet-stream" }, "parents": [f.parent], "version": f.version.to_string() })
     }
 
+    /// What Drive sends back for one file: only the asked `fields`, as Drive does.
+    fn meta_with(&self, id: &str, fields: &str) -> Value {
+        let mut meta = self.meta(id);
+        if !fields.is_empty() {
+            let keep: Vec<&str> = fields.split(',').map(str::trim).collect();
+            meta.as_object_mut()
+                .unwrap()
+                .retain(|key, _| keep.contains(&key.as_str()));
+        }
+        meta
+    }
+
     fn add(&mut self, name: &str, parent: &str, folder: bool, bytes: Vec<u8>) -> String {
         self.next += 1;
         let id = format!("g{}", self.next);
@@ -147,7 +159,7 @@ impl Google {
                 true,
                 Vec::new(),
             );
-            return json_reply(200, self.meta(&id));
+            return json_reply(200, self.meta_with(&id, &fields));
         }
         if path == format!("{up}/files") && req.method == "POST" {
             assert_eq!(
@@ -180,7 +192,7 @@ impl Google {
                 false,
                 body[start..end].to_vec(),
             );
-            return json_reply(200, self.meta(&id));
+            return json_reply(200, self.meta_with(&id, &fields));
         }
         if let Some(id) = path.strip_prefix(&format!("{up}/files/")) {
             let after = self.stored() - self.files[id].bytes.len() as u64 + req.body.len() as u64;
@@ -190,7 +202,7 @@ impl Google {
             let f = self.files.get_mut(id).unwrap();
             f.bytes = req.body.clone();
             f.version += 1;
-            return json_reply(200, self.meta(id));
+            return json_reply(200, self.meta_with(id, &fields));
         }
         if let Some(id) = path.strip_prefix(&format!("{api}/files/")) {
             if let Some(file) = id.strip_suffix("/permissions") {

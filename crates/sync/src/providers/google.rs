@@ -161,6 +161,15 @@ struct File {
     version: Option<String>,
 }
 
+/// The reply to making or changing a file, asked with `fields=id` or
+/// `fields=id,version`: Drive sends only those.
+#[derive(Deserialize)]
+struct Made {
+    id: String,
+    #[serde(default)]
+    version: Option<String>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FileList {
@@ -208,7 +217,7 @@ fn make_folder(s: &Session, name: &str, parent: &str) -> Result<String> {
     if !reply.ok() {
         return Err(drive_error("드라이브에 폴더를 만들지 못함", &reply));
     }
-    Ok(reply.json::<File>()?.id)
+    Ok(reply.json::<Made>()?.id)
 }
 
 fn child_folder(s: &Session, parent: &str, name: &str) -> Result<Option<String>> {
@@ -430,7 +439,7 @@ impl Remote for GoogleRemote<'_> {
         if !reply.ok() {
             return Err(drive_error("드라이브에 올리지 못함", &reply));
         }
-        let file: File = reply.json()?;
+        let file: Made = reply.json()?;
         let version = file.version.unwrap_or_default();
         self.files.insert(
             path.to_string(),
