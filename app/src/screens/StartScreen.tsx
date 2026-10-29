@@ -76,7 +76,7 @@ export function StartScreen() {
             <Icon name="download" size={22} />
             <span>
               <strong>기존 원고 가져오기</strong>
-              <small>한글·Word·메모장에서 쓰던 원고로 새 작품을 만듭니다</small>
+              <small>한글·Word·메모장에서 쓰던 원고로 새 작품을 만듭니다. 작품 파일(.wpm)도 엽니다</small>
             </span>
           </button>
           <button type="button" className="start-big" onClick={openFolder}>

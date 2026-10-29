@@ -20,6 +20,7 @@ import {
   enterProject,
   loadNotes,
   newDocPartId,
+  openProjectFile,
   refreshOverview,
   saveEverything,
   selectDoc,
@@ -90,6 +91,11 @@ function hasSkips(s: SkipTotals): boolean {
  */
 export const BIG_CHAPTER = 50_000;
 
+/** A WriterProgram 작품 파일, which opens instead of being imported. */
+export function isProjectFile(path: string): boolean {
+  return /\.wpm$/i.test(path);
+}
+
 /** A file name without its folder and extension, as a first title. */
 export function titleFromPath(path: string): string {
   return fileName(path).replace(/\.[^.]+$/, '').trim();
@@ -142,8 +148,19 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
 
   const pick = async () => {
     try {
-      const picked = await api.pickFiles('가져올 원고 파일');
+      // From the start screen a .wpm can be picked too: it is a whole work, so it opens as it is.
+      const picked = await api.pickFiles('가져올 원고 파일', undefined, newProject);
       if (!picked.length) return;
+      const works = picked.filter(isProjectFile);
+      if (works.length) {
+        if (picked.length > 1) {
+          showToast({ text: '작품 파일(.wpm)은 원고와 섞지 말고 하나만 골라 여세요.', tone: 'error' });
+          return;
+        }
+        closeDialog();
+        await openProjectFile(works[0]);
+        return;
+      }
       setPaths((old) => [...old, ...picked.filter((p) => !old.includes(p))]);
       if (newProject && !title.trim()) setTitle(titleFromPath(picked[0]));
     } catch (e) {
@@ -287,7 +304,10 @@ export function ImportDialog({ partId, newProject = false }: { partId?: string; 
           <button type="button" className="import-drop" onClick={() => void pick()}>
             <Icon name="plus" size={18} />
             <strong>파일 고르기</strong>
-            <span>txt · md · docx · 한글(hwp, hwpx), 여러 개를 한꺼번에 고를 수 있습니다</span>
+            <span>
+              txt · md · docx · 한글(hwp, hwpx), 여러 개를 한꺼번에 고를 수 있습니다
+              {newProject && '. 작품 파일(.wpm)을 고르면 그 작품을 그대로 엽니다'}
+            </span>
           </button>
           {paths.length > 0 && (
             <ul className="import-files">

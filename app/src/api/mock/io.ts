@@ -87,7 +87,7 @@ export const ioMethods = {
     console.info('[mock] export file', { kind, dest, perDoc, format, opts, items });
     return perDoc ? items.map((i) => `${dest}\\${i.fileName}.${kind}`) : [dest];
   },
-  async pickFiles(_title, only) {
+  async pickFiles(_title, only, _projectFiles) {
     if (only) return [`C:\\Users\\작가\\Downloads\\교정본_김편집.${only.extensions[0]}`];
     return ['C:\\원고\\연재본.hwpx', 'C:\\원고\\외전.txt', 'C:\\원고\\옛 원고.hwp'];
   },

@@ -71,8 +71,15 @@ export async function saveProjectFileAs() {
 export async function pickProjectFile() {
   try {
     const files = await api.pickFiles('작품 파일 열기', { name: 'WriterProgram 작품 파일 (.wpm)', extensions: ['wpm'] });
-    const path = files[0];
-    if (!path) return;
+    if (files[0]) await openProjectFile(files[0]);
+  } catch (e) {
+    toastError('작품 파일을 열지 못함', e);
+  }
+}
+
+/** A .wpm the writer picked, here or in 기존 원고 가져오기. */
+export async function openProjectFile(path: string) {
+  try {
     if (get().overview && !(await saveEverything(true))) return;
     await openProject(path);
   } catch (e) {

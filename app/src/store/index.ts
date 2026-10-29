@@ -8,7 +8,7 @@ export { findDoc, allManuscript, saveEverything, saveNow, confirmClose, showToas
 export type { DocPlace } from './ui';
 export { registerEditor, isFocusedTab, openTarget, openDocInNewTab, activateTab, cycleTab, reorderTab, transferTab, resizeTab, closeTab, closeActiveTab, reopenClosedTab, goBack, showInTab, focusPane, splitView, unsplit, toggleLock } from './tabs';
 export { enterProject, loadCatalog, updateProject, applyFormat, openProject, recoverProject, leaveProject, refreshOverview } from './project';
-export { pickProjectFile, saveProjectFileAs, finishProjectFile } from './wpm';
+export { pickProjectFile, openProjectFile, saveProjectFileAs, finishProjectFile } from './wpm';
 export { selectDoc, mendDoc, addDoc, setStatus, setLocked, setTarget, renameDoc, moveDoc, trashDoc, addPart, renamePart, removePart } from './docs';
 export { previewCard, openCard, refreshCardCounts, createCard, patchCardSummary, trashCard } from './cards';
 export { loadNotes, focusNote, patchNote, addNote, addTextNote, showNote, trashNote, openNoteCounts } from './notes';

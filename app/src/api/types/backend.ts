@@ -271,8 +271,9 @@ export interface Backend {
   /**
    * Files to import (txt, md, docx, hwpx); empty when the writer cancels.
    * With `only`, one file of those kinds (a corrected file: hwpx, docx).
+   * With `projectFiles`, .wpm files can be picked too (opened, not imported).
    */
-  pickFiles(title: string, only?: { name: string; extensions: string[] }): Promise<string[]>;
+  pickFiles(title: string, only?: { name: string; extensions: string[] }, projectFiles?: boolean): Promise<string[]>;
   /** `extension` without the dot: txt, docx or hwpx. */
   pickSaveFile(title: string, defaultName: string, extension: string): Promise<string | null>;
   /**
