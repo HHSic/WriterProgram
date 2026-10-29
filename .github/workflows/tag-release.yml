@@ -18,7 +18,7 @@ permissions:
 
 env:
   TAG: v0.1.10
-  COMMIT: dda51c6
+  COMMIT: dda51c6baa190bc2b9ecbd090cadd5a2ba73d7ec
 
 jobs:
   windows-checks:
