@@ -73,10 +73,16 @@ pub fn check_read() -> Result<(), String> {
 
 /// The guide as the assistant reads it here.
 pub fn skill() -> String {
-    let body = SKILL
+    shaped(SKILL)
+}
+
+fn shaped(raw: &str) -> String {
+    // A Windows checkout gives the embedded files CRLF line ends.
+    let skill = raw.replace("\r\n", "\n");
+    let body = skill
         .strip_prefix("---\n")
         .and_then(|s| s.split_once("\n---\n"))
-        .map_or(SKILL, |(_, body)| body);
+        .map_or(skill.as_str(), |(_, body)| body);
     let body = match body.find("\n## 원고 점검\n") {
         Some(at) => {
             let rest = &body[at + 1..];
@@ -118,7 +124,7 @@ pub fn read(topic: Option<&str>) -> Result<String, String> {
         Some(name) => TOPICS
             .iter()
             .find(|(n, _)| *n == name)
-            .map(|(_, text)| text.to_string())
+            .map(|(_, text)| text.replace("\r\n", "\n"))
             .ok_or_else(|| format!("참고 문서가 없음: {name}")),
     }
 }
@@ -188,6 +194,13 @@ mod tests {
         ] {
             assert!(!guide.contains(gone), "{gone}");
         }
+    }
+
+    #[test]
+    fn a_windows_checkout_gives_the_same_guide() {
+        let crlf = SKILL.replace("\r\n", "\n").replace('\n', "\r\n");
+        assert_eq!(shaped(&crlf), skill());
+        assert!(!shaped(&crlf).contains("CLAUDE_PLUGIN_ROOT"));
     }
 
     #[test]
