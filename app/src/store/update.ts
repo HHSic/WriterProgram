@@ -1,6 +1,6 @@
-// New versions of the app: a quiet check once a day, a toast when one is out,
-// and the install after everything is saved (the installer closes the app and
-// opens the new version). 보기 설정 shows the version and checks on demand.
+// New versions of the app: a quiet check at every start, a toast when one is
+// out, and the install after everything is saved (the installer closes the app
+// and opens the new version). 보기 설정 shows the version and checks on demand.
 
 import { api } from '../api';
 import type { UpdateInfo } from '../api/types';
@@ -8,11 +8,10 @@ import { set } from './state';
 import { closeDialog, openDialog, saveEverything, showToast, toastError } from './ui';
 import { finishProjectFile } from './wpm';
 
-const CHECKED_KEY = 'wp.update.checked';
 const AUTO_KEY = 'wp.update.auto';
 let installing = false;
 
-/** Whether the app looks for new versions by itself (once a day). */
+/** Whether the app looks for new versions by itself (at every start). */
 export function autoUpdateCheck(): boolean {
   try {
     return localStorage.getItem(AUTO_KEY) !== 'off';
@@ -29,24 +28,14 @@ export function setAutoUpdateCheck(on: boolean) {
   }
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Looks for a new version once a day, saying nothing unless one is out. */
-export async function checkForUpdateDaily() {
+/** Looks for a new version when the app starts, saying nothing unless one is out. */
+export async function checkForUpdateOnStart() {
   if (!api.isDesktop || !autoUpdateCheck()) return;
   try {
-    if (localStorage.getItem(CHECKED_KEY) === today()) return;
-  } catch {
-    // Without storage, check every start.
-  }
-  try {
     const found = await api.updateCheck();
-    try { localStorage.setItem(CHECKED_KEY, today()); } catch { /* The check still succeeded. */ }
     if (found) offerUpdate(found);
   } catch {
-    // A failed request must not count as today's completed check.
+    // Offline or GitHub unreachable: the next start asks again.
   }
 }
 

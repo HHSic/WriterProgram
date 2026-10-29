@@ -41,4 +41,4 @@ export { startReading, pauseReading, resumeReading, stopReading, toggleReading, 
 export { loadAi, aiReady, updateAi, setAiKey, removeAiKey, askAi, putSynopsis } from './ai';
 export { offerRescues, setRescueAside, takeRescue } from './rescue';
 export { restoreRecord } from './records';
-export { autoUpdateCheck, setAutoUpdateCheck, checkForUpdateDaily, checkForUpdateNow } from './update';
+export { autoUpdateCheck, setAutoUpdateCheck, checkForUpdateOnStart, checkForUpdateNow } from './update';

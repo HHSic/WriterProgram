@@ -11,7 +11,7 @@ vi.mock('./state', () => ({ set: mock.set }));
 vi.mock('./ui', () => ({ saveEverything: mock.save, showToast: mock.toast, toastError: mock.error, openDialog: mock.open, closeDialog: mock.close }));
 vi.mock('./wpm', () => ({ finishProjectFile: mock.finish }));
 
-import { checkForUpdateDaily, checkForUpdateNow, setAutoUpdateCheck } from './update';
+import { checkForUpdateNow, checkForUpdateOnStart, setAutoUpdateCheck } from './update';
 const found: UpdateInfo = { version: '0.1.2', current: '0.1.1', notes: '작품 파일과 책 미리보기', date: null };
 beforeEach(() => {
   vi.clearAllMocks(); localStorage.clear();
@@ -29,18 +29,18 @@ async function accept() {
   return mock.open.mock.calls.at(-1)![0].onConfirm as () => Promise<void>;
 }
 
-it('checks once after a successful daily request and does not count an offline failure', async () => {
+it('asks at every start, even after a check earlier the same day, and stays quiet offline', async () => {
   mock.api.updateCheck.mockRejectedValueOnce('offline');
-  await checkForUpdateDaily(); expect(localStorage.getItem('wp.update.checked')).toBeNull();
+  await checkForUpdateOnStart();
   expect(mock.toast).not.toHaveBeenCalled(); expect(mock.error).not.toHaveBeenCalled();
-  await checkForUpdateDaily(); await checkForUpdateDaily();
-  expect(mock.api.updateCheck).toHaveBeenCalledTimes(2);
-  expect(mock.toast).toHaveBeenCalledOnce();
+  await checkForUpdateOnStart(); await checkForUpdateOnStart();
+  expect(mock.api.updateCheck).toHaveBeenCalledTimes(3);
+  expect(mock.toast).toHaveBeenCalledTimes(2);
 });
 
 it('respects disabled automatic checks and browser-only previews', async () => {
-  setAutoUpdateCheck(false); await checkForUpdateDaily();
-  setAutoUpdateCheck(true); mock.api.isDesktop = false; await checkForUpdateDaily();
+  setAutoUpdateCheck(false); await checkForUpdateOnStart();
+  setAutoUpdateCheck(true); mock.api.isDesktop = false; await checkForUpdateOnStart();
   expect(mock.api.updateCheck).not.toHaveBeenCalled();
 });
 

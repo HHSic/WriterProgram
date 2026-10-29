@@ -361,7 +361,7 @@ function VersionField() {
             setAuto(e.target.checked);
           }}
         />
-        하루 한 번 새 버전이 있는지 알아보기
+        앱을 켤 때마다 새 버전이 있는지 알아보기
       </label>
       <small className="hint">새 버전이 있는지만 GitHub에 묻습니다. 원고나 작품 정보는 보내지 않습니다.</small>
     </fieldset>

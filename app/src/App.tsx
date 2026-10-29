@@ -7,7 +7,7 @@ import { ToastHost } from './components/ToastHost';
 import { installJournal } from './editor/journal';
 import { applyColors } from './lib/colors';
 import { StartScreen } from './screens/StartScreen';
-import { checkForUpdateDaily, confirmClose, finishProjectFile, openProject, stampOnClosing, toastError, useApp } from './store';
+import { checkForUpdateOnStart, confirmClose, finishProjectFile, openProject, stampOnClosing, toastError, useApp } from './store';
 import { rescueAll, unsavedKeys } from './store/saves';
 import { CloseAskDialog } from './workspace/CloseAskDialog';
 import { DialogHost } from './workspace/dialogs';
@@ -79,8 +79,8 @@ export function App() {
         if (path) void openProject(path);
       }).catch((e) => toastError('작품 파일을 열지 못함', e));
     }
-    // A new version, looked for once a day a little after start.
-    const timer = window.setTimeout(() => void checkForUpdateDaily(), 8000);
+    // A new version, looked for at every start, a little after it.
+    const timer = window.setTimeout(() => void checkForUpdateOnStart(), 8000);
     return () => window.clearTimeout(timer);
   }, []);
 
